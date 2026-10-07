@@ -24,6 +24,40 @@ class GroceryStore {
         localStorage.setItem(this.STORAGE_KEYS.PRICE_CATALOG, JSON.stringify(window.INITIAL_PRICE_DATABASE || {}));
       }
     }
+
+    // Background sync with Supabase if available
+    this.syncWithSupabase();
+  }
+
+  async syncWithSupabase() {
+    if (!window.SupabaseHelper || !window.SupabaseHelper.isAvailable()) return;
+
+    try {
+      // 1. Sinkronisasi Budget Settings
+      const cloudBudget = await window.SupabaseHelper.getBudgetSettings();
+      if (cloudBudget && cloudBudget.monthly_budget_cap) {
+        localStorage.setItem(this.STORAGE_KEYS.BUDGET, cloudBudget.monthly_budget_cap.toString());
+        this.notify();
+      }
+
+      // Update cloud sync badge di header
+      const syncBadge = document.getElementById('cloud-sync-badge');
+      const syncText = document.getElementById('sync-text');
+      if (syncBadge && syncText) {
+        syncBadge.classList.remove('offline');
+        syncText.textContent = 'Supabase Cloud';
+        syncBadge.title = 'Terhubung ke Supabase Database';
+      }
+    } catch (e) {
+      console.warn('[GroceryStore] Supabase sync fallback to offline:', e);
+      const syncBadge = document.getElementById('cloud-sync-badge');
+      const syncText = document.getElementById('sync-text');
+      if (syncBadge && syncText) {
+        syncBadge.classList.add('offline');
+        syncText.textContent = 'Mode Lokal';
+        syncBadge.title = 'Bekerja secara offline / lokal';
+      }
+    }
   }
 
   resetToDefaults() {
@@ -190,6 +224,11 @@ class GroceryStore {
     const limit = Math.max(10000, Number(newLimit) || 500000);
     localStorage.setItem(this.STORAGE_KEYS.BUDGET, limit.toString());
     this.notify();
+
+    // Async sync ke Supabase
+    if (window.SupabaseHelper && window.SupabaseHelper.isAvailable()) {
+      window.SupabaseHelper.updateBudgetSettings(limit);
+    }
     return limit;
   }
 
@@ -241,17 +280,25 @@ class GroceryStore {
       }))
     };
 
-    // 1. Update historical database so prices become "harga_bulan_lalu" for next trips
+    // 1. Update historical database lokal so prices become "harga_bulan_lalu" for next trips
     items.forEach(item => {
       this.recordPriceInCatalog(item.nama_barang, item.harga_akhir_per_satuan);
     });
 
-    // 2. Prepend to history
+    // 2. Prepend to history lokal
     const history = this.getHistory();
     history.unshift(receipt);
     localStorage.setItem(this.STORAGE_KEYS.HISTORY, JSON.stringify(history));
 
-    // 3. Clear active cart
+    // 3. Simpan ke Supabase (Batch Insert grocery_history & grocery_items)
+    if (window.SupabaseHelper && window.SupabaseHelper.isAvailable()) {
+      window.SupabaseHelper.saveShoppingTrip(
+        { shopping_date: dateStr, total_spent: totals.runningTotal, notes: storeName },
+        receipt.items
+      );
+    }
+
+    // 4. Clear active cart
     this.clearCart();
 
     return receipt;

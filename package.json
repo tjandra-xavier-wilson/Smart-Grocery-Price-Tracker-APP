@@ -1,0 +1,25 @@
+{
+  "name": "smart-grocery-price-tracker-app",
+  "version": "1.0.0",
+  "description": "> **Aplikasi Web Mobile PWA Bergaya Native App untuk Belanja Grosir Satu-Tangan Anak Kos / Siswa Rantau.**",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tjandra-xavier-wilson/Smart-Grocery-Price-Tracker-APP.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/tjandra-xavier-wilson/Smart-Grocery-Price-Tracker-APP/issues"
+  },
+  "homepage": "https://github.com/tjandra-xavier-wilson/Smart-Grocery-Price-Tracker-APP#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2"
+  }
+}

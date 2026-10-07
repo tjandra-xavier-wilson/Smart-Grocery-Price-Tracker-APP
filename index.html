@@ -59,6 +59,10 @@
           </div>
 
           <div class="header-actions">
+            <div id="cloud-sync-badge" class="cloud-sync-pill" title="Status Supabase Sync (Klik untuk info)">
+              <span class="sync-dot"></span>
+              <span id="sync-text">Supabase</span>
+            </div>
             <button class="icon-btn-round" id="sound-toggle-btn" title="Toggle Suara & Haptik" aria-label="Toggle Suara">
               <!-- Sound icon rendered via JS -->
             </button>
@@ -447,6 +451,8 @@
   </div>
 
   <!-- Application Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./js/supabaseClient.js"></script>
   <script src="./js/sample-data.js"></script>
   <script src="./js/audio-haptics.js"></script>
   <script src="./js/calculator.js"></script>
