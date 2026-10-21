@@ -3,461 +3,760 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Smart Grocery Price Tracker &amp; Budget Safety Cap</title>
-  <meta name="description" content="Aplikasi mobile PWA belanja grosir anak kos ramah satu tangan dengan kalkulator diskon bertingkat, komparator harga unit, detektor fluktuasi harga, dan budget safety cap anti-malu di kasir.">
-  <meta name="theme-color" content="#0b1120">
+  <title>GrabMart - Belanja Sayur, Buah &amp; Kebutuhan Dapur Segar</title>
+  <meta name="description" content="Aplikasi mobile belanja kebutuhan grosir &amp; sayuran segar bergaya GrabFood &amp; GrabMart ramah satu tangan dengan harga terbaik.">
+  <meta name="theme-color" content="#00B14F">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="SakuGrosir">
+  <meta name="apple-mobile-web-app-title" content="GrabMart">
 
   <!-- PWA Manifest & Icons -->
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
 
-  <!-- Google Fonts -->
+  <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- Stylesheet -->
-  <link rel="stylesheet" href="./styles/main.css">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            grab: {
+              green: '#00B14F',
+              dark: '#008C3E',
+              hover: '#009743',
+              light: '#E6F8EE',
+              surface: '#F0FAF4',
+            },
+            charcoal: '#111827',
+            subtext: '#6B7280',
+            divider: '#F3F4F6',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+          boxShadow: {
+            'grab': '0 4px 14px 0 rgba(0, 177, 79, 0.25)',
+            'card': '0 2px 8px -1px rgba(0, 0, 0, 0.08), 0 1px 4px -1px rgba(0, 0, 0, 0.04)',
+            'float': '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+            'nav': '0 -2px 10px rgba(0, 0, 0, 0.05)',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* Mobile-first touch & scrollbar styling */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .active-press:active { transform: scale(0.96); transition: transform 0.1s ease; }
+    body { font-family: 'Inter', sans-serif; touch-action: manipulation; background-color: #0E131F; }
+  </style>
 </head>
-<body>
+<body class="text-charcoal min-h-screen flex items-center justify-center p-0 md:p-6 lg:p-10 select-none">
 
-  <!-- Desktop Wrapper: Center Viewport with High-End Ambient Frame on Laptop/PC -->
-  <div class="desktop-wrapper">
-    <div class="mobile-app-shell" id="app-shell">
+  <!-- Mobile Shell Mockup Wrapper (Centered on desktop, full-width on mobile) -->
+  <div class="w-full max-w-[430px] bg-white min-h-screen md:min-h-[890px] md:max-h-[920px] md:rounded-[44px] shadow-2xl md:ring-12 md:ring-slate-800/80 overflow-hidden flex flex-col relative" id="app-shell">
 
-      <!-- Simulated Mobile Status Bar (iOS/Android feel) -->
-      <div class="status-bar" id="mobile-status-bar">
-        <span id="status-bar-time" class="tabular-nums">09:30</span>
-        <div class="status-bar-notch"></div>
-        <div class="status-bar-icons">
-          <span>5G</span>
-          <span>●●●</span>
-          <span>🔋 96%</span>
-        </div>
+    <!-- Simulated Mobile Status Bar (iOS feel) -->
+    <div class="bg-white px-6 pt-3 pb-1 flex items-center justify-between text-xs text-charcoal font-semibold shrink-0 border-b border-gray-50">
+      <span class="font-bold tracking-tight">09:41</span>
+      <div class="w-20 h-4 bg-charcoal/10 rounded-full flex items-center justify-center">
+        <span class="w-2.5 h-2.5 bg-charcoal rounded-full"></span>
       </div>
+      <div class="flex items-center space-x-1.5 text-[11px] text-gray-700">
+        <span>5G</span>
+        <span>●●●</span>
+        <span>🔋</span>
+      </div>
+    </div>
 
-      <!-- App Header & Budget Safety Cap Monitor (F-05) -->
-      <header class="app-header" id="app-header">
-        <div class="header-top">
-          <div class="app-brand">
-            <div class="app-logo-badge">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="8" cy="21" r="1"></circle>
-                <circle cx="19" cy="21" r="1"></circle>
-                <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path>
-              </svg>
-            </div>
-            <div class="brand-text">
-              <h1>SakuGrosir</h1>
-              <span class="brand-subtitle">Budget Safety Cap</span>
-            </div>
-          </div>
+    <!-- Scrollable Main Content Container -->
+    <div class="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar bg-white" id="main-content">
+      
+      <!-- TAB: HOME -->
+      <div id="tab-home" class="space-y-0">
+        
+        <!-- 1. Header (Sticky) -->
+        <header class="sticky top-0 z-30 bg-white border-b border-gray-100 shadow-xs">
+          <div class="px-4 pt-3 pb-2.5">
+            <!-- Top Row: "Deliver to" & dummy address -->
+            <div class="flex items-center justify-between mb-2.5">
+              <div class="flex items-center space-x-1.5 cursor-pointer active-press" id="btn-address" onclick="openAddressModal()">
+                <div class="w-8 h-8 rounded-full bg-grab-light flex items-center justify-center text-grab-green shrink-0">
+                  <i data-lucide="map-pin" class="w-4 h-4 fill-grab-green"></i>
+                </div>
+                <div class="flex flex-col text-left">
+                  <div class="flex items-center space-x-1">
+                    <span class="text-[11px] font-medium text-subtext uppercase tracking-wider">Deliver to</span>
+                    <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-subtext"></i>
+                  </div>
+                  <span class="text-[14px] font-bold text-charcoal truncate max-w-[210px] leading-tight" id="display-address">
+                    Jl. Sudirman No. 45
+                  </span>
+                </div>
+              </div>
 
-          <div class="header-actions">
-            <div id="cloud-sync-badge" class="cloud-sync-pill" title="Status Supabase Sync (Klik untuk info)">
-              <span class="sync-dot"></span>
-              <span id="sync-text">Supabase</span>
-            </div>
-            <button class="icon-btn-round" id="sound-toggle-btn" title="Toggle Suara & Haptik" aria-label="Toggle Suara">
-              <!-- Sound icon rendered via JS -->
-            </button>
-          </div>
-        </div>
-
-        <!-- Budget Hero Card: Running Total & Dynamic Visual Safety Cap -->
-        <div class="budget-hero-card" id="budget-hero-card">
-          <div class="budget-hero-row">
-            <div>
-              <span class="budget-hero-label">
-                <span>🛒</span> Total Belanja Troli
-              </span>
-              <div class="running-total-val tabular-nums" id="header-running-total">
-                Rp 0
+              <!-- Supabase Sync Badge & Wishlist -->
+              <div class="flex items-center space-x-2">
+                <div class="flex items-center space-x-1 px-2 py-1 rounded-full text-[10px] font-medium border bg-emerald-50 text-emerald-700 border-emerald-200">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span class="font-semibold">Supabase</span>
+                </div>
+                <button class="w-8 h-8 rounded-full flex items-center justify-center text-gray-600 hover:text-grab-green active-press">
+                  <i data-lucide="heart" class="w-4 h-4"></i>
+                </button>
               </div>
             </div>
-            <div id="header-budget-badge" class="budget-badge-pill tier-safe">
-              🟢 Aman (0%)
+
+            <!-- Bottom Row: Full-width search bar -->
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                <i data-lucide="search" class="w-4 h-4"></i>
+              </div>
+              <input
+                type="text"
+                id="search-input"
+                oninput="handleSearch(this.value)"
+                placeholder="Cari sayur, buah, atau daging..."
+                class="w-full pl-10 pr-10 py-2.5 bg-[#F3F4F6] text-charcoal text-[13px] placeholder:text-gray-400 rounded-xl border border-transparent focus:outline-none focus:border-grab-green focus:bg-white focus:ring-2 focus:ring-grab-green/20 transition-all shadow-inner"
+              >
             </div>
           </div>
+        </header>
 
-          <!-- Dynamic Animated Progress Bar (Green <80%, Yellow 80-95%, Red >=95%) -->
-          <div class="budget-bar-track">
-            <div class="budget-bar-fill tier-safe" id="header-budget-fill" style="width: 0%;"></div>
+        <!-- 2. Category Carousel (Horizontal Scroll) -->
+        <section class="py-3 bg-white border-b border-gray-100">
+          <div class="flex items-center space-x-3 overflow-x-auto no-scrollbar px-4 scroll-smooth" id="category-container">
+            <!-- Categories rendered by JS -->
           </div>
+        </section>
 
-          <!-- Secondary Budget Indicators -->
-          <div class="budget-meta-row">
-            <span id="header-sisa-saldo" class="tabular-nums">Sisa Saku: <strong>Rp 500.000</strong></span>
-            <span class="budget-limit-tap" id="header-limit-btn" onclick="window.GroceryUI.switchTab('anggaran')">
-              Limit: <strong id="header-budget-limit" class="tabular-nums">Rp 500.000</strong> ✏️
+        <!-- 3. Banner Section -->
+        <section class="px-4 py-3 bg-white">
+          <div class="relative overflow-hidden rounded-2xl shadow-card group">
+            <div class="w-full min-h-[148px] p-4 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-700 text-white flex flex-col justify-between relative">
+              <div class="flex items-center justify-between relative z-10">
+                <span class="bg-white/20 backdrop-blur-xs text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-white/20 flex items-center space-x-1">
+                  <i data-lucide="sparkles" class="w-3 h-3 text-yellow-300"></i>
+                  <span>PASTI HEMAT</span>
+                </span>
+                <span class="bg-yellow-400 text-charcoal text-[11px] font-extrabold px-2.5 py-0.5 rounded-full shadow-xs">
+                  Diskon 50%
+                </span>
+              </div>
+
+              <div class="relative z-10 my-2">
+                <h3 class="font-extrabold text-[17px] leading-snug drop-shadow-xs max-w-[240px]">
+                  Diskon 50% untuk Sayuran Segar
+                </h3>
+                <p class="text-white/80 text-[11px] font-medium mt-0.5">
+                  Khusus belanja groceries di GrabMart hari ini!
+                </p>
+              </div>
+
+              <div class="flex items-center justify-between relative z-10 pt-1">
+                <div onclick="copyPromoCode('GRABMART50')" class="inline-flex items-center space-x-1.5 bg-white text-charcoal px-3 py-1 rounded-xl text-xs font-bold cursor-pointer hover:bg-yellow-50 active-press shadow-xs">
+                  <i data-lucide="tag" class="w-3.5 h-3.5 text-grab-green"></i>
+                  <span>GRABMART50</span>
+                  <span id="copy-status" class="text-[10px] text-subtext font-normal ml-0.5">(Klaim)</span>
+                </div>
+                <span class="text-white/90 text-xs font-semibold flex items-center space-x-0.5 cursor-pointer" onclick="openCheckout()">
+                  <span>Pakai</span>
+                  <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section Divider (Light Gray as specified) -->
+        <div class="h-2 bg-[#F3F4F6] w-full"></div>
+
+        <!-- 4. Product Grid (Grocery Items) -->
+        <section class="px-4 py-4 pb-36">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="text-base font-extrabold text-charcoal tracking-tight">Rekomendasi Hari Ini</h3>
+              <p class="text-[11px] text-subtext">Pilihan segar langsung dari pasar mitra</p>
+            </div>
+            <span class="text-[11px] font-bold text-grab-green bg-grab-light px-2 py-0.5 rounded-full" id="product-count-badge">
+              12 Produk
             </span>
           </div>
 
-          <!-- Critical Danger Warning Banner (F-05: Mencegah Malu di Kasir) -->
-          <div class="danger-cap-alert" id="header-danger-banner" style="display: none;">
-            <!-- Populated reactively when >=95% -->
+          <!-- 2-column grid layout as required -->
+          <div class="grid grid-cols-2 gap-3" id="products-grid">
+            <!-- Product Cards rendered dynamically via JS -->
+          </div>
+        </section>
+
+      </div>
+
+      <!-- TAB: ORDERS (Riwayat) -->
+      <div id="tab-orders" class="p-4 space-y-4 pb-28 hidden">
+        <div class="flex items-center justify-between pb-2 border-b border-gray-100">
+          <div>
+            <h2 class="text-lg font-bold text-charcoal">Aktivitas &amp; Riwayat Pesanan</h2>
+            <p class="text-xs text-subtext">Tersinkronisasi dengan Supabase PostgreSQL</p>
+          </div>
+          <div class="p-2 bg-grab-light text-grab-green rounded-full">
+            <i data-lucide="receipt-text" class="w-5 h-5"></i>
           </div>
         </div>
-      </header>
-
-      <!-- Main Scrollable Content Area -->
-      <main class="main-viewport" id="main-viewport">
-        <!-- Rendered reactively via GroceryUI.render() -->
-      </main>
-
-      <!-- Floating Bottom Navigation Bar (1-Thumb Reach, 3 Main Menus) -->
-      <nav class="bottom-nav-container" aria-label="Navigasi Utama">
-        <div class="bottom-nav-bar">
-          <!-- 1. Belanja -->
-          <button class="nav-item-btn active" data-tab="belanja" id="nav-btn-belanja">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="9" cy="21" r="1"></circle>
-              <circle cx="20" cy="21" r="1"></circle>
-              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-            </svg>
-            <span>Belanja</span>
-            <span class="nav-badge-count tabular-nums" id="nav-cart-badge" style="display: none;">0</span>
-          </button>
-
-          <!-- 2. Riwayat -->
-          <button class="nav-item-btn" data-tab="riwayat" id="nav-btn-riwayat">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="16" y1="13" x2="8" y2="13"></line>
-              <line x1="16" y1="17" x2="8" y2="17"></line>
-              <polyline points="10 9 9 9 8 9"></polyline>
-            </svg>
-            <span>Riwayat</span>
-          </button>
-
-          <!-- 3. Anggaran -->
-          <button class="nav-item-btn" data-tab="anggaran" id="nav-btn-anggaran">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-            </svg>
-            <span>Anggaran</span>
-          </button>
-        </div>
-      </nav>
-
-      <!-- Toast Notifications Container -->
-      <div class="toast-container" id="toast-container"></div>
-
-      <!-- ==========================================================================
-           MODAL 1: TAMBAH / EDIT ITEM BELANJA (F-01, F-02, F-03, F-04)
-           ========================================================================== -->
-      <div class="modal-backdrop" id="modal-add-item">
-        <div class="bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="modal-item-title">
-          <div class="sheet-handle-bar"></div>
-          <div class="sheet-header">
-            <h3 id="modal-item-title">Tambah Item Belanja</h3>
-            <button class="sheet-close-btn" aria-label="Tutup">✕</button>
-          </div>
-          <div class="sheet-body">
-            <form id="item-form" autocomplete="off">
-              <input type="hidden" id="item-id">
-
-              <!-- Nama Barang & Kategori -->
-              <div class="form-group">
-                <label class="form-label" for="item-nama">
-                  Nama Barang Belanja
-                  <span class="form-hint" id="past-price-hint"></span>
-                </label>
-                <input type="text" class="form-input" id="item-nama" 
-                       placeholder="Misal: Minyak Goreng Bimoli 2L, Beras, Indomie" required>
-              </div>
-
-              <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 10px;">
-                <div class="form-group">
-                  <label class="form-label" for="item-kategori">Kategori</label>
-                  <select class="form-select" id="item-kategori">
-                    <option value="Kebutuhan Pokok">Kebutuhan Pokok</option>
-                    <option value="Makanan Instan">Makanan Instan</option>
-                    <option value="Sabun & Pembersih">Sabun &amp; Pembersih</option>
-                    <option value="Telur & Daging">Telur &amp; Daging Segar</option>
-                    <option value="Minuman & Camilan">Minuman &amp; Camilan</option>
-                    <option value="Lainnya">Lainnya</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label class="form-label" for="item-satuan">Satuan</label>
-                  <select class="form-select" id="item-satuan">
-                    <option value="pcs">pcs</option>
-                    <option value="liter">liter</option>
-                    <option value="kg">kg</option>
-                    <option value="pack">pack/dus</option>
-                  </select>
-                </div>
-              </div>
-
-              <!-- Harga Satuan & Kuantitas -->
-              <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 10px;">
-                <div class="form-group">
-                  <label class="form-label" for="item-harga-satuan">Harga Satuan Asli (Rp)</label>
-                  <input type="number" class="form-input tabular-nums" id="item-harga-satuan" 
-                         inputmode="numeric" placeholder="38000" min="0" step="500" required>
-                </div>
-                <div class="form-group">
-                  <label class="form-label" for="item-kuantitas">Kuantitas</label>
-                  <input type="number" class="form-input tabular-nums" id="item-kuantitas" 
-                         inputmode="numeric" value="1" min="1" max="999" required>
-                </div>
-              </div>
-
-              <!-- Kalkulator Diskon Bertingkat (F-03) -->
-              <div class="form-group">
-                <label class="form-label">
-                  Diskon Bertingkat &amp; Potongan
-                  <span class="form-hint">Rumus: H × (1-D1) × (1-D2) - Potongan</span>
-                </label>
-                <div class="discount-grid">
-                  <div>
-                    <input type="number" class="form-input tabular-nums" id="item-d1" 
-                           inputmode="numeric" placeholder="Disc 1 %" min="0" max="100" value="0">
-                  </div>
-                  <div>
-                    <input type="number" class="form-input tabular-nums" id="item-d2" 
-                           inputmode="numeric" placeholder="+ Disc 2 %" min="0" max="100" value="0">
-                  </div>
-                  <div>
-                    <input type="number" class="form-input tabular-nums" id="item-potongan" 
-                           inputmode="numeric" placeholder="- Potongan Rp" min="0" step="500" value="0">
-                  </div>
-                </div>
-              </div>
-
-              <!-- Harga Bulan Lalu untuk Detektor Fluktuasi (F-04) -->
-              <div class="form-group">
-                <label class="form-label" for="item-harga-lalu">
-                  Harga Bulan Lalu (Pembanding)
-                  <span class="form-hint">Untuk detektor naik/turun</span>
-                </label>
-                <input type="number" class="form-input tabular-nums" id="item-harga-lalu" 
-                       inputmode="numeric" placeholder="Misal: 36000 (otomatis terisi jika ada)">
-              </div>
-
-              <!-- Real-time Live Calculation & Fluctuation Preview -->
-              <div class="calc-preview-card">
-                <div class="calc-preview-title">⚡ Kalkulasi Real-time Item</div>
-                <div class="calc-preview-row">
-                  <span>Harga Normal:</span>
-                  <span id="prev-harga-awal" class="tabular-nums">Rp 0</span>
-                </div>
-                <div class="calc-preview-row">
-                  <span>Skema Diskon:</span>
-                  <span id="prev-diskon-formula" style="color: #fbbf24;">Tanpa Diskon</span>
-                </div>
-                <div class="calc-preview-row">
-                  <span>Harga Akhir / Unit:</span>
-                  <strong id="prev-harga-unit" class="tabular-nums" style="color: #34d399;">Rp 0</strong>
-                </div>
-                <div class="calc-preview-row" style="align-items: center; margin-top: 4px;">
-                  <span>Detektor vs Bulan Lalu:</span>
-                  <span id="prev-fluktuasi-badge" class="fluc-badge fluc-new">✨ Belum Ada Pembanding</span>
-                </div>
-                <div class="calc-preview-final">
-                  <span>Subtotal Item:</span>
-                  <span id="prev-subtotal" class="tabular-nums">Rp 0</span>
-                </div>
-              </div>
-
-              <!-- Action buttons -->
-              <div class="form-actions-bar">
-                <button type="submit" class="btn-submit-main" id="btn-save-item">
-                  <span>💾 Simpan ke Troli Belanja</span>
-                </button>
-              </div>
-            </form>
-          </div>
+        <div class="space-y-3" id="orders-list-container">
+          <!-- Orders rendered via JS -->
         </div>
       </div>
 
-      <!-- ==========================================================================
-           MODAL 2: KOMPARATOR HARGA UNIT TERMURAH (F-03)
-           ========================================================================== -->
-      <div class="modal-backdrop" id="modal-unit-comparator">
-        <div class="bottom-sheet" role="dialog" aria-modal="true">
-          <div class="sheet-handle-bar"></div>
-          <div class="sheet-header">
-            <h3>⚡ Komparator Unit Grosir</h3>
-            <button class="sheet-close-btn" aria-label="Tutup">✕</button>
+      <!-- TAB: INBOX (Pesan) -->
+      <div id="tab-inbox" class="p-4 space-y-4 pb-28 hidden">
+        <div class="flex items-center justify-between pb-2 border-b border-gray-100">
+          <div>
+            <h2 class="text-lg font-bold text-charcoal">Kotak Masuk &amp; Promo</h2>
+            <p class="text-xs text-subtext">Voucher &amp; promo eksklusif GrabMart</p>
           </div>
-          <div class="sheet-body">
-            <p style="font-size: 12px; color: #94a3b8; margin-bottom: 12px;">
-              Bandingkan 2 varian kemasan supermarket untuk menemukan harga per liter/kg paling hemat!
-            </p>
-
-            <div class="form-group" style="margin-bottom: 10px;">
-              <label class="form-label" for="comp-unit">Satuan Pembanding</label>
-              <select class="form-select" id="comp-unit" style="height: 42px;">
-                <option value="liter">Liter (Contoh: Minyak Goreng)</option>
-                <option value="kg">Kilogram / kg (Contoh: Beras, Telur)</option>
-                <option value="pcs">Pcs / Butir (Contoh: Sabun, Mie)</option>
-                <option value="gram">Gram (Contoh: Bumbu, Kopi)</option>
-              </select>
-            </div>
-
-            <!-- Side-by-side Options -->
-            <div class="comparator-cards-grid">
-              <!-- Opsi A -->
-              <div class="comp-box" id="comp-box-a">
-                <div class="comp-badge-winner" id="comp-badge-a" style="display: none;">LEBIH HEMAT!</div>
-                <div class="comp-box-header">📦 Opsi A</div>
-                <input type="text" class="comp-input" id="comp-name-a" value="Kemasan 1L x 3 bks" placeholder="Nama Opsi A">
-                <input type="number" class="comp-input tabular-nums" id="comp-qty-a" value="3" placeholder="Volume / Unit A">
-                <input type="number" class="comp-input tabular-nums" id="comp-price-a" value="49500" placeholder="Total Harga (Rp)">
-                
-                <div class="comp-result-per-unit">
-                  Harga per unit:
-                  <strong id="comp-unit-price-a" class="tabular-nums">Rp 16.500 / liter</strong>
-                </div>
-              </div>
-
-              <!-- Opsi B -->
-              <div class="comp-box" id="comp-box-b">
-                <div class="comp-badge-winner" id="comp-badge-b" style="display: none;">LEBIH HEMAT!</div>
-                <div class="comp-box-header">🛢️ Opsi B</div>
-                <input type="text" class="comp-input" id="comp-name-b" value="Jerigen Grosir 5L" placeholder="Nama Opsi B">
-                <input type="number" class="comp-input tabular-nums" id="comp-qty-b" value="5" placeholder="Volume / Unit B">
-                <input type="number" class="comp-input tabular-nums" id="comp-price-b" value="86000" placeholder="Total Harga (Rp)">
-                
-                <div class="comp-result-per-unit">
-                  Harga per unit:
-                  <strong id="comp-unit-price-b" class="tabular-nums">Rp 17.200 / liter</strong>
-                </div>
-              </div>
-            </div>
-
-            <!-- Instant Comparison Verdict Banner -->
-            <div class="comp-verdict-banner" id="comp-verdict-banner">
-              <!-- Populated live -->
-            </div>
-
-            <!-- Add Cheaper to Cart -->
-            <button class="btn-submit-main" id="btn-add-winner-to-cart" style="display: none; width: 100%;">
-              ⚡ Masukkan Pilihan Hemat ke Keranjang
+          <div class="p-2 bg-grab-light text-grab-green rounded-full">
+            <i data-lucide="mail" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="space-y-3">
+          <div class="bg-white rounded-2xl border border-gray-100 p-4 shadow-card space-y-2">
+            <span class="text-[10px] font-bold uppercase text-grab-green">Promo Mart</span>
+            <h4 class="font-bold text-sm text-charcoal">Diskon 50% Sayuran Segar</h4>
+            <p class="text-xs text-subtext">Gunakan kode voucher <strong>GRABMART50</strong> untuk potongan s/d Rp 25.000!</p>
+            <button onclick="applyVoucher('GRABMART50'); openCheckout();" class="mt-2 w-full py-2 bg-grab-green text-white text-xs font-bold rounded-xl active-press">
+              Gunakan Voucher
             </button>
           </div>
         </div>
       </div>
 
-      <!-- ==========================================================================
-           MODAL 3: CHECKOUT / SELESAI BELANJA (F-06)
-           ========================================================================== -->
-      <div class="modal-backdrop" id="modal-checkout">
-        <div class="bottom-sheet" role="dialog" aria-modal="true">
-          <div class="sheet-handle-bar"></div>
-          <div class="sheet-header">
-            <h3>🛒 Selesai Belanja &amp; Simpan Struk</h3>
-            <button class="sheet-close-btn" aria-label="Tutup">✕</button>
+      <!-- TAB: ACCOUNT (Akun & Budget Safety Cap) -->
+      <div id="tab-account" class="p-4 space-y-4 pb-28 hidden">
+        <div class="bg-white rounded-2xl border border-gray-100 p-4 shadow-card flex items-center space-x-3.5">
+          <div class="w-14 h-14 rounded-full bg-grab-green text-white flex items-center justify-center font-extrabold text-xl shadow-grab shrink-0">
+            W
           </div>
-          <div class="sheet-body">
-            <p style="font-size: 12.5px; color: #94a3b8; margin-bottom: 14px;">
-              Data belanjaan akan diarsipkan ke riwayat dan otomatis menjadi <strong>basis referensi harga bulan lalu</strong> untuk belanja berikutnya!
-            </p>
-
-            <div class="calc-preview-card" style="margin-top: 0;">
-              <div class="calc-preview-row">
-                <span>Jumlah Barang:</span>
-                <strong id="checkout-items-count" class="tabular-nums">0</strong>
-              </div>
-              <div class="calc-preview-row">
-                <span>Total Pengeluaran Kasir:</span>
-                <strong id="checkout-total-rp" class="tabular-nums" style="color: #34d399; font-size: 16px;">Rp 0</strong>
-              </div>
-              <div class="calc-preview-row">
-                <span>Total Hemat Diskon:</span>
-                <strong id="checkout-savings-rp" class="tabular-nums" style="color: #fbbf24;">Rp 0</strong>
-              </div>
+          <div class="flex-1">
+            <div class="flex items-center space-x-2">
+              <h3 class="font-bold text-base text-charcoal">Wilson Tjandra</h3>
+              <span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full">Gold</span>
             </div>
-
-            <div class="form-group">
-              <label class="form-label" for="checkout-store-name">Nama Supermarket / Grosir</label>
-              <input type="text" class="form-input" id="checkout-store-name" value="Indogrosir Super Kos" placeholder="Misal: Indogrosir, Superindo">
-            </div>
-
-            <div class="form-group">
-              <label class="form-label" for="checkout-date">Tanggal Belanja</label>
-              <input type="date" class="form-input" id="checkout-date">
-            </div>
-
-            <button class="btn-submit-main" id="btn-confirm-checkout" onclick="window.GroceryUI.handlePerformCheckout()" style="width: 100%; margin-top: 10px;">
-              ✅ Simpan Struk &amp; Arsipkan ke Riwayat
-            </button>
+            <p class="text-xs text-subtext mt-0.5">+62 812-3456-7890 • Member Kos</p>
+            <p class="text-[11px] text-grab-green font-semibold mt-1">4.850 Poin GrabRewards</p>
           </div>
         </div>
-      </div>
 
-      <!-- ==========================================================================
-           MODAL 4: DETAIL STRUK BELANJA BULAN LALU (F-06)
-           ========================================================================== -->
-      <div class="modal-backdrop" id="modal-receipt-detail">
-        <div class="bottom-sheet" role="dialog" aria-modal="true">
-          <div class="sheet-handle-bar"></div>
-          <div class="sheet-header">
-            <div>
-              <h3 id="receipt-store-title">Struk Belanja</h3>
-              <div style="font-size: 11px; color: #94a3b8;" id="receipt-date-subtitle"></div>
-            </div>
-            <button class="sheet-close-btn" aria-label="Tutup">✕</button>
+        <!-- Budget Safety Cap (Connected to Supabase) -->
+        <div class="bg-white rounded-2xl border border-gray-100 p-4 shadow-card space-y-2">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="shield-check" class="w-5 h-5 text-grab-green"></i>
+            <h4 class="font-bold text-sm text-charcoal">Budget Safety Cap (Supabase)</h4>
           </div>
-          <div class="sheet-body">
-            <div class="calc-preview-card" style="margin-top: 0;">
-              <div class="calc-preview-row">
-                <span>Total Struk:</span>
-                <strong id="receipt-grand-total" class="tabular-nums" style="color: #34d399; font-size: 18px;">Rp 0</strong>
-              </div>
-              <div class="calc-preview-row">
-                <span>Total Penghematan Promo:</span>
-                <strong id="receipt-total-savings" class="tabular-nums" style="color: #fbbf24;">Rp 0</strong>
-              </div>
+          <p class="text-xs text-subtext">Batas aman belanja bulanan agar tidak malu saat di kasir.</p>
+          <div class="p-3 bg-gray-50 rounded-xl space-y-2">
+            <div class="flex justify-between text-xs font-bold">
+              <span>Batas Anggaran:</span>
+              <span class="text-grab-green" id="budget-cap-display">Rp 500.000</span>
             </div>
-
-            <div style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px;">
-              Daftar Barang Belanjaan:
-            </div>
-            <div id="receipt-items-breakdown" style="max-height: 220px; overflow-y: auto; margin-bottom: 16px;">
-              <!-- Populated via JS -->
-            </div>
-
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <button class="btn-secondary" id="btn-copy-receipt-text" style="justify-content: center;">
-                📋 Salin Struk Teks (Untuk WhatsApp Kos)
-              </button>
-              <button class="btn-submit-main" id="btn-reorder-receipt" style="height: 46px; font-size: 13.5px;">
-                🔄 Muat Ulang Barang ke Keranjang Baru
-              </button>
-              <button class="btn-secondary" id="btn-delete-receipt" style="justify-content: center; color: #fb7185; border-color: rgba(244, 63, 94, 0.3);">
-                🗑️ Hapus Catatan Struk Ini
-              </button>
-            </div>
+            <input type="range" min="100000" max="2000000" step="50000" value="500000" class="w-full accent-grab-green" onchange="updateBudgetCap(this.value)">
           </div>
         </div>
       </div>
 
     </div>
+
+    <!-- 5. Floating Cart Bar (Positioned just above bottom navigation) -->
+    <div class="fixed bottom-[68px] left-0 right-0 z-40 max-w-md mx-auto px-4 pointer-events-none" id="floating-cart-bar">
+      <button onclick="openCheckout()" class="w-full pointer-events-auto bg-grab-green hover:bg-grab-dark text-white rounded-2xl p-3.5 shadow-float active-press transition-all flex items-center justify-between border border-emerald-400/30">
+        <!-- Left: Shopping bag icon, items count, total price -->
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white shrink-0">
+            <i data-lucide="shopping-bag" class="w-5 h-5"></i>
+          </div>
+          <div class="flex flex-col text-left">
+            <span class="text-[11px] font-semibold text-white/90 leading-tight" id="cart-item-count">2 items</span>
+            <span class="text-[16px] font-extrabold text-white leading-tight tracking-tight" id="cart-total-price">Rp 45.000</span>
+          </div>
+        </div>
+
+        <!-- Right: "Checkout" text and chevron -->
+        <div class="flex items-center space-x-1.5 bg-white/20 px-3.5 py-1.5 rounded-xl font-bold text-sm text-white">
+          <span>Checkout</span>
+          <i data-lucide="chevron-right" class="w-4 h-4"></i>
+        </div>
+      </button>
+    </div>
+
+    <!-- 6. Bottom Navigation (Fixed: Home, Orders, Inbox, Account) -->
+    <nav class="fixed bottom-0 left-0 right-0 z-40 max-w-md mx-auto bg-white border-t border-gray-100 shadow-nav pb-safe">
+      <div class="grid grid-cols-4 h-16 items-center px-2">
+        <button id="nav-btn-belanja" onclick="switchTab('home')" class="nav-tab active flex flex-col items-center justify-center h-full text-grab-green group active-press">
+          <i data-lucide="home" class="w-5 h-5 stroke-[2.5]"></i>
+          <span class="text-[11px] mt-1 font-bold">Home</span>
+        </button>
+
+        <button id="nav-btn-riwayat" onclick="switchTab('orders')" class="nav-tab flex flex-col items-center justify-center h-full text-subtext group active-press">
+          <i data-lucide="receipt-text" class="w-5 h-5 stroke-2"></i>
+          <span class="text-[11px] mt-1 font-medium">Orders</span>
+        </button>
+
+        <button id="nav-btn-inbox" onclick="switchTab('inbox')" class="nav-tab flex flex-col items-center justify-center h-full text-subtext group active-press">
+          <div class="relative">
+            <i data-lucide="mail" class="w-5 h-5 stroke-2"></i>
+            <span class="absolute -top-1 -right-2 bg-grab-green text-white text-[8px] font-bold px-1 rounded-full">Promo</span>
+          </div>
+          <span class="text-[11px] mt-1 font-medium">Inbox</span>
+        </button>
+
+        <button id="nav-btn-anggaran" onclick="switchTab('account')" class="nav-tab flex flex-col items-center justify-center h-full text-subtext group active-press">
+          <i data-lucide="user" class="w-5 h-5 stroke-2"></i>
+          <span class="text-[11px] mt-1 font-medium">Account</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Slide-Up Checkout Drawer -->
+    <div id="checkout-drawer" class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-xs hidden">
+      <div class="w-full max-w-md bg-white rounded-t-3xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-slide-up" onclick="event.stopPropagation()">
+        <!-- Header -->
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
+          <div class="flex items-center space-x-2">
+            <div class="w-8 h-8 rounded-full bg-grab-light flex items-center justify-center text-grab-green">
+              <i data-lucide="shopping-bag" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-base text-charcoal">Ringkasan Pesanan</h3>
+              <p class="text-[11px] text-subtext">GrabMart Express Delivery</p>
+            </div>
+          </div>
+          <button onclick="closeCheckout()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <!-- Items & Details -->
+        <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4 no-scrollbar" id="checkout-drawer-content">
+          <!-- Dynamic checkout items -->
+        </div>
+
+        <!-- Checkout Action Button -->
+        <div class="p-4 border-t border-gray-100 bg-white sticky bottom-0" id="checkout-footer">
+          <button onclick="placeOrder()" class="w-full py-3.5 bg-grab-green hover:bg-grab-dark text-white font-bold text-sm rounded-2xl active-press shadow-grab flex items-center justify-center space-x-2">
+            <i data-lucide="shield-check" class="w-5 h-5"></i>
+            <span id="place-order-text">Pesan Sekarang</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
-  <!-- Desktop Controls Bar (Only visible on wide screens to switch mobile frame) -->
-  <div class="desktop-controls-hint">
-    <button class="desktop-pill-btn" id="btn-toggle-frame">↔️ Mode Full Screen</button>
-    <span class="desktop-pill-btn">📱 Standar Viewport: 430px (iPhone 16 Pro Max)</span>
-  </div>
+  <!-- JavaScript logic & Supabase Integration -->
+  <script>
+    // Product Catalog Data with realistic Unsplash URLs
+    const PRODUCTS = [
+      {
+        id: 'prod-1',
+        name: 'Bayam Hijau Segar Organik',
+        category: 'sayur',
+        unit: 'ikat (250g)',
+        price: 6500,
+        originalPrice: 9500,
+        discountPercent: 32,
+        image: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=600&auto=format&fit=crop&q=80'
+      },
+      {
+        id: 'prod-2',
+        name: 'Apel Fuji Super Manis & Renyah',
+        category: 'buah',
+        unit: '1 kg (isi 4-5)',
+        price: 28000,
+        originalPrice: 40000,
+        discountPercent: 30,
+        image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=600&auto=format&fit=crop&q=80'
+      },
+      {
+        id: 'prod-3',
+        name: 'Dada Ayam Fillet Segar Tanpa Tulang',
+        category: 'daging',
+        unit: '500g',
+        price: 34500,
+        originalPrice: 45000,
+        discountPercent: 23,
+        image: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=600&auto=format&fit=crop&q=80'
+      },
+      {
+        id: 'prod-4',
+        name: 'Pisang Cavendish Sunpride Premium',
+        category: 'buah',
+        unit: '1 sisir (~1.2kg)',
+        price: 22000,
+        originalPrice: 28000,
+        discountPercent: 21,
+        image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=600&auto=format&fit=crop&q=80'
+      },
+      {
+        id: 'prod-5',
+        name: 'Wortel Brastagi Segar Manis',
+        category: 'sayur',
+        unit: '500g',
+        price: 8500,
+        originalPrice: 12000,
+        discountPercent: 29,
+        image: 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=600&auto=format&fit=crop&q=80'
+      },
+      {
+        id: 'prod-6',
+        name: 'Salmon Fillet Norwegia Premium Fresh',
+        category: 'daging',
+        unit: '250g',
+        price: 68000,
+        originalPrice: 85000,
+        discountPercent: 20,
+        image: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=600&auto=format&fit=crop&q=80'
+      },
+      {
+        id: 'prod-7',
+        name: 'Minyak Goreng Sawit Murni 2 Liter',
+        category: 'dapur',
+        unit: 'pouch 2L',
+        price: 33500,
+        originalPrice: 38000,
+        discountPercent: 12,
+        image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80'
+      },
+      {
+        id: 'prod-8',
+        name: 'Telur Ayam Negeri Segar Omega 3',
+        category: 'dapur',
+        unit: 'pack (10 butir)',
+        price: 26500,
+        originalPrice: 31000,
+        discountPercent: 15,
+        image: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=600&auto=format&fit=crop&q=80'
+      }
+    ];
 
-  <!-- Application Scripts -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./js/supabaseClient.js"></script>
-  <script src="./js/sample-data.js"></script>
-  <script src="./js/audio-haptics.js"></script>
-  <script src="./js/calculator.js"></script>
-  <script src="./js/store.js"></script>
-  <script src="./js/ui.js"></script>
-  <script src="./js/app.js"></script>
+    const CATEGORIES = [
+      { id: 'all', name: 'Semua', icon: 'sparkles' },
+      { id: 'promo', name: 'Promo', icon: 'flame', badge: '50%' },
+      { id: 'sayur', name: 'Sayuran segar', icon: 'carrot' },
+      { id: 'buah', name: 'Buah-buahan', icon: 'apple' },
+      { id: 'daging', name: 'Daging & Ikan', icon: 'fish' },
+      { id: 'dapur', name: 'Kebutuhan Dapur', icon: 'shopping-bag' }
+    ];
+
+    // State: Initialized with 2 items summing to Rp 45.000 as requested
+    let cart = [
+      { id: 'prod-2', name: 'Apel Fuji Super Manis & Renyah', price: 28000, originalPrice: 40000, quantity: 1, unit: '1 kg', image: PRODUCTS[1].image },
+      { id: 'prod-5', name: 'Wortel Brastagi Segar Manis', price: 8500, originalPrice: 12000, quantity: 2, unit: '500g', image: PRODUCTS[4].image }
+    ];
+    let selectedCategory = 'all';
+    let searchQuery = '';
+    let currentAddress = 'Jl. Sudirman No. 45';
+    let appliedVoucher = 'GRABMART50';
+
+    function formatRupiah(val) {
+      return 'Rp ' + Number(val).toLocaleString('id-ID');
+    }
+
+    function renderCategories() {
+      const container = document.getElementById('category-container');
+      container.innerHTML = CATEGORIES.map(cat => {
+        const isSelected = selectedCategory === cat.id;
+        return `
+          <button onclick="setCategory('${cat.id}')" class="flex flex-col items-center shrink-0 group focus:outline-none active-press">
+            <div class="relative w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${
+              isSelected ? 'bg-grab-green text-white shadow-grab scale-105 ring-2 ring-grab-green ring-offset-2' : 'bg-[#F3F4F6] text-charcoal'
+            }">
+              <i data-lucide="${cat.icon}" class="w-6 h-6 stroke-2"></i>
+              ${cat.badge ? `<span class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-extrabold px-1.5 py-0.2 rounded-full border border-white">${cat.badge}</span>` : ''}
+            </div>
+            <span class="text-[11px] mt-1.5 text-center font-medium max-w-[68px] leading-tight ${isSelected ? 'text-grab-green font-bold' : 'text-subtext'}">
+              ${cat.name}
+            </span>
+          </button>
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    function renderProducts() {
+      const grid = document.getElementById('products-grid');
+      const filtered = PRODUCTS.filter(p => {
+        const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+        if (selectedCategory === 'all') return matchSearch;
+        if (selectedCategory === 'promo') return matchSearch && p.discountPercent >= 20;
+        return matchSearch && p.category === selectedCategory;
+      });
+
+      document.getElementById('product-count-badge').textContent = `${filtered.length} Produk`;
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '<div class="col-span-2 py-8 text-center text-subtext text-xs">Produk tidak ditemukan.</div>';
+        return;
+      }
+
+      grid.innerHTML = filtered.map(p => {
+        const itemInCart = cart.find(c => c.id === p.id);
+        const qty = itemInCart ? itemInCart.quantity : 0;
+
+        return `
+          <div class="bg-white rounded-2xl border border-gray-100 p-2.5 shadow-card flex flex-col justify-between group active-press">
+            <div>
+              <div class="relative aspect-square w-full rounded-xl overflow-hidden bg-gray-50 mb-2">
+                <img src="${p.image}" alt="${p.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform">
+                ${p.discountPercent ? `<div class="absolute top-2 left-2 bg-rose-500 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-full">${p.discountPercent}% OFF</div>` : ''}
+              </div>
+              <h4 class="text-[14px] font-bold text-charcoal line-clamp-2 leading-tight mb-1 min-h-[34px]">${p.name}</h4>
+              <p class="text-[11px] text-subtext mb-2">${p.unit}</p>
+            </div>
+            <div class="flex items-end justify-between pt-1">
+              <div class="flex flex-col">
+                ${p.originalPrice ? `<span class="text-[11px] text-gray-400 line-through leading-none mb-0.5">${formatRupiah(p.originalPrice)}</span>` : ''}
+                <span class="text-[15px] font-bold text-grab-green leading-tight">${formatRupiah(p.price)}</span>
+              </div>
+              ${qty > 0 ? `
+                <div class="flex items-center space-x-1 bg-grab-light border border-grab-green/30 rounded-full p-0.5">
+                  <button onclick="updateQty('${p.id}', ${qty - 1})" class="w-6 h-6 rounded-full bg-white text-grab-green flex items-center justify-center shadow-xs active-press">
+                    <i data-lucide="minus" class="w-3 h-3 stroke-[2.5]"></i>
+                  </button>
+                  <span class="text-xs font-bold text-grab-dark px-1">${qty}</span>
+                  <button onclick="updateQty('${p.id}', ${qty + 1})" class="w-6 h-6 rounded-full bg-grab-green text-white flex items-center justify-center shadow-xs active-press">
+                    <i data-lucide="plus" class="w-3 h-3 stroke-[3]"></i>
+                  </button>
+                </div>
+              ` : `
+                <button onclick="addToCart('${p.id}')" class="w-8 h-8 rounded-full bg-grab-green hover:bg-grab-dark text-white flex items-center justify-center shadow-grab active-press">
+                  <i data-lucide="plus" class="w-4 h-4 stroke-[3]"></i>
+                </button>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    function updateCartBar() {
+      const bar = document.getElementById('floating-cart-bar');
+      const totalCount = cart.length;
+      const totalPrice = cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+
+      if (totalCount > 0) {
+        bar.classList.remove('hidden');
+        document.getElementById('cart-item-count').textContent = `${totalCount} items`;
+        document.getElementById('cart-total-price').textContent = formatRupiah(totalPrice);
+      } else {
+        bar.classList.add('hidden');
+      }
+    }
+
+    function addToCart(prodId) {
+      const p = PRODUCTS.find(x => x.id === prodId);
+      if (!p) return;
+      const exist = cart.find(x => x.id === prodId);
+      if (exist) {
+        exist.quantity += 1;
+      } else {
+        cart.push({ ...p, quantity: 1 });
+      }
+      renderProducts();
+      updateCartBar();
+    }
+
+    function updateQty(prodId, newQty) {
+      if (newQty <= 0) {
+        cart = cart.filter(x => x.id !== prodId);
+      } else {
+        const item = cart.find(x => x.id === prodId);
+        if (item) item.quantity = newQty;
+      }
+      renderProducts();
+      updateCartBar();
+      if (!document.getElementById('checkout-drawer').classList.contains('hidden')) {
+        renderCheckoutDrawer();
+      }
+    }
+
+    function setCategory(id) {
+      selectedCategory = id;
+      renderCategories();
+      renderProducts();
+    }
+
+    function handleSearch(val) {
+      searchQuery = val;
+      renderProducts();
+    }
+
+    function copyPromoCode(code) {
+      navigator.clipboard?.writeText(code);
+      document.getElementById('copy-status').textContent = 'Tersalin!';
+      appliedVoucher = code;
+      setTimeout(() => {
+        document.getElementById('copy-status').textContent = '(Klaim)';
+      }, 2000);
+    }
+
+    function switchTab(tabId) {
+      ['home', 'orders', 'inbox', 'account'].forEach(t => {
+        const el = document.getElementById('tab-' + t);
+        if (el) el.classList.add('hidden');
+      });
+      const activeEl = document.getElementById('tab-' + tabId);
+      if (activeEl) activeEl.classList.remove('hidden');
+
+      document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.classList.remove('text-grab-green');
+        btn.classList.add('text-subtext');
+      });
+      const currentBtn = document.getElementById('nav-btn-' + (tabId === 'home' ? 'belanja' : tabId === 'orders' ? 'riwayat' : tabId === 'inbox' ? 'inbox' : 'anggaran'));
+      if (currentBtn) {
+        currentBtn.classList.add('text-grab-green');
+        currentBtn.classList.remove('text-subtext');
+      }
+
+      if (tabId === 'orders') renderOrders();
+    }
+
+    function openCheckout() {
+      document.getElementById('checkout-drawer').classList.remove('hidden');
+      renderCheckoutDrawer();
+    }
+
+    function closeCheckout() {
+      document.getElementById('checkout-drawer').classList.add('hidden');
+    }
+
+    function renderCheckoutDrawer() {
+      const container = document.getElementById('checkout-drawer-content');
+      const subtotal = cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+      const deliveryFee = 12000;
+      const discount = appliedVoucher === 'GRABMART50' ? Math.min(Math.round(subtotal * 0.5), 25000) : 0;
+      const grandTotal = Math.max(0, subtotal + deliveryFee - discount + 2000);
+
+      container.innerHTML = `
+        <div class="p-3.5 bg-gray-50 rounded-2xl border border-gray-100 flex items-start space-x-3">
+          <i data-lucide="map-pin" class="w-4 h-4 text-grab-green mt-0.5"></i>
+          <div>
+            <span class="text-[11px] font-bold text-subtext uppercase">Alamat Antar</span>
+            <p class="text-xs font-semibold text-charcoal mt-0.5">${currentAddress}</p>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <h4 class="text-xs font-bold text-subtext uppercase">Daftar Belanja (${cart.length} item)</h4>
+          ${cart.map(item => `
+            <div class="flex items-center justify-between p-2.5 bg-white border border-gray-100 rounded-xl">
+              <div class="flex items-center space-x-2">
+                <img src="${item.image}" class="w-10 h-10 object-cover rounded-lg">
+                <div>
+                  <h5 class="text-xs font-bold text-charcoal line-clamp-1">${item.name}</h5>
+                  <p class="text-[11px] text-subtext">${formatRupiah(item.price)}</p>
+                </div>
+              </div>
+              <div class="flex items-center space-x-1.5 bg-gray-50 rounded-full p-1 border">
+                <button onclick="updateQty('${item.id}', ${item.quantity - 1})" class="w-5 h-5 bg-white rounded-full flex items-center justify-center text-xs font-bold">-</button>
+                <span class="text-xs font-bold px-1">${item.quantity}</span>
+                <button onclick="updateQty('${item.id}', ${item.quantity + 1})" class="w-5 h-5 bg-grab-green text-white rounded-full flex items-center justify-center text-xs font-bold">+</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="p-3.5 bg-white border border-gray-100 rounded-2xl space-y-1.5 text-xs">
+          <div class="flex justify-between text-subtext"><span>Subtotal Belanja</span><span>${formatRupiah(subtotal)}</span></div>
+          <div class="flex justify-between text-subtext"><span>Ongkos Kirim</span><span>${formatRupiah(deliveryFee)}</span></div>
+          ${discount > 0 ? `<div class="flex justify-between text-rose-600 font-semibold"><span>Diskon Promo (${appliedVoucher})</span><span>-${formatRupiah(discount)}</span></div>` : ''}
+          <div class="border-t pt-2 flex justify-between font-extrabold text-sm text-charcoal">
+            <span>Total Pembayaran</span>
+            <span class="text-grab-green text-base">${formatRupiah(grandTotal)}</span>
+          </div>
+        </div>
+      `;
+      document.getElementById('place-order-text').textContent = `Pesan Sekarang • ${formatRupiah(grandTotal)}`;
+      lucide.createIcons();
+    }
+
+    async function placeOrder() {
+      const subtotal = cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+      const deliveryFee = 12000;
+      const discount = appliedVoucher === 'GRABMART50' ? Math.min(Math.round(subtotal * 0.5), 25000) : 0;
+      const grandTotal = Math.max(0, subtotal + deliveryFee - discount + 2000);
+
+      // Save order to LocalStorage history
+      const history = JSON.parse(localStorage.getItem('sakugrosir_history_v1') || '[]');
+      const order = {
+        id: 'GM-' + Math.floor(100000 + Math.random() * 900000),
+        store_name: 'GrabMart Sudirman Express',
+        date: new Date().toLocaleDateString('id-ID'),
+        total_spent: grandTotal,
+        items_count: cart.length,
+        items: [...cart]
+      };
+      history.unshift(order);
+      localStorage.setItem('sakugrosir_history_v1', JSON.stringify(history));
+
+      document.getElementById('checkout-drawer-content').innerHTML = `
+        <div class="py-8 text-center space-y-3">
+          <div class="w-16 h-16 bg-grab-light text-grab-green rounded-full flex items-center justify-center mx-auto">
+            <i data-lucide="check-circle-2" class="w-10 h-10 stroke-[2.5]"></i>
+          </div>
+          <h4 class="font-bold text-lg text-charcoal">Pesanan Terkonfirmasi!</h4>
+          <p class="text-xs text-subtext">Driver Grab sedang menuju toko mitra untuk mengambil pesananmu.</p>
+          <div class="p-3 bg-gray-50 rounded-xl text-xs font-mono font-bold">${order.id} • ${formatRupiah(grandTotal)}</div>
+        </div>
+      `;
+      document.getElementById('checkout-footer').innerHTML = `
+        <button onclick="cart=[]; updateCartBar(); renderProducts(); closeCheckout();" class="w-full py-3 bg-grab-green text-white font-bold text-sm rounded-xl">
+          Kembali ke Beranda
+        </button>
+      `;
+      lucide.createIcons();
+    }
+
+    function renderOrders() {
+      const container = document.getElementById('orders-list-container');
+      const history = JSON.parse(localStorage.getItem('sakugrosir_history_v1') || '[]');
+      if (history.length === 0) {
+        container.innerHTML = '<div class="py-12 text-center text-xs text-subtext">Belum ada riwayat belanja.</div>';
+        return;
+      }
+      container.innerHTML = history.map(item => `
+        <div class="bg-white rounded-2xl border border-gray-100 p-4 shadow-card space-y-2">
+          <div class="flex justify-between items-center text-xs">
+            <span class="font-bold text-charcoal">${item.store_name}</span>
+            <span class="bg-emerald-50 text-grab-dark font-bold text-[10px] px-2 py-0.5 rounded-full">Selesai</span>
+          </div>
+          <div class="flex justify-between text-xs text-subtext">
+            <span>${item.items_count} Barang • ${item.date}</span>
+            <span class="font-bold text-grab-green">${formatRupiah(item.total_spent)}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', () => {
+      renderCategories();
+      renderProducts();
+      updateCartBar();
+      lucide.createIcons();
+    });
+  </script>
 </body>
 </html>

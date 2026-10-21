@@ -1,7 +1,6 @@
 {
-  "version": 2,
-  "name": "smart-grocery-price-tracker-app",
-  "public": true,
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
   "headers": [
     {
       "source": "/sw.js",

@@ -1,0 +1,53 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+:root {
+  --grab-green: #00B14F;
+  --grab-dark: #008C3E;
+  --grab-light: #E6F8EE;
+  --charcoal: #111827;
+  --subtext: #6B7280;
+  --divider: #F3F4F6;
+}
+
+/* Hide scrollbar for horizontal category carousel */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Smooth touch manipulation & safe areas */
+html, body {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  background-color: #0b1120;
+}
+
+@supports (padding: max(0px)) {
+  .safe-bottom {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}
+
+/* Custom bounce / click feedback */
+.active-press:active {
+  transform: scale(0.96);
+  transition: transform 0.1s ease;
+}
+
+/* Glassmorphism effects */
+.glass-header {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.glass-pill {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+}
