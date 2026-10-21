@@ -349,3 +349,108 @@ function saveOfflineTrip(historyData, itemsList) {
     localStorage.setItem(FALLBACK_KEYS.HISTORY, JSON.stringify(history));
   } catch (e) {}
 }
+
+// ==============================================================================
+// 6. SINGLE-USER ACCESS & GOOGLE AUTHENTICATION (OAUTH)
+// ==============================================================================
+export const SINGLE_USER_STORAGE_KEY = 'sakugrosir_single_user_v1';
+export const DESIGNATED_OWNER_EMAIL = 'tjandra.xavier.wilson@gmail.com';
+
+/**
+ * Sign in with Google via Supabase OAuth
+ */
+export async function signInWithGoogle() {
+  try {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: origin,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent'
+        }
+      }
+    });
+
+    if (error) throw error;
+    return { success: true, data };
+  } catch (err) {
+    console.warn('[Supabase Google Auth] OAuth trigger error:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Sign out from session
+ */
+export async function signOutUser() {
+  try {
+    await supabase.auth.signOut();
+  } catch (err) {}
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(SINGLE_USER_STORAGE_KEY);
+  }
+  return { success: true };
+}
+
+/**
+ * Get the currently authenticated single user or persistent single user profile
+ */
+export async function getSingleUserSession() {
+  try {
+    // 1. Check Supabase live session
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session && session.user) {
+      const u = session.user;
+      const profile = {
+        id: u.id,
+        email: u.email,
+        name: u.user_metadata?.full_name || u.user_metadata?.name || 'Wilson Tjandra',
+        avatar_url: u.user_metadata?.avatar_url || u.user_metadata?.picture || null,
+        provider: 'google',
+        role: 'single_owner',
+        isDesignatedOwner: true,
+        authenticated_at: new Date().toISOString()
+      };
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(SINGLE_USER_STORAGE_KEY, JSON.stringify(profile));
+      }
+      return profile;
+    }
+  } catch (e) {}
+
+  // 2. Check local single-user cached session
+  if (typeof localStorage !== 'undefined') {
+    const raw = localStorage.getItem(SINGLE_USER_STORAGE_KEY);
+    if (raw) {
+      try {
+        return JSON.parse(raw);
+      } catch (e) {}
+    }
+  }
+
+  // 3. Default single-user profile (Owner mode)
+  return {
+    id: 'single-user-owner-01',
+    email: DESIGNATED_OWNER_EMAIL,
+    name: 'Wilson Tjandra',
+    avatar_url: null,
+    provider: 'google',
+    role: 'single_owner',
+    isDesignatedOwner: true,
+    authenticated_at: new Date().toISOString()
+  };
+}
+
+/**
+ * Enforces single user access policy (restricts multi-user signup/access)
+ */
+export function verifySingleUserPolicy(email) {
+  if (!email) return false;
+  // In single-user mode, access is exclusively restricted to the designated account
+  const clean = email.toLowerCase().trim();
+  const designated = DESIGNATED_OWNER_EMAIL.toLowerCase().trim();
+  return clean === designated;
+}
+

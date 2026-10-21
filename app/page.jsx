@@ -8,11 +8,12 @@ import ProductCard from './components/ProductCard';
 import FloatingCartBar from './components/FloatingCartBar';
 import BottomNav from './components/BottomNav';
 import CheckoutDrawer from './components/CheckoutDrawer';
+import AuthModal from './components/AuthModal';
 import OrdersTab from './components/OrdersTab';
 import AccountTab from './components/AccountTab';
 import InboxTab from './components/InboxTab';
 import { CATEGORIES, GROCERY_PRODUCTS, PROMO_BANNERS } from './data/groceryData';
-import { supabase } from '../src/lib/supabaseClient';
+import { supabase, getSingleUserSession, signOutUser } from '../src/lib/supabaseClient';
 import { Smartphone, Monitor, ShoppingBag, Sparkles, RefreshCw } from 'lucide-react';
 import { playTapSound } from './utils/sound';
 
@@ -23,7 +24,9 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('home');
   const [appliedVoucher, setAppliedVoucher] = useState('GRABMART50');
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [supabaseStatus, setSupabaseStatus] = useState('checking');
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Initial cart with 2 items summing to Rp 45.000 as specified in the prompt
   const [cartItems, setCartItems] = useState([
@@ -49,13 +52,13 @@ export default function Home() {
     }
   ]);
 
-  // Check Supabase connection on load
+  // Check Supabase connection and load single-user session on load
   useEffect(() => {
-    async function checkSupabase() {
+    async function initSession() {
+      // 1. Supabase Health
       try {
         const { error } = await supabase.from('budget_settings').select('id').limit(1);
         if (error) {
-          console.warn('Supabase query status:', error.message);
           setSupabaseStatus('offline');
         } else {
           setSupabaseStatus('connected');
@@ -63,9 +66,39 @@ export default function Home() {
       } catch (err) {
         setSupabaseStatus('offline');
       }
+
+      // 2. Load Single-User Google Account
+      const user = await getSingleUserSession();
+      setCurrentUser(user);
     }
-    checkSupabase();
+
+    initSession();
+
+    // 3. Supabase Auth Listener for live Google OAuth redirect
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const profile = {
+          id: session.user.id,
+          email: session.user.email,
+          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
+          avatar_url: session.user.user_metadata?.avatar_url || null,
+          provider: 'google',
+          role: 'single_owner',
+          isDesignatedOwner: true
+        };
+        setCurrentUser(profile);
+      }
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
+
+  const handleLogout = async () => {
+    await signOutUser();
+    setCurrentUser(null);
+  };
 
   // Filter products based on search & category
   const filteredProducts = GROCERY_PRODUCTS.filter((product) => {
@@ -135,7 +168,7 @@ export default function Home() {
     return item ? item.quantity : 0;
   };
 
-  const totalCartCount = cartItems.length; // Distinct item types count (e.g. "2 items")
+  const totalCartCount = cartItems.length;
   const totalCartUnits = cartItems.reduce((acc, i) => acc + i.quantity, 0);
   const totalCartPrice = cartItems.reduce((acc, i) => acc + (i.price * i.quantity), 0);
 
@@ -144,7 +177,7 @@ export default function Home() {
       {/* Mobile Shell Mockup Wrapper (Centered on desktop, full-width on mobile) */}
       <div className="w-full max-w-[430px] bg-white min-h-screen md:min-h-[890px] md:max-h-[920px] md:rounded-[44px] shadow-2xl md:ring-12 md:ring-slate-800/80 overflow-hidden flex flex-col relative transition-all duration-300">
         
-        {/* Simulated Mobile Status Bar (iOS/Android feel for mobile mockup fidelity) */}
+        {/* Simulated Mobile Status Bar */}
         <div className="bg-white px-6 pt-3 pb-1 flex items-center justify-between text-xs text-charcoal font-semibold shrink-0 select-none border-b border-gray-50">
           <span className="font-bold tracking-tight">09:41</span>
           <div className="w-20 h-4 bg-charcoal/10 rounded-full flex items-center justify-center">
@@ -168,6 +201,8 @@ export default function Home() {
                 currentAddress={currentAddress}
                 setCurrentAddress={setCurrentAddress}
                 supabaseStatus={supabaseStatus}
+                currentUser={currentUser}
+                onOpenAuthModal={() => setIsAuthModalOpen(true)}
               />
 
               {/* 2. Category Carousel (Horizontal Scroll) */}
@@ -261,7 +296,11 @@ export default function Home() {
           )}
 
           {activeTab === 'account' && (
-            <AccountTab />
+            <AccountTab 
+              currentUser={currentUser}
+              onOpenAuthModal={() => setIsAuthModalOpen(true)}
+              onLogout={handleLogout}
+            />
           )}
         </div>
 
@@ -292,12 +331,19 @@ export default function Home() {
           currentAddress={currentAddress}
           appliedVoucher={appliedVoucher}
           onApplyVoucher={(code) => setAppliedVoucher(code)}
-          onOrderSuccess={() => {
-            // Cart will be cleared after user returns to home
+          onOrderSuccess={() => {}}
+        />
+
+        {/* Google Authentication & Single-User Access Modal */}
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onAuthSuccess={(user) => {
+            setCurrentUser(user);
           }}
         />
 
-        {/* Home Indicator bar for iOS frame styling */}
+        {/* Home Indicator bar */}
         <div className="hidden md:flex justify-center pb-2 bg-white shrink-0 pointer-events-none">
           <div className="w-32 h-1 bg-gray-300 rounded-full" />
         </div>

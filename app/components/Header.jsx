@@ -19,7 +19,9 @@ export default function Header({
   setSearchQuery, 
   currentAddress, 
   setCurrentAddress,
-  supabaseStatus 
+  supabaseStatus,
+  currentUser,
+  onOpenAuthModal
 }) {
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const addresses = [
@@ -59,8 +61,8 @@ export default function Header({
               </div>
             </div>
 
-            {/* Right Icons: Supabase Sync Badge & Wishlist */}
-            <div className="flex items-center space-x-2">
+            {/* Right Icons: Supabase Sync Badge & Google User Avatar */}
+            <div className="flex items-center space-x-1.5">
               <div 
                 className={`flex items-center space-x-1 px-2 py-1 rounded-full text-[10px] font-medium border ${
                   supabaseStatus === 'connected' 
@@ -72,16 +74,27 @@ export default function Header({
                 <span className={`w-1.5 h-1.5 rounded-full ${
                   supabaseStatus === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
                 }`} />
-                <span className="hidden sm:inline">Supabase</span>
                 <span className="font-semibold">{supabaseStatus === 'connected' ? 'Cloud' : 'Offline'}</span>
               </div>
 
-              <button 
-                onClick={playTapSound}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-600 hover:text-grab-green hover:bg-gray-50 active-press transition-colors"
-                aria-label="Disukai"
+              {/* Google User Avatar / Auth Button */}
+              <button
+                onClick={() => {
+                  playTapSound();
+                  if (onOpenAuthModal) onOpenAuthModal();
+                }}
+                className="relative w-8 h-8 rounded-full bg-grab-green text-white flex items-center justify-center font-bold text-xs shadow-xs active-press overflow-hidden border border-emerald-300"
+                title={currentUser ? `Akun: ${currentUser.email} (Single-User)` : 'Masuk dengan Google'}
               >
-                <Heart className="w-4 h-4" />
+                {currentUser?.avatar_url ? (
+                  <img src={currentUser.avatar_url} alt={currentUser.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span>{currentUser?.name?.[0] || 'W'}</span>
+                )}
+                {/* Tiny Google indicator dot */}
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-white rounded-full flex items-center justify-center shadow-xs">
+                  <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                </span>
               </button>
             </div>
           </div>

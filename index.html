@@ -102,20 +102,25 @@
                     <span class="text-[11px] font-medium text-subtext uppercase tracking-wider">Deliver to</span>
                     <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-subtext"></i>
                   </div>
-                  <span class="text-[14px] font-bold text-charcoal truncate max-w-[210px] leading-tight" id="display-address">
+                  <span class="text-[14px] font-bold text-charcoal truncate max-w-[200px] leading-tight" id="display-address">
                     Jl. Sudirman No. 45
                   </span>
                 </div>
               </div>
 
-              <!-- Supabase Sync Badge & Wishlist -->
+              <!-- Supabase Sync Badge & Google Single-User Button -->
               <div class="flex items-center space-x-2">
                 <div class="flex items-center space-x-1 px-2 py-1 rounded-full text-[10px] font-medium border bg-emerald-50 text-emerald-700 border-emerald-200">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                   <span class="font-semibold">Supabase</span>
                 </div>
-                <button class="w-8 h-8 rounded-full flex items-center justify-center text-gray-600 hover:text-grab-green active-press">
-                  <i data-lucide="heart" class="w-4 h-4"></i>
+
+                <!-- Google User Button -->
+                <button onclick="openAuthModal()" class="relative w-8 h-8 rounded-full bg-grab-green text-white flex items-center justify-center font-bold text-xs shadow-xs active-press overflow-hidden border border-emerald-300" title="Akun Pengguna Tunggal Google">
+                  <span id="header-user-initial">W</span>
+                  <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-white rounded-full flex items-center justify-center shadow-xs">
+                    <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                  </span>
                 </button>
               </div>
             </div>
@@ -192,7 +197,7 @@
               <p class="text-[11px] text-subtext">Pilihan segar langsung dari pasar mitra</p>
             </div>
             <span class="text-[11px] font-bold text-grab-green bg-grab-light px-2 py-0.5 rounded-full" id="product-count-badge">
-              12 Produk
+              8 Produk
             </span>
           </div>
 
@@ -243,19 +248,57 @@
         </div>
       </div>
 
-      <!-- TAB: ACCOUNT (Akun & Budget Safety Cap) -->
+      <!-- TAB: ACCOUNT (Akun, Google Auth & Single-User Access) -->
       <div id="tab-account" class="p-4 space-y-4 pb-28 hidden">
+        <!-- Google Profile Header -->
         <div class="bg-white rounded-2xl border border-gray-100 p-4 shadow-card flex items-center space-x-3.5">
           <div class="w-14 h-14 rounded-full bg-grab-green text-white flex items-center justify-center font-extrabold text-xl shadow-grab shrink-0">
             W
           </div>
           <div class="flex-1">
             <div class="flex items-center space-x-2">
-              <h3 class="font-bold text-base text-charcoal">Wilson Tjandra</h3>
+              <h3 class="font-bold text-base text-charcoal" id="account-name">Wilson Tjandra</h3>
               <span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full">Gold</span>
             </div>
-            <p class="text-xs text-subtext mt-0.5">+62 812-3456-7890 • Member Kos</p>
-            <p class="text-[11px] text-grab-green font-semibold mt-1">4.850 Poin GrabRewards</p>
+            
+            <div class="flex items-center space-x-1.5 mt-0.5">
+              <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+              </svg>
+              <p class="text-xs text-subtext truncate max-w-[200px]" id="account-email">tjandra.xavier.wilson@gmail.com</p>
+            </div>
+
+            <div class="flex items-center space-x-2 mt-2">
+              <span class="text-[10px] bg-emerald-50 text-grab-green font-bold px-2 py-0.5 rounded-md">Google Verified</span>
+              <span class="text-[10px] bg-gray-100 text-subtext font-semibold px-2 py-0.5 rounded-md">4.850 Poin</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Single User Access Mode Card -->
+        <div class="bg-white rounded-2xl border border-gray-100 p-4 shadow-card space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="lock" class="w-4 h-4 text-grab-green"></i>
+              <h4 class="font-bold text-sm text-charcoal">Mode Akses Pengguna Tunggal</h4>
+            </div>
+            <span class="bg-emerald-50 text-grab-dark text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-emerald-200">
+              AKTIF
+            </span>
+          </div>
+          <p class="text-xs text-subtext leading-relaxed">
+            Akses multi-pengguna dinonaktifkan. Seluruh data transaksi dan kalkulasi diskon grosir terkunci khusus pada akun Google pemilik tunggal.
+          </p>
+          <div class="flex space-x-2 pt-1">
+            <button onclick="openAuthModal()" class="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-charcoal font-bold text-xs rounded-xl active-press">
+              Kelola Akun Google
+            </button>
+            <button onclick="logoutGoogle()" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl active-press">
+              Keluar
+            </button>
           </div>
         </div>
 
@@ -327,6 +370,51 @@
         </button>
       </div>
     </nav>
+
+    <!-- Google Authentication & Single-User Access Modal -->
+    <div id="auth-modal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs hidden">
+      <div class="w-full max-w-md bg-white rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl animate-slide-up" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+          <div class="flex items-center space-x-2">
+            <div class="w-8 h-8 rounded-full bg-grab-light flex items-center justify-center text-grab-green">
+              <i data-lucide="lock" class="w-4 h-4 stroke-[2.5]"></i>
+            </div>
+            <div>
+              <h3 class="font-extrabold text-base text-charcoal">Autentikasi Akun Google</h3>
+              <p class="text-[11px] text-subtext">Single-User Access Policy</p>
+            </div>
+          </div>
+          <button onclick="closeAuthModal()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div class="mt-4 p-3.5 bg-emerald-50 rounded-2xl border border-emerald-100 space-y-1.5">
+          <div class="flex items-center space-x-2 text-grab-dark font-bold text-xs">
+            <i data-lucide="shield-check" class="w-4 h-4 text-grab-green"></i>
+            <span>Mode Akses Pengguna Tunggal (Aktif)</span>
+          </div>
+          <p class="text-[11px] text-emerald-900 leading-relaxed">
+            Aplikasi dikhususkan untuk 1 akun pengguna terverifikasi. Multi-user access dibatasi agar data troli belanja dan limit uang saku tidak bercampur.
+          </p>
+        </div>
+
+        <div class="mt-5 space-y-3">
+          <button onclick="loginGoogle()" class="w-full py-3.5 px-4 bg-white hover:bg-gray-50 text-charcoal font-bold text-sm rounded-2xl border border-gray-300 shadow-xs flex items-center justify-center space-x-3 active-press">
+            <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+            </svg>
+            <span>Lanjutkan dengan Google</span>
+          </button>
+          <div class="text-center pt-1">
+            <span class="text-[11px] text-subtext">Akun Pemilik: <strong>tjandra.xavier.wilson@gmail.com</strong></span>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Slide-Up Checkout Drawer -->
     <div id="checkout-drawer" class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-xs hidden">
@@ -640,6 +728,23 @@
 
     function closeCheckout() {
       document.getElementById('checkout-drawer').classList.add('hidden');
+    }
+
+    function openAuthModal() {
+      document.getElementById('auth-modal').classList.remove('hidden');
+    }
+
+    function closeAuthModal() {
+      document.getElementById('auth-modal').classList.add('hidden');
+    }
+
+    function loginGoogle() {
+      alert('Autentikasi Google Berhasil! Masuk sebagai: tjandra.xavier.wilson@gmail.com (Mode Akses Tunggal)');
+      closeAuthModal();
+    }
+
+    function logoutGoogle() {
+      alert('Sesi akun pemilik tunggal telah di-reset.');
     }
 
     function renderCheckoutDrawer() {
