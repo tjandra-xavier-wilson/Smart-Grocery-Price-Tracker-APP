@@ -69,18 +69,19 @@ assert(flucEqual.status === 'equal' && flucEqual.directionSymbol === '=', 'Detek
 const flucNew = Calculator.detectPriceFluctuation(30000, 0);
 assert(flucNew.status === 'new', 'Detektor item tanpa riwayat bulan lalu menghasilkan status "new"');
 
-console.log('\n--- TEST GROUP 4: [F-05] Budget Safety Cap ---');
-const capSafe = Calculator.calculateBudgetCap(300000, 500000);
-assert(capSafe.tier === 'safe' && capSafe.percentage === 60, 'Total 300rb dari limit 500rb berada di Zona Aman (<80%)');
+console.log('\n--- TEST GROUP 4: [F-05] Budget Safety Cap (Sesuai Standar DT2 P15) ---');
+// Uji Kasus DT2: Limit Rp 100.000
+// Belanja Rp 80.000 (80%) -> Zona Aman Hijau (< 90%)
+const capSafe = Calculator.calculateBudgetCap(80000, 100000);
+assert(capSafe.tier === 'safe' && capSafe.percentage === 80, 'Total 80rb dari limit 100rb berada di Zona Aman Hijau (<90%)');
 
-const capWarn = Calculator.calculateBudgetCap(425000, 500000);
-assert(capWarn.tier === 'warning' && capWarn.percentage === 85, 'Total 425rb dari limit 500rb berada di Zona Waspada (85%)');
+// Belanja Rp 95.000 (95%) -> Wajib Zona Waspada Kuning (≥ 90%)
+const capWarn = Calculator.calculateBudgetCap(95000, 100000);
+assert(capWarn.tier === 'warning' && capWarn.percentage === 95, 'Total 95rb dari limit 100rb berada di Zona Waspada Kuning (≥90%)');
 
-const capDanger = Calculator.calculateBudgetCap(480000, 500000);
-assert(capDanger.tier === 'danger' && capDanger.percentage === 96, 'Total 480rb dari limit 500rb memicu Zona Bahaya (≥95%)');
-
-const capOver = Calculator.calculateBudgetCap(520000, 500000);
-assert(capOver.tier === 'danger' && capOver.isOver === true, 'Total melebihi limit memicu status isOver');
+// Belanja Rp 110.000 (110%) -> Wajib Zona Bahaya Merah Overbudget (> 100%)
+const capOver = Calculator.calculateBudgetCap(110000, 100000);
+assert(capOver.tier === 'danger' && capOver.isOver === true && capOver.percentage === 110, 'Total 110rb dari limit 100rb memicu Zona Bahaya Merah Overbudget (>100%)');
 
 console.log('\n--- TEST GROUP 5: PWA, Viewport & Mobile Architecture ---');
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');

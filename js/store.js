@@ -1,31 +1,49 @@
 // Reactive Store & LocalStorage Persistence for SakuGrosir
+// Terhubung dengan LocalStorage, Cloud Firestore Realtime onSnapshot, dan Supabase
 
 class GroceryStore {
   constructor() {
     this.STORAGE_KEYS = {
       CART: 'sakugrosir_cart_v1',
       BUDGET: 'sakugrosir_budget_v1',
+      STORE_NAME: 'sakugrosir_store_name_v1',
+      TRANS_DATE: 'sakugrosir_trans_date_v1',
       HISTORY: 'sakugrosir_history_v1',
       PRICE_CATALOG: 'sakugrosir_price_catalog_v1',
       PREFERENCES: 'sakugrosir_prefs_v1'
     };
 
     this.listeners = [];
+    this.isLocalMutating = false;
     this.init();
   }
 
   init() {
-    // Check if first time run, initialize with sample data
+    // 1. Inisialisasi default lokasi toko belanja untuk skenario DT2
+    if (!localStorage.getItem(this.STORAGE_KEYS.STORE_NAME)) {
+      localStorage.setItem(this.STORAGE_KEYS.STORE_NAME, 'Lotte Mart Grocery - Puri Indah');
+    }
+
+    // 2. Inisialisasi selector tanggal transaksi
+    if (!localStorage.getItem(this.STORAGE_KEYS.TRANS_DATE)) {
+      localStorage.setItem(this.STORAGE_KEYS.TRANS_DATE, new Date().toISOString().split('T')[0]);
+    }
+
+    // 3. Inisialisasi limit saku (Rp 100.000 sesuai skenario guru)
+    if (!localStorage.getItem(this.STORAGE_KEYS.BUDGET)) {
+      localStorage.setItem(this.STORAGE_KEYS.BUDGET, '100000');
+    }
+
+    // 4. Inisialisasi item keranjang
     if (!localStorage.getItem(this.STORAGE_KEYS.CART)) {
       this.resetToDefaults();
     } else {
-      // Ensure catalog has seeds if empty
       if (!localStorage.getItem(this.STORAGE_KEYS.PRICE_CATALOG)) {
         localStorage.setItem(this.STORAGE_KEYS.PRICE_CATALOG, JSON.stringify(window.INITIAL_PRICE_DATABASE || {}));
       }
     }
 
-    // Background sync with Supabase if available
+    // Sinkronisasi awal dengan Supabase Cloud jika online
     this.syncWithSupabase();
   }
 
@@ -33,38 +51,31 @@ class GroceryStore {
     if (!window.SupabaseHelper || !window.SupabaseHelper.isAvailable()) return;
 
     try {
-      // 1. Sinkronisasi Budget Settings
       const cloudBudget = await window.SupabaseHelper.getBudgetSettings();
       if (cloudBudget && cloudBudget.monthly_budget_cap) {
         localStorage.setItem(this.STORAGE_KEYS.BUDGET, cloudBudget.monthly_budget_cap.toString());
         this.notify();
       }
 
-      // Update cloud sync badge di header
       const syncBadge = document.getElementById('cloud-sync-badge');
       const syncText = document.getElementById('sync-text');
       if (syncBadge && syncText) {
         syncBadge.classList.remove('offline');
-        syncText.textContent = 'Supabase Cloud';
-        syncBadge.title = 'Terhubung ke Supabase Database';
+        syncText.textContent = 'Supabase & Firestore Live';
       }
     } catch (e) {
-      console.warn('[GroceryStore] Supabase sync fallback to offline:', e);
-      const syncBadge = document.getElementById('cloud-sync-badge');
-      const syncText = document.getElementById('sync-text');
-      if (syncBadge && syncText) {
-        syncBadge.classList.add('offline');
-        syncText.textContent = 'Mode Lokal';
-        syncBadge.title = 'Bekerja secara offline / lokal';
-      }
+      console.warn('[GroceryStore] Supabase fallback to local storage:', e);
     }
   }
 
   resetToDefaults() {
     localStorage.setItem(this.STORAGE_KEYS.CART, JSON.stringify(window.SAMPLE_INITIAL_ITEMS || []));
-    localStorage.setItem(this.STORAGE_KEYS.BUDGET, '500000');
+    localStorage.setItem(this.STORAGE_KEYS.BUDGET, '100000');
+    localStorage.setItem(this.STORAGE_KEYS.STORE_NAME, 'Lotte Mart Grocery - Puri Indah');
+    localStorage.setItem(this.STORAGE_KEYS.TRANS_DATE, new Date().toISOString().split('T')[0]);
     localStorage.setItem(this.STORAGE_KEYS.HISTORY, JSON.stringify(window.SAMPLE_SHOPPING_HISTORY || []));
     localStorage.setItem(this.STORAGE_KEYS.PRICE_CATALOG, JSON.stringify(window.INITIAL_PRICE_DATABASE || {}));
+    this.broadcastToCloud();
     this.notify();
   }
 
@@ -79,7 +90,65 @@ class GroceryStore {
     this.listeners.forEach(fn => fn());
   }
 
-  // --- CART OPERATIONS ---
+  // --- SESI BELANJA & TOKO METADATA (F-01 & F-06A) ---
+
+  getSessionMetadata() {
+    return {
+      storeName: localStorage.getItem(this.STORAGE_KEYS.STORE_NAME) || 'Lotte Mart Grocery - Puri Indah',
+      transDate: localStorage.getItem(this.STORAGE_KEYS.TRANS_DATE) || new Date().toISOString().split('T')[0]
+    };
+  }
+
+  setSessionMetadata(storeName, transDate) {
+    if (storeName) localStorage.setItem(this.STORAGE_KEYS.STORE_NAME, storeName.trim());
+    if (transDate) localStorage.setItem(this.STORAGE_KEYS.TRANS_DATE, transDate);
+    this.broadcastToCloud();
+    this.notify();
+  }
+
+  // Sinkronisasi otomatis dari Firebase Cloud Firestore onSnapshot (F-06B)
+  applyCloudSnapshot(cloudData) {
+    if (!cloudData) return;
+    let changed = false;
+
+    if (cloudData.items && Array.isArray(cloudData.items)) {
+      localStorage.setItem(this.STORAGE_KEYS.CART, JSON.stringify(cloudData.items));
+      changed = true;
+    }
+    if (cloudData.budget_limit) {
+      localStorage.setItem(this.STORAGE_KEYS.BUDGET, cloudData.budget_limit.toString());
+      changed = true;
+    }
+    if (cloudData.store_name) {
+      localStorage.setItem(this.STORAGE_KEYS.STORE_NAME, cloudData.store_name);
+      changed = true;
+    }
+    if (cloudData.transaction_date) {
+      localStorage.setItem(this.STORAGE_KEYS.TRANS_DATE, cloudData.transaction_date);
+      changed = true;
+    }
+
+    if (changed) {
+      this.notify();
+    }
+  }
+
+  broadcastToCloud() {
+    const state = {
+      store_name: this.getSessionMetadata().storeName,
+      transaction_date: this.getSessionMetadata().transDate,
+      budget_limit: this.getBudgetLimit(),
+      items: this.getItems()
+    };
+
+    if (window.FirebaseSync && typeof window.FirebaseSync.broadcastChange === 'function') {
+      this.isLocalMutating = true;
+      window.FirebaseSync.broadcastChange(state);
+      setTimeout(() => { this.isLocalMutating = false; }, 350);
+    }
+  }
+
+  // --- OPERASI KERANJANG BELANJA (F-01, F-02, F-06A) ---
 
   getItems() {
     try {
@@ -92,6 +161,7 @@ class GroceryStore {
 
   saveItems(items) {
     localStorage.setItem(this.STORAGE_KEYS.CART, JSON.stringify(items));
+    this.broadcastToCloud();
     this.notify();
   }
 
@@ -103,7 +173,6 @@ class GroceryStore {
     const items = this.getItems();
     const id = rawItem.id || 'item_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
 
-    // If past price not explicitly given, try looking up in catalog
     let hargaBulanLalu = Number(rawItem.harga_bulan_lalu);
     if (!hargaBulanLalu || hargaBulanLalu <= 0) {
       hargaBulanLalu = this.lookupPastPrice(rawItem.nama_barang) || 0;
@@ -114,7 +183,7 @@ class GroceryStore {
     const newItem = {
       id: id,
       nama_barang: (rawItem.nama_barang || '').trim(),
-      kategori: rawItem.kategori || 'Kebutuhan Pokok',
+      kategori: rawItem.kategori || 'Bahan Pokok',
       satuan: rawItem.satuan || 'pcs',
       kuantitas: Math.max(1, Number(rawItem.kuantitas) || 1),
       harga_satuan: Math.max(0, Number(rawItem.harga_satuan) || 0),
@@ -126,10 +195,8 @@ class GroceryStore {
       harga_bulan_lalu: hargaBulanLalu
     };
 
-    items.unshift(newItem); // place newest at top for immediate thumb visibility
+    items.unshift(newItem);
     this.saveItems(items);
-
-    // Also remember this price in catalog
     this.recordPriceInCatalog(newItem.nama_barang, newItem.harga_akhir_per_satuan);
 
     return newItem;
@@ -166,12 +233,19 @@ class GroceryStore {
     return items[index];
   }
 
-  updateQuantity(id, delta) {
+  // Penggandaan kuantitas otomatis tanpa delay (F-02)
+  updateQuantity(id, deltaOrAbsolute, isAbsolute = false) {
     const items = this.getItems();
     const item = items.find(i => i.id === id);
     if (!item) return null;
 
-    const newQty = Math.max(1, (Number(item.kuantitas) || 1) + delta);
+    let newQty;
+    if (isAbsolute) {
+      newQty = Math.max(1, Number(deltaOrAbsolute) || 1);
+    } else {
+      newQty = Math.max(1, (Number(item.kuantitas) || 1) + deltaOrAbsolute);
+    }
+
     item.kuantitas = newQty;
     item.total_harga_item = item.harga_akhir_per_satuan * newQty;
 
@@ -179,6 +253,7 @@ class GroceryStore {
     return item;
   }
 
+  // Hapus item permanen (F-06A)
   deleteItem(id) {
     const items = this.getItems().filter(i => i.id !== id);
     this.saveItems(items);
@@ -213,26 +288,26 @@ class GroceryStore {
     };
   }
 
-  // --- BUDGET SETTINGS ---
+  // --- PENGENDALI ANGGARAN (F-05) ---
 
   getBudgetLimit() {
     const val = localStorage.getItem(this.STORAGE_KEYS.BUDGET);
-    return Math.max(10000, Number(val) || 500000);
+    return Math.max(10000, Number(val) || 100000);
   }
 
   setBudgetLimit(newLimit) {
-    const limit = Math.max(10000, Number(newLimit) || 500000);
+    const limit = Math.max(10000, Number(newLimit) || 100000);
     localStorage.setItem(this.STORAGE_KEYS.BUDGET, limit.toString());
+    this.broadcastToCloud();
     this.notify();
 
-    // Async sync ke Supabase
     if (window.SupabaseHelper && window.SupabaseHelper.isAvailable()) {
       window.SupabaseHelper.updateBudgetSettings(limit);
     }
     return limit;
   }
 
-  // --- SHOPPING HISTORY & CHECKOUT (F-06) ---
+  // --- RIWAYAT STRUK BELANJA & CHECKOUT (F-06A) ---
 
   getHistory() {
     try {
@@ -243,14 +318,16 @@ class GroceryStore {
     }
   }
 
-  checkoutCart(storeName = 'Supermarket Grosir', customDate = null) {
+  checkoutCart(storeName = null, customDate = null) {
     const items = this.getItems();
     if (items.length === 0) return null;
 
     const totals = this.getCartTotals();
+    const session = this.getSessionMetadata();
+    const finalStore = storeName || session.storeName || 'Lotte Mart Grocery - Puri Indah';
     const now = new Date();
-    const dateStr = customDate || now.toISOString().split('T')[0];
-    const dateDisplay = now.toLocaleDateString('id-ID', {
+    const dateStr = customDate || session.transDate || now.toISOString().split('T')[0];
+    const dateDisplay = new Date(dateStr).toLocaleDateString('id-ID', {
       day: 'numeric',
       month: 'long',
       year: 'numeric'
@@ -258,7 +335,7 @@ class GroceryStore {
 
     const receipt = {
       id: 'trip_' + Date.now(),
-      store_name: storeName.trim() || 'Supermarket Grosir',
+      store_name: finalStore,
       date: dateStr,
       date_display: dateDisplay,
       budget_limit: totals.budgetCap.budgetLimit,
@@ -280,27 +357,24 @@ class GroceryStore {
       }))
     };
 
-    // 1. Update historical database lokal so prices become "harga_bulan_lalu" for next trips
+    // Update database harga bulan lalu
     items.forEach(item => {
       this.recordPriceInCatalog(item.nama_barang, item.harga_akhir_per_satuan);
     });
 
-    // 2. Prepend to history lokal
     const history = this.getHistory();
     history.unshift(receipt);
     localStorage.setItem(this.STORAGE_KEYS.HISTORY, JSON.stringify(history));
 
-    // 3. Simpan ke Supabase (Batch Insert grocery_history & grocery_items)
+    // Sinkronisasi riwayat ke Supabase
     if (window.SupabaseHelper && window.SupabaseHelper.isAvailable()) {
       window.SupabaseHelper.saveShoppingTrip(
-        { shopping_date: dateStr, total_spent: totals.runningTotal, notes: storeName },
+        { shopping_date: dateStr, total_spent: totals.runningTotal, notes: finalStore },
         receipt.items
       );
     }
 
-    // 4. Clear active cart
     this.clearCart();
-
     return receipt;
   }
 
@@ -314,13 +388,12 @@ class GroceryStore {
     const trip = this.getHistory().find(h => h.id === tripId);
     if (!trip || !trip.items) return false;
 
-    // Load items into current cart, updating their harga_bulan_lalu from the trip
     const items = trip.items.map(oldItem => {
       const calc = window.GroceryCalculator.calculateItemPricing(oldItem);
       return {
         id: 'item_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
         nama_barang: oldItem.nama_barang,
-        kategori: oldItem.kategori || 'Kebutuhan Pokok',
+        kategori: oldItem.kategori || 'Bahan Pokok',
         satuan: oldItem.satuan || 'pcs',
         kuantitas: oldItem.kuantitas || 1,
         harga_satuan: oldItem.harga_satuan || oldItem.harga_akhir_per_satuan,
@@ -337,7 +410,7 @@ class GroceryStore {
     return true;
   }
 
-  // --- PRICE CATALOG / HISTORICAL REFERENCE DATABASE ---
+  // --- DATABASE KATALOG HARGA (F-04) ---
 
   getPriceCatalog() {
     try {
@@ -360,13 +433,11 @@ class GroceryStore {
     const cleanName = itemName.trim().toLowerCase();
     const catalog = this.getPriceCatalog();
 
-    // Exact match or case-insensitive match
     for (const [key, val] of Object.entries(catalog)) {
       if (key.toLowerCase() === cleanName) {
         return Number(val);
       }
     }
-    // Partial fuzzy match
     for (const [key, val] of Object.entries(catalog)) {
       if (key.toLowerCase().includes(cleanName) || cleanName.includes(key.toLowerCase())) {
         return Number(val);

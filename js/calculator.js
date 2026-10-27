@@ -114,7 +114,7 @@ const GroceryCalculator = {
    */
   calculateBudgetCap(runningTotal, budgetLimit) {
     const total = Math.max(0, Number(runningTotal) || 0);
-    const limit = Math.max(1, Number(budgetLimit) || 500000);
+    const limit = Math.max(1, Number(budgetLimit) || 100000);
     const remaining = limit - total;
     const percentage = (total / limit) * 100;
 
@@ -123,18 +123,17 @@ const GroceryCalculator = {
     let badgeText = '🟢 Aman';
     let alertMsg = 'Pengeluaran aman terkendali di bawah limit saku.';
 
-    if (percentage >= 95) {
+    // DT2 SRS F-05: Merah tegas jika over-budget (>100%), Kuning waspada jika >= 90%
+    if (total > limit) {
       tier = 'danger';
       statusLabel = 'BAHAYA OVERBUDGET!';
-      badgeText = '🔴 BAHAYA (≥95%)';
-      alertMsg = remaining < 0 
-        ? `AWAS! Belanja melebihi jatah saku sebesar Rp ${this.formatNumber(Math.abs(remaining))}! Mencegah situasi memalukan di depan kasir!`
-        : `KRITIS! Sisa uang saku tinggal Rp ${this.formatNumber(remaining)}. Stop atau kurangi item sekarang!`;
-    } else if (percentage >= 80) {
+      badgeText = `🔴 Bahaya (${percentage.toFixed(0)}%)`;
+      alertMsg = 'Total belanja melebihi batas saldo dompet! Kurangi kuantitas atau batalkan barang sekunder.';
+    } else if (percentage >= 90) {
       tier = 'warning';
-      statusLabel = 'Mendekati Batas';
-      badgeText = '🟡 Waspada (80-95%)';
-      alertMsg = `Mendekati limit saku! Sisa uang belanja tinggal Rp ${this.formatNumber(remaining)}.`;
+      statusLabel = 'Peringatan Waspada';
+      badgeText = `🟡 Waspada (${percentage.toFixed(0)}%)`;
+      alertMsg = `Mendekati batas dompet (≥90%)! Sisa saldo saku tinggal Rp ${this.formatNumber(remaining)}.`;
     }
 
     return {
@@ -147,7 +146,7 @@ const GroceryCalculator = {
       statusLabel: statusLabel,
       badgeText: badgeText,
       alertMsg: alertMsg,
-      isOver: remaining < 0
+      isOver: total > limit
     };
   },
 

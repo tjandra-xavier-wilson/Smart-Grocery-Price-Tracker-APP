@@ -133,11 +133,29 @@ const GroceryUI = {
       }
     });
 
+    // Session Store Selection (F-01: Lotte Mart Grocery - Puri Indah)
+    const storeSelect = document.getElementById('session-store-select');
+    if (storeSelect) {
+      storeSelect.addEventListener('change', (e) => {
+        window.groceryStore.setSessionMetadata(e.target.value, null);
+        this.showToast(`Lokasi toko: ${e.target.value}`, 'info');
+      });
+    }
+
+    // Session Date Selector (F-01)
+    const datePicker = document.getElementById('session-date-picker');
+    if (datePicker) {
+      datePicker.addEventListener('change', (e) => {
+        window.groceryStore.setSessionMetadata(null, e.target.value);
+        this.showToast(`Tanggal transaksi: ${e.target.value}`, 'info');
+      });
+    }
+
     // Reset Data action if needed
     const resetBtn = document.getElementById('btn-reset-demo');
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
-        if (confirm('Kembalikan ke data simulasi awal anak kos?')) {
+        if (confirm('Kembalikan ke data simulasi Lotte Mart Puri Indah?')) {
           window.groceryStore.resetToDefaults();
           this.showToast('Data demo berhasil di-reset!', 'success');
         }
@@ -261,20 +279,49 @@ const GroceryUI = {
     }
   },
 
-  // Save new or edited item
+  // Save new or edited item with Active Form Validation (F-01)
   handleSaveItem() {
-    const nama = document.getElementById('item-nama').value.trim();
+    const namaInput = document.getElementById('item-nama');
+    const hargaInput = document.getElementById('item-harga-satuan');
+    const qtyInput = document.getElementById('item-kuantitas');
+
+    const nama = (namaInput?.value || '').trim();
+    const rawHarga = hargaInput?.value;
+    const harga = Number(rawHarga);
+    const qty = Number(qtyInput?.value) || 1;
+
+    // 1. Validasi Nama Barang Wajib Diisi (F-01)
     if (!nama) {
       this.showToast('Nama barang wajib diisi!', 'danger');
+      namaInput?.focus();
+      return;
+    }
+
+    // 2. Validasi Aktif Harga Negatif / Kosong (SRS F-01)
+    if (rawHarga === '' || isNaN(harga)) {
+      this.showToast('Harga satuan wajib diisi angka valid!', 'danger');
+      hargaInput?.focus();
+      return;
+    }
+
+    if (harga < 0) {
+      this.showToast('Harga tidak boleh bernilai negatif (-Rp)!', 'danger');
+      hargaInput?.focus();
+      return; // Blokir penyimpanan dan jangan tambahkan baris rusak ke keranjang
+    }
+
+    if (qty <= 0) {
+      this.showToast('Kuantitas minimal 1 barang!', 'danger');
+      qtyInput?.focus();
       return;
     }
 
     const itemData = {
       nama_barang: nama,
-      kategori: document.getElementById('item-kategori').value,
-      satuan: document.getElementById('item-satuan').value,
-      kuantitas: Number(document.getElementById('item-kuantitas').value) || 1,
-      harga_satuan: Number(document.getElementById('item-harga-satuan').value) || 0,
+      kategori: document.getElementById('item-kategori').value || 'Bahan Pokok',
+      satuan: document.getElementById('item-satuan').value || 'pcs',
+      kuantitas: qty,
+      harga_satuan: harga,
       diskon_persen_1: Number(document.getElementById('item-d1').value) || 0,
       diskon_persen_2: Number(document.getElementById('item-d2').value) || 0,
       potongan_langsung: Number(document.getElementById('item-potongan').value) || 0,
@@ -288,7 +335,7 @@ const GroceryUI = {
     } else {
       window.groceryStore.addItem(itemData);
       window.soundHaptics.playSuccess();
-      this.showToast('Item dimasukkan ke troli belanja!', 'success');
+      this.showToast('Item berhasil dimasukkan ke keranjang!', 'success');
     }
 
     this.closeAllModals();
@@ -500,6 +547,17 @@ const GroceryUI = {
     const totals = window.groceryStore.getCartTotals();
     const cap = totals.budgetCap;
 
+    // 0. Update Session Store & Date values in header (F-01)
+    const session = window.groceryStore.getSessionMetadata();
+    const storeSelect = document.getElementById('session-store-select');
+    if (storeSelect && session.storeName && storeSelect.value !== session.storeName) {
+      storeSelect.value = session.storeName;
+    }
+    const datePicker = document.getElementById('session-date-picker');
+    if (datePicker && session.transDate && datePicker.value !== session.transDate) {
+      datePicker.value = session.transDate;
+    }
+
     // 1. Update Header Running Total & Budget Meter
     this.renderHeaderBudget(totals, cap);
 
@@ -678,7 +736,7 @@ const GroceryUI = {
                 <button class="stepper-btn stepper-btn-minus" data-step-id="${item.id}" data-delta="-1" aria-label="Kurangi Kuantitas">
                   −
                 </button>
-                <span class="stepper-qty-val tabular-nums">${item.kuantitas}</span>
+                <input type="number" inputmode="numeric" pattern="[0-9]*" min="1" class="stepper-qty-input tabular-nums" data-input-qty-id="${item.id}" value="${item.kuantitas}" style="width: 44px; height: 36px; text-align: center; background: transparent; border: none; color: #f8fafc; font-size: 15px; font-weight: 800; outline: none;" aria-label="Kuantitas Item">
                 <button class="stepper-btn stepper-btn-plus" data-step-id="${item.id}" data-delta="1" aria-label="Tambah Kuantitas">
                   +
                 </button>
@@ -751,6 +809,16 @@ const GroceryUI = {
         const delta = parseInt(btn.dataset.delta, 10);
         window.soundHaptics.playStep();
         window.groceryStore.updateQuantity(id, delta);
+      });
+    });
+
+    // Stepper Direct Numeric Typing (F-02)
+    container.querySelectorAll('.stepper-qty-input').forEach(input => {
+      input.addEventListener('change', (e) => {
+        const id = e.target.dataset.inputQtyId;
+        const newQty = Math.max(1, parseInt(e.target.value, 10) || 1);
+        window.soundHaptics.playStep();
+        window.groceryStore.updateQuantity(id, newQty, true);
       });
     });
 
@@ -893,29 +961,29 @@ const GroceryUI = {
 
         <div style="font-size: 11.5px; color: #94a3b8; margin-top: 4px;">Pilihan Cepat Jatah Uang Saku:</div>
         <div class="budget-quick-presets">
-          <button class="preset-pill" data-val="350000">Rp 350.000</button>
+          <button class="preset-pill" data-val="100000">Rp 100.000 (Uji DT2)</button>
+          <button class="preset-pill" data-val="350000">Rp 350.000 (Rian Kos)</button>
           <button class="preset-pill" data-val="500000">Rp 500.000</button>
           <button class="preset-pill" data-val="750000">Rp 750.000</button>
-          <button class="preset-pill" data-val="1000000">Rp 1.000.000</button>
         </div>
       </div>
 
-      <!-- Safety Cap Status Explainer -->
+      <!-- Safety Cap Status Explainer (SRS F-05) -->
       <div class="budget-config-card">
-        <h3 style="font-size: 13.5px; font-weight: 800; color: #f8fafc; margin-bottom: 10px;">Indikator Zona Keamanan (Safety Cap)</h3>
+        <h3 style="font-size: 13.5px; font-weight: 800; color: #f8fafc; margin-bottom: 10px;">Indikator Pengendali Anggaran (DT2 Safety Cap)</h3>
         
         <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px;">
           <div style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.25);">
             <span style="font-size: 16px;">🟢</span>
-            <div><strong>Zona Aman (&lt; 80%):</strong> Masih banyak sisa jatah saku.</div>
+            <div><strong>Zona Aman (&lt; 90%):</strong> Total belanja masih aman di bawah limit saldo dompet.</div>
           </div>
           <div style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: rgba(245, 158, 11, 0.1); border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.25);">
             <span style="font-size: 16px;">🟡</span>
-            <div><strong>Zona Waspada (80% - 94%):</strong> Perhatikan sisa uang sebelum tambah camilan!</div>
+            <div><strong>Peringatan Waspada (≥ 90% s/d 100%):</strong> Status bar berubah kuning mendekati batas dompet.</div>
           </div>
           <div style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: rgba(244, 63, 94, 0.1); border-radius: 8px; border: 1px solid rgba(244, 63, 94, 0.25);">
             <span style="font-size: 16px;">🔴</span>
-            <div><strong>Zona Bahaya (≥ 95%):</strong> Alarm berbunyi & getar untuk cegah malu di kasir.</div>
+            <div><strong>Bahaya Overbudget (&gt; 100%):</strong> Banner merah tegas menyala dengan notifikasi bahaya.</div>
           </div>
         </div>
       </div>
