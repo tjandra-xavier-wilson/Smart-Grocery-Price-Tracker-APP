@@ -6,12 +6,12 @@ export async function GET() {
 
   return NextResponse.json({
     status: 'ok',
-    appName: 'Smart Grocery Price Tracker (GrabMart Style)',
+    appName: 'PasarPintar - Smart Grocery Price Tracker & Budget Cap',
     timestamp: new Date().toISOString(),
     environment: {
       supabaseConfigured: hasUrl && hasKey,
       vercelRegion: process.env.VERCEL_REGION || 'local',
-      runtime: 'Next.js 16 App Router'
+      runtime: 'Next.js App Router'
     }
   });
 }

@@ -20,7 +20,7 @@ export default function FloatingCartBar({
           playTapSound();
           if (onOpenCheckout) onOpenCheckout();
         }}
-        className="w-full pointer-events-auto bg-grab-green hover:bg-grab-dark text-white rounded-2xl p-3.5 shadow-float active-press transition-all duration-200 flex items-center justify-between border border-emerald-400/30 group animate-slide-up"
+        className="w-full pointer-events-auto bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl p-3.5 shadow-float active-press transition-all duration-200 flex items-center justify-between border border-indigo-400/30 group animate-slide-up"
       >
         {/* Left Section: Shopping Bag Icon, Item Count & Total Price */}
         <div className="flex items-center space-x-3">
@@ -29,8 +29,8 @@ export default function FloatingCartBar({
           </div>
 
           <div className="flex flex-col text-left">
-            <span className="text-[11px] font-semibold text-white/90 leading-tight">
-              {totalItems} items
+            <span className="text-[11px] font-semibold text-indigo-100 leading-tight">
+              {totalItems} barang di keranjang
             </span>
             <span className="text-[16px] font-extrabold text-white leading-tight tracking-tight">
               {formatRupiah(totalPrice)}
@@ -40,7 +40,7 @@ export default function FloatingCartBar({
 
         {/* Right Section: "Checkout" text and chevron */}
         <div className="flex items-center space-x-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-xs px-3.5 py-1.5 rounded-xl font-bold text-sm tracking-wide text-white transition-colors">
-          <span>Checkout</span>
+          <span>Lihat Keranjang</span>
           <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
         </div>
       </button>

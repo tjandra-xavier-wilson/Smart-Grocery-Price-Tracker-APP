@@ -3,12 +3,12 @@
 @import "tailwindcss/utilities";
 
 :root {
-  --grab-green: #00B14F;
-  --grab-dark: #008C3E;
-  --grab-light: #E6F8EE;
-  --charcoal: #111827;
-  --subtext: #6B7280;
-  --divider: #F3F4F6;
+  --brand-primary: #4F46E5;
+  --brand-dark: #3730A3;
+  --brand-light: #EEF2FF;
+  --charcoal: #0F172A;
+  --subtext: #64748B;
+  --divider: #E2E8F0;
 }
 
 /* Hide scrollbar for horizontal category carousel */
@@ -25,7 +25,7 @@ html, body {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
-  background-color: #0b1120;
+  background-color: #0F172A;
 }
 
 @supports (padding: max(0px)) {
@@ -40,14 +40,14 @@ html, body {
   transition: transform 0.1s ease;
 }
 
-/* Glassmorphism effects */
+/* Minimalist Card & Glassmorphism */
 .glass-header {
   background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .glass-pill {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(6px);
 }

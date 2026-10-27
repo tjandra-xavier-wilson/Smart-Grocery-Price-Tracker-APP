@@ -36,29 +36,23 @@ export default function PromoBanner({ banners, onApplyPromo }) {
       >
         {/* Background gradient with ambient image */}
         <div className={`w-full min-h-[148px] p-4 bg-gradient-to-r ${activeBanner.bgGradient} text-white flex flex-col justify-between relative`}>
-          {/* Background Decorative Pattern / Image overlay */}
-          <div 
-            className="absolute inset-0 opacity-15 bg-cover bg-center mix-blend-overlay pointer-events-none"
-            style={{ backgroundImage: `url(${activeBanner.image})` }}
-          />
-
           {/* Top Row: Tag & Badge */}
           <div className="flex items-center justify-between relative z-10">
             <span className="bg-white/20 backdrop-blur-xs text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-white/20 flex items-center space-x-1">
-              <Sparkles className="w-3 h-3 text-yellow-300" />
-              <span>{activeBanner.tag}</span>
+              <Sparkles className="w-3 h-3 text-amber-300" />
+              <span>Promo Pasar</span>
             </span>
-            <span className="bg-yellow-400 text-charcoal text-[11px] font-extrabold px-2.5 py-0.5 rounded-full shadow-xs">
-              {activeBanner.badge}
+            <span className="bg-amber-400 text-slate-900 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full shadow-xs">
+              {activeBanner.discountBadge}
             </span>
           </div>
 
           {/* Main Title & Subtitle */}
           <div className="relative z-10 my-2">
-            <h3 className="font-extrabold text-[17px] sm:text-[18px] leading-snug drop-shadow-xs max-w-[240px]">
+            <h3 className="font-extrabold text-[17px] sm:text-[18px] leading-snug drop-shadow-xs max-w-[260px]">
               {activeBanner.title}
             </h3>
-            <p className="text-white/80 text-[11px] font-medium mt-0.5 max-w-[260px] line-clamp-1">
+            <p className="text-white/80 text-[11px] font-medium mt-0.5 max-w-[280px] line-clamp-1">
               {activeBanner.subtitle}
             </p>
           </div>
@@ -67,16 +61,16 @@ export default function PromoBanner({ banners, onApplyPromo }) {
           <div className="flex items-center justify-between relative z-10 pt-1">
             <div 
               onClick={() => handleCopyCode(activeBanner.code)}
-              className="inline-flex items-center space-x-1.5 bg-white text-charcoal px-3 py-1 rounded-xl text-xs font-bold cursor-pointer hover:bg-yellow-50 active-press shadow-xs transition-colors"
+              className="inline-flex items-center space-x-1.5 bg-white text-slate-900 px-3 py-1 rounded-xl text-xs font-bold cursor-pointer hover:bg-indigo-50 active-press shadow-xs transition-colors"
             >
-              <Tag className="w-3.5 h-3.5 text-grab-green" />
+              <Tag className="w-3.5 h-3.5 text-indigo-600" />
               <span>{activeBanner.code}</span>
               {copiedCode === activeBanner.code ? (
-                <span className="text-[10px] text-grab-green font-extrabold flex items-center ml-1">
+                <span className="text-[10px] text-indigo-600 font-extrabold flex items-center ml-1">
                   <Check className="w-3 h-3 mr-0.5" /> Tersalin!
                 </span>
               ) : (
-                <span className="text-[10px] text-subtext font-normal ml-0.5">(Klaim)</span>
+                <span className="text-[10px] text-slate-500 font-normal ml-0.5">(Klaim)</span>
               )}
             </div>
 

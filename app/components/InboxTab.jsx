@@ -10,33 +10,33 @@ export default function InboxTab({ onApplyVoucher }) {
   const notifications = [
     {
       id: 'n1',
-      title: 'Diskon 50% Sayuran Segar Hari Ini!',
-      desc: 'Borong sayuran segar organik dari petani mitra dengan kode voucher khusus.',
-      code: 'GRABMART50',
-      time: '10 menit lalu',
-      badge: 'Promo Mart',
+      title: 'Diskon 30% Belanja Pasar Pagi!',
+      desc: 'Dapatkan potongan langsung hingga Rp 25.000 untuk sayuran segar & sembako.',
+      code: 'PASARHEMAT',
+      time: '15 menit lalu',
+      badge: 'Voucher Utama',
       icon: Tag,
-      color: 'bg-emerald-50 text-grab-green',
+      color: 'bg-indigo-50 text-indigo-600',
     },
     {
       id: 'n2',
-      title: 'Gratis Ongkir Kilat 30 Menit!',
-      desc: 'Nikmati bebas biaya antar untuk pemesanan groceries minimal Rp 30.000.',
+      title: 'Bebas Ongkir Pengantaran Langsung!',
+      desc: 'Nikmati gratis pengiriman tanpa minimum belanja ke wilayah terdekat mitra.',
       code: 'ONGKIRFREE',
-      time: '2 jam lalu',
-      badge: 'Voucher Kilat',
+      time: '1 jam lalu',
+      badge: 'Bebas Ongkir',
       icon: Gift,
-      color: 'bg-amber-50 text-amber-600',
+      color: 'bg-emerald-50 text-emerald-600',
     },
     {
       id: 'n3',
-      title: 'Flash Sale Protein Segar (Daging & Salmon)',
-      desc: 'Potongan langsung Rp 15.000 untuk salmon dan dada ayam tanpa tulang.',
-      code: 'PROTEINHEMAT',
-      time: 'Kemarin',
-      badge: 'Flash Sale',
+      title: 'Potongan Sembako Rp 15.000',
+      desc: 'Hemat belanja beras pulen, minyak goreng sawit, dan telur ayam ras pilihan.',
+      code: 'SEMBAKOPINTAR',
+      time: 'Hari ini',
+      badge: 'Paket Hemat',
       icon: Sparkles,
-      color: 'bg-rose-50 text-rose-600',
+      color: 'bg-amber-50 text-amber-600',
     },
   ];
 
@@ -52,12 +52,12 @@ export default function InboxTab({ onApplyVoucher }) {
 
   return (
     <div className="p-4 space-y-4 pb-28 animate-fade-in">
-      <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
         <div>
-          <h2 className="text-lg font-bold text-charcoal">Kotak Masuk & Promo</h2>
-          <p className="text-xs text-subtext">Kumpulan promo dan voucher GrabMart eksklusif</p>
+          <h2 className="text-lg font-bold text-slate-900">Kotak Promo &amp; Kupon</h2>
+          <p className="text-xs text-slate-500">Kumpulan kode diskon resmi belanja pasar hemat</p>
         </div>
-        <div className="p-2 bg-grab-light text-grab-green rounded-full">
+        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-full border border-indigo-100">
           <Mail className="w-5 h-5" />
         </div>
       </div>
@@ -70,7 +70,7 @@ export default function InboxTab({ onApplyVoucher }) {
           return (
             <div
               key={item.id}
-              className="bg-white rounded-2xl border border-gray-100 p-4 shadow-card space-y-3"
+              className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-card space-y-3"
             >
               <div className="flex items-start space-x-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${item.color}`}>
@@ -78,25 +78,25 @@ export default function InboxTab({ onApplyVoucher }) {
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-grab-green">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">
                       {item.badge}
                     </span>
-                    <span className="text-[10px] text-gray-400">{item.time}</span>
+                    <span className="text-[10px] text-slate-400">{item.time}</span>
                   </div>
-                  <h4 className="font-bold text-sm text-charcoal mt-0.5 leading-snug">{item.title}</h4>
-                  <p className="text-xs text-subtext mt-1 leading-relaxed">{item.desc}</p>
+                  <h4 className="font-bold text-sm text-slate-900 mt-0.5 leading-snug">{item.title}</h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">{item.desc}</p>
                 </div>
               </div>
 
               {/* Code voucher copy bar */}
-              <div className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+              <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-dashed border-slate-200">
                 <div className="flex items-center space-x-2">
-                  <Tag className="w-4 h-4 text-grab-green" />
-                  <span className="font-mono font-bold text-xs text-charcoal">{item.code}</span>
+                  <Tag className="w-4 h-4 text-indigo-600" />
+                  <span className="font-mono font-bold text-xs text-slate-900">{item.code}</span>
                 </div>
                 <button
                   onClick={() => handleCopy(item)}
-                  className="px-3 py-1 bg-grab-green text-white text-xs font-bold rounded-lg active-press hover:bg-grab-dark flex items-center space-x-1"
+                  className="px-3 py-1 bg-indigo-600 text-white text-xs font-bold rounded-lg active-press hover:bg-indigo-700 shadow-brand flex items-center space-x-1 transition-colors"
                 >
                   {isCopied ? (
                     <>
@@ -104,7 +104,7 @@ export default function InboxTab({ onApplyVoucher }) {
                       <span>Dipakai!</span>
                     </>
                   ) : (
-                    <span>Gunakan Voucher</span>
+                    <span>Gunakan</span>
                   )}
                 </button>
               </div>

@@ -14,48 +14,48 @@ import AccountTab from './components/AccountTab';
 import InboxTab from './components/InboxTab';
 import { CATEGORIES, GROCERY_PRODUCTS, PROMO_BANNERS } from './data/groceryData';
 import { supabase, getSingleUserSession, signOutUser } from '../src/lib/supabaseClient';
-import { Smartphone, Monitor, ShoppingBag, Sparkles, RefreshCw } from 'lucide-react';
+import { ShoppingBag, Sparkles } from 'lucide-react';
 import { playTapSound } from './utils/sound';
 
 export default function Home() {
-  const [currentAddress, setCurrentAddress] = useState('Jl. Sudirman No. 45, Jakarta Pusat');
+  const [currentAddress, setCurrentAddress] = useState('Lotte Mart Grocery - Puri Indah');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [activeTab, setActiveTab] = useState('home');
-  const [appliedVoucher, setAppliedVoucher] = useState('GRABMART50');
+  const [appliedVoucher, setAppliedVoucher] = useState('PASARHEMAT');
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [supabaseStatus, setSupabaseStatus] = useState('checking');
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Initial cart with 2 items summing to Rp 45.000 as specified in the prompt
+  // Initial cart with realistic market grocery items (matching DT2 scenario)
   const [cartItems, setCartItems] = useState([
     {
-      id: 'prod-2',
-      name: 'Apel Fuji Super Manis & Renyah',
-      price: 28000,
-      originalPrice: 40000,
+      id: 'prod-1',
+      name: 'Beras Rojolele Super Pulen',
+      price: 74000,
+      originalPrice: 82000,
       quantity: 1,
-      unit: '1 kg',
-      image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=600&auto=format&fit=crop&q=80',
-      category: 'buah'
+      unit: 'karung 5kg',
+      image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&auto=format&fit=crop&q=80',
+      category: 'sembako'
     },
     {
-      id: 'prod-5',
-      name: 'Wortel Brastagi Segar Manis',
-      price: 8500,
-      originalPrice: 12000,
-      quantity: 2, // 2 x 8.500 = 17.000. 28.000 + 17.000 = Rp 45.000!
-      unit: '500g',
-      image: 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=600&auto=format&fit=crop&q=80',
-      category: 'sayur'
+      id: 'prod-2',
+      name: 'Minyak Goreng Sawit Murni 2L',
+      price: 43000,
+      originalPrice: 48000,
+      quantity: 1,
+      unit: 'pouch 2 liter',
+      image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80',
+      category: 'sembako'
     }
   ]);
 
   // Check Supabase connection and load single-user session on load
   useEffect(() => {
     async function initSession() {
-      // 1. Supabase Health
+      // 1. Supabase Health Check
       try {
         const { error } = await supabase.from('budget_settings').select('id').limit(1);
         if (error) {
@@ -107,7 +107,7 @@ export default function Home() {
       product.description.toLowerCase().includes(searchQuery.toLowerCase());
     
     if (selectedCategory === 'all') return matchesSearch;
-    if (selectedCategory === 'promo') return matchesSearch && product.discountPercent >= 20;
+    if (selectedCategory === 'promo') return matchesSearch && product.discountPercent >= 15;
     return matchesSearch && product.category === selectedCategory;
   });
 
@@ -169,21 +169,20 @@ export default function Home() {
   };
 
   const totalCartCount = cartItems.length;
-  const totalCartUnits = cartItems.reduce((acc, i) => acc + i.quantity, 0);
   const totalCartPrice = cartItems.reduce((acc, i) => acc + (i.price * i.quantity), 0);
 
   return (
-    <main className="min-h-screen bg-[#0E131F] flex items-center justify-center p-0 md:p-6 lg:p-10 font-sans">
-      {/* Mobile Shell Mockup Wrapper (Centered on desktop, full-width on mobile) */}
+    <main className="min-h-screen bg-[#0B0F19] flex items-center justify-center p-0 md:p-6 lg:p-10 font-sans">
+      {/* Mobile Shell Mockup Wrapper */}
       <div className="w-full max-w-[430px] bg-white min-h-screen md:min-h-[890px] md:max-h-[920px] md:rounded-[44px] shadow-2xl md:ring-12 md:ring-slate-800/80 overflow-hidden flex flex-col relative transition-all duration-300">
         
         {/* Simulated Mobile Status Bar */}
-        <div className="bg-white px-6 pt-3 pb-1 flex items-center justify-between text-xs text-charcoal font-semibold shrink-0 select-none border-b border-gray-50">
+        <div className="bg-white px-6 pt-3 pb-1 flex items-center justify-between text-xs text-slate-800 font-semibold shrink-0 select-none border-b border-slate-50">
           <span className="font-bold tracking-tight">09:41</span>
-          <div className="w-20 h-4 bg-charcoal/10 rounded-full flex items-center justify-center">
-            <span className="w-2.5 h-2.5 bg-charcoal rounded-full" />
+          <div className="w-20 h-4 bg-slate-200/80 rounded-full flex items-center justify-center">
+            <span className="w-2.5 h-2.5 bg-slate-700 rounded-full" />
           </div>
-          <div className="flex items-center space-x-1.5 text-[11px] text-gray-700">
+          <div className="flex items-center space-x-1.5 text-[11px] text-slate-700">
             <span>5G</span>
             <span>●●●</span>
             <span>🔋</span>
@@ -220,46 +219,46 @@ export default function Home() {
                 onApplyPromo={(code) => setAppliedVoucher(code)}
               />
 
-              {/* Section Divider (Clean light gray as specified) */}
-              <div className="h-2 bg-[#F3F4F6] w-full" />
+              {/* Clean Minimalist Divider */}
+              <div className="h-2 bg-slate-100/70 w-full" />
 
               {/* 4. Product Grid (Grocery Items) */}
               <section className="px-4 py-4 pb-36">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h3 className="text-base font-extrabold text-charcoal tracking-tight">
-                      Rekomendasi Hari Ini
+                    <h3 className="text-base font-extrabold text-slate-900 tracking-tight">
+                      Katalog Pasar &amp; Bahan Pokok
                     </h3>
-                    <p className="text-[11px] text-subtext">
-                      Pilihan sayur &amp; buah segar dari petani mitra Grab
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      35 pilihan bahan segar langsung dari pedagang pasar &amp; grosir
                     </p>
                   </div>
                   {filteredProducts.length > 0 && (
-                    <span className="text-[11px] font-bold text-grab-green bg-grab-light px-2 py-0.5 rounded-full">
+                    <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full">
                       {filteredProducts.length} Produk
                     </span>
                   )}
                 </div>
 
                 {filteredProducts.length === 0 ? (
-                  <div className="py-12 text-center space-y-2 bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                    <ShoppingBag className="w-10 h-10 text-gray-300 mx-auto" />
-                    <h4 className="text-sm font-bold text-charcoal">Produk tidak ditemukan</h4>
-                    <p className="text-xs text-subtext">
-                      Coba cari dengan kata kunci lain seperti &quot;bayam&quot;, &quot;apel&quot;, atau &quot;ayam&quot;.
+                  <div className="py-12 text-center space-y-2 bg-slate-50 rounded-2xl p-6 border border-slate-200/80">
+                    <ShoppingBag className="w-10 h-10 text-slate-300 mx-auto" />
+                    <h4 className="text-sm font-bold text-slate-800">Produk tidak ditemukan</h4>
+                    <p className="text-xs text-slate-500">
+                      Coba cari dengan kata kunci lain seperti &quot;beras&quot;, &quot;minyak&quot;, atau &quot;telur&quot;.
                     </p>
                     <button
                       onClick={() => {
                         setSearchQuery('');
                         setSelectedCategory('all');
                       }}
-                      className="mt-2 text-xs font-bold text-grab-green hover:underline"
+                      className="mt-2 text-xs font-bold text-indigo-600 hover:underline"
                     >
                       Reset Filter
                     </button>
                   </div>
                 ) : (
-                  /* 2-column grid layout as required */
+                  /* 2-column clean minimalist grid layout */
                   <div className="grid grid-cols-2 gap-3">
                     {filteredProducts.map((product) => (
                       <ProductCard
@@ -304,7 +303,7 @@ export default function Home() {
           )}
         </div>
 
-        {/* 5. Floating Cart Bar (Positioned just above bottom navigation) */}
+        {/* 5. Floating Cart Bar */}
         {activeTab === 'home' && totalCartCount > 0 && (
           <FloatingCartBar
             totalItems={totalCartCount}
@@ -313,14 +312,14 @@ export default function Home() {
           />
         )}
 
-        {/* 6. Bottom Navigation (Fixed) */}
+        {/* 6. Bottom Navigation */}
         <BottomNav
           activeTab={activeTab}
           onChangeTab={(tabId) => setActiveTab(tabId)}
           ordersCount={1}
         />
 
-        {/* Grab Checkout Slide-Up Drawer */}
+        {/* Slide-Up Checkout Drawer */}
         <CheckoutDrawer
           isOpen={isCheckoutOpen}
           onClose={() => setIsCheckoutOpen(false)}
@@ -345,7 +344,7 @@ export default function Home() {
 
         {/* Home Indicator bar */}
         <div className="hidden md:flex justify-center pb-2 bg-white shrink-0 pointer-events-none">
-          <div className="w-32 h-1 bg-gray-300 rounded-full" />
+          <div className="w-32 h-1 bg-slate-300 rounded-full" />
         </div>
       </div>
     </main>
