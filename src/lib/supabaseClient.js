@@ -355,6 +355,101 @@ function saveOfflineTrip(historyData, itemsList) {
 // ==============================================================================
 export const SINGLE_USER_STORAGE_KEY = 'sakugrosir_single_user_v1';
 export const DESIGNATED_OWNER_EMAIL = 'tjandra.xavier.wilson@gmail.com';
+export const DEVICE_ACCOUNTS_STORAGE_KEY = 'sakugrosir_device_accounts_v1';
+
+/**
+ * Sign in with Email & Password via Supabase Auth
+ */
+export async function signInWithEmailPassword(email, password) {
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: password
+    });
+    if (error) throw error;
+    return { success: true, data };
+  } catch (err) {
+    console.warn('[Supabase signInWithPassword] Error:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Sign up with Email & Password via Supabase Auth
+ */
+export async function signUpWithEmailPassword(email, password, fullName) {
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password: password,
+      options: {
+        data: {
+          full_name: fullName || email.split('@')[0]
+        }
+      }
+    });
+    if (error) throw error;
+    return { success: true, data };
+  } catch (err) {
+    console.warn('[Supabase signUp] Error:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Device Registered Accounts Manager (LocalStorage Persistence)
+ */
+export function getDeviceAccounts() {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(DEVICE_ACCOUNTS_STORAGE_KEY);
+    if (!raw) {
+      const defaultAccounts = [
+        {
+          name: 'Wilson Tjandra',
+          email: DESIGNATED_OWNER_EMAIL,
+          avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+          provider: 'google',
+          last_login: new Date().toISOString()
+        }
+      ];
+      localStorage.setItem(DEVICE_ACCOUNTS_STORAGE_KEY, JSON.stringify(defaultAccounts));
+      return defaultAccounts;
+    }
+    return JSON.parse(raw);
+  } catch (e) {
+    return [];
+  }
+}
+
+export function saveDeviceAccount(profile) {
+  if (typeof localStorage === 'undefined' || !profile?.email) return;
+  try {
+    let accounts = getDeviceAccounts();
+    accounts = accounts.filter(a => a.email.toLowerCase() !== profile.email.toLowerCase());
+    accounts.unshift({
+      name: profile.name || profile.email.split('@')[0],
+      email: profile.email,
+      avatar_url: profile.avatar_url || null,
+      provider: profile.provider || 'password',
+      last_login: new Date().toISOString()
+    });
+    accounts = accounts.slice(0, 5);
+    localStorage.setItem(DEVICE_ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
+  } catch (e) {}
+}
+
+export function removeDeviceAccount(email) {
+  if (typeof localStorage === 'undefined' || !email) return [];
+  try {
+    let accounts = getDeviceAccounts();
+    accounts = accounts.filter(a => a.email.toLowerCase() !== email.toLowerCase());
+    localStorage.setItem(DEVICE_ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
+    return accounts;
+  } catch (e) {
+    return [];
+  }
+}
 
 /**
  * Sign in with Google via Supabase OAuth

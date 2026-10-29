@@ -20,7 +20,8 @@ import {
   getSingleUserSession, 
   signOutUser, 
   saveShoppingTrip, 
-  updateBudgetSettings 
+  updateBudgetSettings,
+  saveDeviceAccount
 } from '../src/lib/supabaseClient';
 import { playTapSound, playSuccessSound } from './utils/sound';
 
@@ -257,9 +258,39 @@ export default function Home() {
 
     initFirestoreSync();
 
+    // 4. Live Supabase Auth State Change Listener (SRS Requirement)
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('⚡ [Supabase onAuthStateChange Event]:', event);
+      if (session?.user) {
+        const u = session.user;
+        const profile = {
+          id: u.id,
+          name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0] || 'Wilson Tjandra',
+          email: u.email,
+          avatar_url: u.user_metadata?.avatar_url || u.user_metadata?.picture || null,
+          provider: session.user.app_metadata?.provider || 'supabase',
+          role: 'single_owner',
+          isDesignatedOwner: true,
+          authenticated_at: new Date().toISOString()
+        };
+        saveDeviceAccount(profile);
+        setCurrentUser(profile);
+        setIsAuthenticated(true);
+        setActiveTab('cart');
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(STORAGE_KEYS.AUTH, 'true');
+          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(profile));
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+      }
+    });
+
     return () => {
       broadcastChannelRef.current?.close();
       if (unsubscribeFirestore) unsubscribeFirestore();
+      authSub?.unsubscribe();
     };
   }, []);
 
@@ -294,10 +325,11 @@ export default function Home() {
     setActiveTab('cart');
   };
 
-  const handleLogout = () => {
-    signOutUser();
+  const handleLogout = async () => {
+    await signOutUser();
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(STORAGE_KEYS.AUTH);
+      localStorage.removeItem(STORAGE_KEYS.USER);
     }
     setIsAuthenticated(false);
   };
