@@ -371,3 +371,60 @@ export function CheckoutModal({ isOpen, onClose, totalSpent, storeName, itemCoun
     </div>
   );
 }
+
+/**
+ * 6. Modal Profil Akun & Opsi Logout / Ganti Akun
+ */
+export function UserProfileModal({ isOpen, onClose, currentUser, onLogout }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/60 backdrop-blur-xs p-0 sm:p-4 animate-fade-in">
+      <div 
+        className="w-full max-w-[400px] bg-white rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl border border-slate-100 animate-slide-up text-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+          <h3 className="font-extrabold text-sm text-slate-900">Profil Akun Pemilik</h3>
+          <button 
+            onClick={() => { playTapSound(); onClose(); }}
+            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="w-16 h-16 rounded-full bg-emerald-800 text-white mx-auto flex items-center justify-center font-bold text-xl shadow-md overflow-hidden mb-3">
+          {currentUser?.avatar_url ? (
+            <img src={currentUser.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+          ) : (
+            <span>WT</span>
+          )}
+        </div>
+
+        <h4 className="text-base font-extrabold text-slate-900">{currentUser?.name || 'Wilson Tjandra'}</h4>
+        <p className="text-xs text-slate-500 font-mono mt-0.5">{currentUser?.email || 'tjandra.xavier.wilson@gmail.com'}</p>
+
+        <div className="mt-3 inline-flex items-center space-x-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 rounded-full text-[11px] font-bold border border-emerald-200">
+          <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
+          <span>Single-User Dedicated Owner</span>
+        </div>
+
+        <div className="mt-6 pt-4 border-t border-slate-100 space-y-2">
+          <button
+            type="button"
+            onClick={() => {
+              playTapSound();
+              onLogout();
+              onClose();
+            }}
+            className="w-full py-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl flex items-center justify-center space-x-2 transition-colors cursor-pointer"
+          >
+            <span>🚪 Keluar ke Halaman Login Awal</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
