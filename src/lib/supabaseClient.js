@@ -351,11 +351,70 @@ function saveOfflineTrip(historyData, itemsList) {
 }
 
 // ==============================================================================
-// 6. SINGLE-USER ACCESS & GOOGLE AUTHENTICATION (OAUTH)
+// 6. SUPABASE AUTHENTICATION & SESSION MANAGEMENT
 // ==============================================================================
 export const SINGLE_USER_STORAGE_KEY = 'sakugrosir_single_user_v1';
-export const DESIGNATED_OWNER_EMAIL = 'tjandra.xavier.wilson@gmail.com';
 export const DEVICE_ACCOUNTS_STORAGE_KEY = 'sakugrosir_device_accounts_v1';
+export const REGISTERED_USERS_STORAGE_KEY = 'sakugrosir_registered_users_v1';
+export const DESIGNATED_OWNER_EMAIL = 'tjandra.xavier.wilson@gmail.com';
+
+/**
+ * Cek apakah email sudah terdaftar di sistem (Whitelist Akun)
+ */
+export async function isEmailRegistered(email) {
+  if (!email) return false;
+  const clean = email.toLowerCase().trim();
+
+  // 1. Cek dari LocalStorage daftar registrasi
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(REGISTERED_USERS_STORAGE_KEY);
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list) && list.some(e => e.toLowerCase() === clean)) {
+          return true;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 2. Cek apakah ada di daftar akun tersimpan di perangkat
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const devAccounts = getDeviceAccounts();
+      if (devAccounts.some(a => a.email.toLowerCase() === clean)) {
+        return true;
+      }
+    } catch (e) {}
+  }
+
+  // 3. Cek di Supabase database jika ada tabel profiles/users
+  try {
+    const { data, error } = await supabase
+      .from('budget_settings')
+      .select('id')
+      .limit(1);
+  } catch (e) {}
+
+  return false;
+}
+
+/**
+ * Daftarkan email ke whitelist sistem
+ */
+export function addRegisteredEmail(email) {
+  if (typeof localStorage === 'undefined' || !email) return;
+  const clean = email.toLowerCase().trim();
+  try {
+    const raw = localStorage.getItem(REGISTERED_USERS_STORAGE_KEY);
+    let list = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(list)) list = [];
+    if (!list.some(e => e.toLowerCase() === clean)) {
+      list.push(clean);
+      localStorage.setItem(REGISTERED_USERS_STORAGE_KEY, JSON.stringify(list));
+    }
+  } catch (e) {}
+}
 
 /**
  * Sign in with Email & Password via Supabase Auth
@@ -367,6 +426,8 @@ export async function signInWithEmailPassword(email, password) {
       password: password
     });
     if (error) throw error;
+    // Tandai email sebagai terdaftar
+    addRegisteredEmail(email);
     return { success: true, data };
   } catch (err) {
     console.warn('[Supabase signInWithPassword] Error:', err.message);
@@ -389,6 +450,8 @@ export async function signUpWithEmailPassword(email, password, fullName) {
       }
     });
     if (error) throw error;
+    // Tambahkan ke whitelist akun terdaftar
+    addRegisteredEmail(email);
     return { success: true, data };
   } catch (err) {
     console.warn('[Supabase signUp] Error:', err.message);
@@ -397,26 +460,16 @@ export async function signUpWithEmailPassword(email, password, fullName) {
 }
 
 /**
- * Device Registered Accounts Manager (LocalStorage Persistence)
+ * Device Registered Accounts Manager (Tanpa hardcoded mock accounts!)
+ * Hanya diisi dari akun yang benar-benar pernah sukses login manual di device ini.
  */
 export function getDeviceAccounts() {
   if (typeof localStorage === 'undefined') return [];
   try {
     const raw = localStorage.getItem(DEVICE_ACCOUNTS_STORAGE_KEY);
-    if (!raw) {
-      const defaultAccounts = [
-        {
-          name: 'Wilson Tjandra',
-          email: DESIGNATED_OWNER_EMAIL,
-          avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-          provider: 'google',
-          last_login: new Date().toISOString()
-        }
-      ];
-      localStorage.setItem(DEVICE_ACCOUNTS_STORAGE_KEY, JSON.stringify(defaultAccounts));
-      return defaultAccounts;
-    }
-    return JSON.parse(raw);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
     return [];
   }
@@ -436,6 +489,7 @@ export function saveDeviceAccount(profile) {
     });
     accounts = accounts.slice(0, 5);
     localStorage.setItem(DEVICE_ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
+    addRegisteredEmail(profile.email);
   } catch (e) {}
 }
 
@@ -453,31 +507,59 @@ export function removeDeviceAccount(email) {
 
 /**
  * Sign in with Google via Supabase OAuth
+ * Dilengkapi pencegahan error 400 layar hitam jika provider belum diaktifkan di dashboard
  */
 export async function signInWithGoogle() {
   try {
+    // 1. Cek ketersediaan Google Provider terlebih dahulu
+    // Di dashboard Supabase, buka menu Authentication -> Providers -> Google,
+    // aktifkan toggle "Enable Google provider", lalu isi Client ID dan Client Secret dari Google Cloud Console.
+    try {
+      const checkRes = await fetch('/api/auth/google-check', { method: 'GET' });
+      const checkData = await checkRes.json();
+      if (!checkData.enabled) {
+        console.warn('[Supabase Google Auth] Provider belum aktif:', checkData.error);
+        console.info('👉 Petunjuk Admin Supabase: Di dashboard Supabase (https://supabase.com/dashboard), buka Authentication -> Providers -> Google, aktifkan toggle "Enable Google provider", lalu isi Client ID dan Client Secret dari Google Cloud Console.');
+        return {
+          success: false,
+          isProviderDisabled: true,
+          error: 'Login Google belum diaktifkan di konfigurasi Supabase. Silakan hubungi admin atau gunakan login email/password.'
+        };
+      }
+    } catch (apiErr) {
+      console.warn('[Check Provider API Warning]:', apiErr.message);
+    }
+
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: origin,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent'
-        }
+        redirectTo: origin
       }
     });
 
-    if (error) throw error;
+    if (error) {
+      console.warn('[Supabase Google Auth error]:', error.message);
+      return { 
+        success: false, 
+        error: error.message.includes('not enabled') 
+          ? 'Login Google belum diaktifkan di konfigurasi Supabase. Silakan hubungi admin atau gunakan login email/password.'
+          : error.message 
+      };
+    }
+
     return { success: true, data };
   } catch (err) {
-    console.warn('[Supabase Google Auth] OAuth trigger error:', err.message);
-    return { success: false, error: err.message };
+    console.warn('[Supabase Google Auth Exception]:', err.message);
+    return { 
+      success: false, 
+      error: 'Login Google belum diaktifkan di konfigurasi Supabase. Silakan hubungi admin atau gunakan login email/password.' 
+    };
   }
 }
 
 /**
- * Sign out from session
+ * Sign out dari sesi aktif dan bersihkan token dari storage
  */
 export async function signOutUser() {
   try {
@@ -485,67 +567,40 @@ export async function signOutUser() {
   } catch (err) {}
   if (typeof localStorage !== 'undefined') {
     localStorage.removeItem(SINGLE_USER_STORAGE_KEY);
+    localStorage.removeItem('sakugrosir_is_logged_in');
   }
   return { success: true };
 }
 
 /**
- * Get the currently authenticated single user or persistent single user profile
+ * Mengambil sesi autentikasi pengguna aktual (tanpa dummy user hardcoded)
  */
 export async function getSingleUserSession() {
   try {
-    // 1. Check Supabase live session
     const { data: { session } } = await supabase.auth.getSession();
     if (session && session.user) {
       const u = session.user;
-      const profile = {
+      return {
         id: u.id,
         email: u.email,
-        name: u.user_metadata?.full_name || u.user_metadata?.name || 'Wilson Tjandra',
+        name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0],
         avatar_url: u.user_metadata?.avatar_url || u.user_metadata?.picture || null,
-        provider: 'google',
-        role: 'single_owner',
-        isDesignatedOwner: true,
+        provider: session.user.app_metadata?.provider || 'supabase',
+        role: 'user',
         authenticated_at: new Date().toISOString()
       };
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(SINGLE_USER_STORAGE_KEY, JSON.stringify(profile));
-      }
-      return profile;
     }
   } catch (e) {}
 
-  // 2. Check local single-user cached session
-  if (typeof localStorage !== 'undefined') {
-    const raw = localStorage.getItem(SINGLE_USER_STORAGE_KEY);
-    if (raw) {
-      try {
-        return JSON.parse(raw);
-      } catch (e) {}
-    }
-  }
-
-  // 3. Default single-user profile (Owner mode)
-  return {
-    id: 'single-user-owner-01',
-    email: DESIGNATED_OWNER_EMAIL,
-    name: 'Wilson Tjandra',
-    avatar_url: null,
-    provider: 'google',
-    role: 'single_owner',
-    isDesignatedOwner: true,
-    authenticated_at: new Date().toISOString()
-  };
+  return null;
 }
 
 /**
- * Enforces single user access policy (restricts multi-user signup/access)
+ * Enforces single user access policy (restricts multi-user signup/access if configured)
  */
 export function verifySingleUserPolicy(email) {
   if (!email) return false;
-  // In single-user mode, access is exclusively restricted to the designated account
   const clean = email.toLowerCase().trim();
   const designated = DESIGNATED_OWNER_EMAIL.toLowerCase().trim();
   return clean === designated;
 }
-

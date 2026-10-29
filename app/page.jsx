@@ -21,7 +21,8 @@ import {
   signOutUser, 
   saveShoppingTrip, 
   updateBudgetSettings,
-  saveDeviceAccount
+  saveDeviceAccount,
+  isEmailRegistered
 } from '../src/lib/supabaseClient';
 import { playTapSound, playSuccessSound } from './utils/sound';
 
@@ -157,6 +158,7 @@ const MOCKUP_OVERBUDGET_CART = [
 export default function Home() {
   // Authentication State: First screen shown on load is Login UI (Mockup 1)
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authErrorMessage, setAuthErrorMessage] = useState('');
 
   // Navigation State: 'cart' | 'input' | 'history'
   const [activeTab, setActiveTab] = useState('cart');
@@ -261,22 +263,44 @@ export default function Home() {
     // 4. Live Supabase Auth State Change Listener (SRS Requirement)
     const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('⚡ [Supabase onAuthStateChange Event]:', event);
-      if (session?.user) {
+
+      // Hanya proses jika event adalah SIGNED_IN atau USER_UPDATED (bukan sekedar INITIAL_SESSION)
+      // Ini memastikan saat website pertama dibuka/direfresh, pengguna tetap diarahkan ke AuthScreen
+      if (session?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
         const u = session.user;
+        const userEmail = u.email;
+
+        // Requirement 2: Whitelist Akun Google (Hanya Akun yang Sudah Terdaftar yang Boleh Masuk)
+        const isRegistered = await isEmailRegistered(userEmail);
+        if (!isRegistered) {
+          console.warn(`[Supabase Auth Guard] Akun Google ${userEmail} belum terdaftar! Batalkan sesi.`);
+          await supabase.auth.signOut();
+          if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem(STORAGE_KEYS.AUTH);
+            localStorage.removeItem(STORAGE_KEYS.USER);
+          }
+          setIsAuthenticated(false);
+          setCurrentUser(null);
+          setAuthErrorMessage('Akun Google ini belum terdaftar di sistem. Silakan registrasi terlebih dahulu sebelum masuk.');
+          return;
+        }
+
         const profile = {
           id: u.id,
-          name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0] || 'Wilson Tjandra',
+          name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0],
           email: u.email,
           avatar_url: u.user_metadata?.avatar_url || u.user_metadata?.picture || null,
           provider: session.user.app_metadata?.provider || 'supabase',
-          role: 'single_owner',
-          isDesignatedOwner: true,
+          role: 'user',
           authenticated_at: new Date().toISOString()
         };
+
         saveDeviceAccount(profile);
         setCurrentUser(profile);
         setIsAuthenticated(true);
         setActiveTab('cart');
+        setAuthErrorMessage('');
+
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem(STORAGE_KEYS.AUTH, 'true');
           localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(profile));
@@ -504,7 +528,10 @@ export default function Home() {
         {/* ============================================================== */}
         {!isAuthenticated ? (
           <div className="flex-1 overflow-y-auto no-scrollbar bg-gradient-to-b from-sky-50/50 via-white to-slate-50 flex flex-col">
-            <LoginScreen onLoginSuccess={handleLoginSuccess} />
+            <LoginScreen 
+              onLoginSuccess={handleLoginSuccess} 
+              externalError={authErrorMessage}
+            />
           </div>
         ) : (
           /* ============================================================== */

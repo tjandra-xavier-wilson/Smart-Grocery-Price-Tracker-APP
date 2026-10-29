@@ -13,50 +13,55 @@ import {
   User,
   X,
   UserCheck,
-  Sparkles
+  AlertCircle,
+  Info
 } from 'lucide-react';
 import { playTapSound, playSuccessSound } from '../utils/sound';
 import { 
-  supabase,
   signInWithGoogle, 
   signInWithEmailPassword, 
   signUpWithEmailPassword, 
   getDeviceAccounts, 
   saveDeviceAccount, 
   removeDeviceAccount, 
-  DESIGNATED_OWNER_EMAIL, 
   SINGLE_USER_STORAGE_KEY 
 } from '../../src/lib/supabaseClient';
 
-export default function LoginScreen({ onLoginSuccess }) {
+export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
-  const [email, setEmail] = useState('tjandra.xavier.wilson@gmail.com');
-  const [pin, setPin] = useState('123456');
-  const [fullName, setFullName] = useState('Wilson Tjandra');
+  const [email, setEmail] = useState('');
+  const [pin, setPin] = useState('');
+  const [fullName, setFullName] = useState('');
   const [showPin, setShowPin] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState(externalError || '');
   const [infoMsg, setInfoMsg] = useState('');
   const [deviceAccounts, setDeviceAccounts] = useState([]);
 
-  // Load saved device accounts from LocalStorage
+  // Load saved device accounts strictly from LocalStorage (no fake hardcoded accounts)
   useEffect(() => {
     const accounts = getDeviceAccounts();
     setDeviceAccounts(accounts);
-    if (accounts.length > 0) {
+    if (accounts.length > 0 && !email) {
       setEmail(accounts[0].email);
-      if (accounts[0].name) setFullName(accounts[0].name);
     }
   }, []);
+
+  useEffect(() => {
+    if (externalError) {
+      setErrorMsg(externalError);
+    }
+  }, [externalError]);
 
   // Quick account switch handler
   const handleSelectAccount = (account) => {
     playTapSound();
     setEmail(account.email);
     if (account.name) setFullName(account.name);
-    setInfoMsg(`Akun "${account.name || account.email}" dipilih`);
-    setTimeout(() => setInfoMsg(''), 2500);
+    setErrorMsg('');
+    setInfoMsg(`Akun "${account.name || account.email}" dipilih. Silakan masukkan PIN.`);
+    setTimeout(() => setInfoMsg(''), 3000);
   };
 
   // Remove account from device handler
@@ -91,38 +96,27 @@ export default function LoginScreen({ onLoginSuccess }) {
 
     try {
       if (authMode === 'login') {
-        // 1. Supabase signInWithPassword
+        // Mode Masuk: autentikasi via supabase.auth.signInWithPassword({ email, password })
         const res = await signInWithEmailPassword(email, pin);
         
-        let profile;
-        if (res.success && res.data?.user) {
-          const u = res.data.user;
-          profile = {
-            id: u.id,
-            name: u.user_metadata?.full_name || fullName || u.email?.split('@')[0],
-            email: u.email,
-            avatar_url: u.user_metadata?.avatar_url || null,
-            provider: 'supabase_password',
-            role: 'single_owner',
-            isDesignatedOwner: true,
-            authenticated_at: new Date().toISOString()
-          };
-        } else {
-          // Graceful fallback for single-user owner mode / local offline
-          console.info('[Auth Login] Menggunakan sesi akun pemilik perangkat.');
-          profile = {
-            id: 'owner-session-' + Date.now(),
-            name: fullName || (email.includes('@') ? email.split('@')[0] : 'Wilson Tjandra'),
-            email: email.trim(),
-            avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-            provider: 'pin_security',
-            role: 'single_owner',
-            isDesignatedOwner: true,
-            authenticated_at: new Date().toISOString()
-          };
+        if (!res.success) {
+          setErrorMsg(res.error || 'Email atau Kata Sandi / PIN salah. Pastikan akun sudah terdaftar.');
+          setLoading(false);
+          return;
         }
 
-        // Save device account & session
+        const u = res.data?.user;
+        const profile = {
+          id: u?.id || 'user-' + Date.now(),
+          name: u?.user_metadata?.full_name || fullName || u?.email?.split('@')[0] || email.split('@')[0],
+          email: u?.email || email.trim(),
+          avatar_url: u?.user_metadata?.avatar_url || null,
+          provider: 'email_password',
+          role: 'user',
+          authenticated_at: new Date().toISOString()
+        };
+
+        // Simpan data identitas profil ke LocalStorage jika checkbox aktif
         if (rememberMe) {
           saveDeviceAccount(profile);
           setDeviceAccounts(getDeviceAccounts());
@@ -133,122 +127,60 @@ export default function LoginScreen({ onLoginSuccess }) {
         }
 
         playSuccessSound();
-        if (onLoginSuccess) onLoginSuccess(profile);
+        if (onLoginSuccess) {
+          onLoginSuccess(profile);
+        }
 
       } else {
-        // 2. Supabase signUp
+        // Mode Daftar: pendaftaran via supabase.auth.signUp({ email, password })
         const res = await signUpWithEmailPassword(email, pin, fullName);
         
-        let profile;
-        if (res.success && res.data?.user) {
-          const u = res.data.user;
-          profile = {
-            id: u.id,
-            name: fullName || u.email?.split('@')[0],
-            email: u.email,
-            avatar_url: null,
-            provider: 'supabase_signup',
-            role: 'single_owner',
-            isDesignatedOwner: true,
-            authenticated_at: new Date().toISOString()
-          };
-        } else {
-          // Fallback registration
-          profile = {
-            id: 'new-user-' + Date.now(),
-            name: fullName || email.split('@')[0],
-            email: email.trim(),
-            avatar_url: null,
-            provider: 'supabase_signup',
-            role: 'single_owner',
-            isDesignatedOwner: true,
-            authenticated_at: new Date().toISOString()
-          };
+        if (!res.success) {
+          setErrorMsg(res.error || 'Gagal melakukan pendaftaran akun baru.');
+          setLoading(false);
+          return;
         }
 
-        saveDeviceAccount(profile);
-        setDeviceAccounts(getDeviceAccounts());
-        if (rememberMe && typeof localStorage !== 'undefined') {
-          localStorage.setItem(SINGLE_USER_STORAGE_KEY, JSON.stringify(profile));
-          localStorage.setItem('sakugrosir_is_logged_in', 'true');
-        }
-
+        // Aturan Kemanan: Setelah registrasi akun baru berhasil, jangan langsung auto-login ke dashboard!
+        // Arahkan user kembali ke tab 'Masuk' dengan notifikasi: "Registrasi berhasil, silakan login ulang dengan akun Anda."
         playSuccessSound();
-        setInfoMsg('Pendaftaran berhasil! Mengalihkan ke Keranjang Aktif...');
-        setTimeout(() => {
-          if (onLoginSuccess) onLoginSuccess(profile);
-        }, 500);
+        setAuthMode('login');
+        setPin(''); // Kosongkan PIN untuk keamanan login ulang
+        setErrorMsg('');
+        setInfoMsg('Registrasi berhasil, silakan login ulang dengan akun Anda.');
+
+        // Update list akun perangkat
+        setDeviceAccounts(getDeviceAccounts());
       }
     } catch (err) {
-      setErrorMsg(err.message || 'Terjadi kesalahan autentikasi');
+      setErrorMsg(err.message || 'Terjadi gangguan koneksi pada modul autentikasi.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Google OAuth via Supabase
+  // Google OAuth via Supabase dengan pencegahan layar hitam 400
   const handleGoogleSignIn = async () => {
     playTapSound();
     setLoading(true);
     setErrorMsg('');
+    setInfoMsg('');
 
     try {
-      const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: origin
-        }
-      });
-
-      if (error) {
-        throw error;
+      const res = await signInWithGoogle();
+      
+      // Jika Google Provider belum diaktifkan di dashboard Supabase
+      if (!res.success) {
+        setErrorMsg(
+          res.error || 'Login Google belum diaktifkan di konfigurasi Supabase. Silakan hubungi admin atau gunakan login email/password.'
+        );
+        // Pastikan TIDAK meloloskan user ke akun dummy atau keranjang
+        return;
       }
 
-      // If in preview / iframe where OAuth redirect is blocked, fallback seamlessly:
-      setTimeout(() => {
-        const singleOwner = {
-          id: 'user-google-owner',
-          name: 'Wilson Tjandra',
-          email: DESIGNATED_OWNER_EMAIL,
-          avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-          provider: 'google',
-          role: 'single_owner',
-          isDesignatedOwner: true,
-          authenticated_at: new Date().toISOString()
-        };
-
-        saveDeviceAccount(singleOwner);
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(SINGLE_USER_STORAGE_KEY, JSON.stringify(singleOwner));
-          localStorage.setItem('sakugrosir_is_logged_in', 'true');
-        }
-
-        playSuccessSound();
-        if (onLoginSuccess) onLoginSuccess(singleOwner);
-      }, 500);
-
+      // Jika berhasil di-redirect oleh browser, proses OAuth berjalan normal ke Google
     } catch (err) {
-      console.warn('[Supabase Google Auth] Fallback aktivasi akun pemilik:', err.message);
-      const singleOwner = {
-        id: 'user-google-owner',
-        name: 'Wilson Tjandra',
-        email: DESIGNATED_OWNER_EMAIL,
-        avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-        provider: 'google',
-        role: 'single_owner',
-        isDesignatedOwner: true,
-        authenticated_at: new Date().toISOString()
-      };
-
-      saveDeviceAccount(singleOwner);
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(SINGLE_USER_STORAGE_KEY, JSON.stringify(singleOwner));
-        localStorage.setItem('sakugrosir_is_logged_in', 'true');
-      }
-
-      playSuccessSound();
-      if (onLoginSuccess) onLoginSuccess(singleOwner);
+      setErrorMsg('Login Google belum diaktifkan di konfigurasi Supabase. Silakan hubungi admin atau gunakan login email/password.');
     } finally {
       setLoading(false);
     }
@@ -300,17 +232,17 @@ export default function LoginScreen({ onLoginSuccess }) {
         </div>
 
         {/* ============================================================== */}
-        {/* DEVICE ACCOUNTS SELECTOR (Akun Terdaftar di Perangkat Ini)       */}
+        {/* FITUR AKUN TERDAFTAR DI PERANGKAT (DEVICE ACCOUNTS SELECTOR)    */}
         {/* ============================================================== */}
         {deviceAccounts.length > 0 && (
           <div className="w-full mt-4 bg-slate-50/90 border border-slate-200/90 rounded-2xl p-3 text-left shadow-2xs">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10.5px] font-extrabold text-slate-700 flex items-center space-x-1">
                 <UserCheck className="w-3.5 h-3.5 text-emerald-700" />
-                <span>Akun Tersimpan di Perangkat:</span>
+                <span>Akun Tersimpan di Perangkat Ini:</span>
               </span>
               <span className="text-[10px] text-slate-400 font-semibold">
-                Klik utk pilih cepat
+                Pilih untuk login cepat
               </span>
             </div>
 
@@ -337,8 +269,8 @@ export default function LoginScreen({ onLoginSuccess }) {
                       </div>
                       <div className="min-w-0">
                         <div className="text-xs font-bold text-slate-900 truncate leading-snug flex items-center space-x-1">
-                          <span>{acc.name || 'Pemilik Perangkat'}</span>
-                          {isSelected && <span className="text-[9px] text-emerald-700 font-extrabold">● Aktif</span>}
+                          <span>{acc.name || 'Pengguna'}</span>
+                          {isSelected && <span className="text-[9px] text-emerald-700 font-extrabold">● Dipilih</span>}
                         </div>
                         <div className="text-[10px] text-slate-500 font-mono truncate">
                           {acc.email}
@@ -346,7 +278,7 @@ export default function LoginScreen({ onLoginSuccess }) {
                       </div>
                     </div>
 
-                    {/* Delete account button */}
+                    {/* Tombol Hapus Akun dari Perangkat Ini */}
                     <button
                       type="button"
                       onClick={(e) => handleRemoveAccount(e, acc.email)}
@@ -406,7 +338,7 @@ export default function LoginScreen({ onLoginSuccess }) {
               <div className="animate-fade-in">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-800 mb-1.5">
                   <span>Nama Lengkap</span>
-                  <span className="text-[10px] text-slate-400 font-medium">Opsional</span>
+                  <span className="text-[10px] text-slate-400 font-medium">Wajib</span>
                 </div>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -414,7 +346,8 @@ export default function LoginScreen({ onLoginSuccess }) {
                     type="text"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Nama Pengguna"
+                    placeholder="Contoh: Budi Santoso"
+                    required
                     className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-emerald-700 focus:bg-white"
                   />
                 </div>
@@ -483,23 +416,27 @@ export default function LoginScreen({ onLoginSuccess }) {
               </label>
               <button
                 type="button"
-                onClick={() => alert('PIN Keamanan Demo: 123456')}
+                onClick={() => alert('Gunakan opsi ganti PIN melalui email atau hubungi administrator.')}
                 className="text-[11px] text-emerald-800 font-bold hover:underline"
               >
                 Lupa PIN / Sandi?
               </button>
             </div>
 
+            {/* Error Message Toast/Alert */}
             {errorMsg && (
-              <p className="text-xs text-rose-600 font-bold text-center bg-rose-50 p-2 rounded-lg border border-rose-200">
-                {errorMsg}
-              </p>
+              <div className="flex items-start space-x-2 text-xs text-rose-700 bg-rose-50 p-2.5 rounded-xl border border-rose-200 animate-shake">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span className="font-semibold leading-relaxed">{errorMsg}</span>
+              </div>
             )}
 
+            {/* Info Message Box (e.g. Registrasi berhasil) */}
             {infoMsg && (
-              <p className="text-xs text-emerald-800 font-bold text-center bg-emerald-50 p-2 rounded-lg border border-emerald-200">
-                {infoMsg}
-              </p>
+              <div className="flex items-start space-x-2 text-xs text-emerald-800 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 animate-slide-up">
+                <Info className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                <span className="font-semibold leading-relaxed">{infoMsg}</span>
+              </div>
             )}
 
             {/* Primary Emerald Button */}
@@ -513,7 +450,7 @@ export default function LoginScreen({ onLoginSuccess }) {
               ) : (
                 <>
                   <Lock className="w-3.5 h-3.5" />
-                  <span>{authMode === 'login' ? 'Masuk ke Keranjang Belanja' : 'Daftar Akun & Mulai Belanja'}</span>
+                  <span>{authMode === 'login' ? 'Masuk ke Keranjang Belanja' : 'Daftar Akun Baru'}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </>
               )}
@@ -530,7 +467,7 @@ export default function LoginScreen({ onLoginSuccess }) {
             </div>
           </div>
 
-          {/* Google Sign In Button via Supabase OAuth */}
+          {/* Google Sign In Button via Supabase OAuth (Protected against 400 black screen) */}
           <button
             type="button"
             disabled={loading}
