@@ -1,7 +1,7 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'PasarPintar - Belanja Kebutuhan Dapur & Bahan Segar Pasar',
+  title: 'Smart Grocery Sentinel - Asisten Belanja Hemat & Pelindung Anggaran Pintar',
   description: 'Aplikasi belanja kebutuhan pasar harian & sembako segar dengan harga akurat, detektor fluktuasi harga, dan budget safety cap.',
 };
 
@@ -11,7 +11,7 @@ export const viewport = {
   maximumScale: 1.0,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: '#4F46E5',
+  themeColor: '#065F46',
 };
 
 export default function RootLayout({ children }) {

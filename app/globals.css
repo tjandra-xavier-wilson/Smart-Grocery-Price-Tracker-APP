@@ -3,12 +3,14 @@
 @import "tailwindcss/utilities";
 
 :root {
-  --brand-primary: #4F46E5;
-  --brand-dark: #3730A3;
-  --brand-light: #EEF2FF;
+  --brand-primary: #065F46;
+  --brand-dark: #064E3B;
+  --brand-light: #ECFDF5;
   --charcoal: #0F172A;
   --subtext: #64748B;
   --divider: #E2E8F0;
+  --stepper-btn-size: 46px;
+  --min-touch-target: 48px;
 }
 
 /* Hide scrollbar for horizontal category carousel */

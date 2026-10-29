@@ -71,3 +71,31 @@ export function playSuccessSound() {
     }
   } catch (e) {}
 }
+
+export function playWarningBeep() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    // Urgent double square-wave beep warning for overbudget safety cap
+    [0, 0.18].forEach((offset) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(880, now + offset); // A5
+
+      gain.gain.setValueAtTime(0.16, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.13);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.13);
+    });
+
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate([150, 80, 150]);
+    }
+  } catch (e) {}
+}
