@@ -59,13 +59,8 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, currentUser 
 
     try {
       const res = await signInWithGoogle();
-      if (res.success && res.profile) {
-        setLoading(false);
-        playSuccessSound();
-        if (onAuthSuccess) onAuthSuccess(res.profile);
-        onClose();
-      } else {
-        setErrorMsg('Gagal memproses login Google');
+      if (!res.success) {
+        setErrorMsg(res.error || 'Gagal memulai login Google');
         setLoading(false);
       }
     } catch (err) {

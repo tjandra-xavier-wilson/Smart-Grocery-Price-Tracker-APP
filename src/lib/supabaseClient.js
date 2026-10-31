@@ -721,53 +721,33 @@ export function removeDeviceAccount(email) {
 }
 
 /**
- * Sign in with Google via Google OAuth
- * Langsung masuk ke menu utama https://smartgrocerypricetrackerapp.vercel.app/
- * Tanpa tab transisi, tanpa popup, dan tanpa sangkut paut dengan domain lain.
+ * Sign in with Google via Supabase OAuth Resmi (accounts.google.com)
+ * Memicu flow OAuth resmi Google melalui Supabase Auth Client SDK
  */
-export async function signInWithGoogle(directAccountOrCallback = null) {
-  let profile = null;
-
-  if (directAccountOrCallback && typeof directAccountOrCallback === 'object' && directAccountOrCallback.email) {
-    const acc = directAccountOrCallback;
-    const cleanEmail = acc.email.toLowerCase().trim();
-    addRegisteredEmail(cleanEmail);
-    profile = {
-      id: acc.id || 'goog_' + Date.now(),
-      name: acc.name || acc.fullName || cleanEmail.split('@')[0],
-      email: cleanEmail,
-      avatar_url: acc.avatar_url || 'https://lh3.googleusercontent.com/a/default-user',
+export async function signInWithGoogle() {
+  try {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      role: 'user',
-      authenticated_at: new Date().toISOString()
-    };
-  } else {
-    // Default akun pemilik resmi terverifikasi
-    const cleanEmail = DESIGNATED_OWNER_EMAIL.toLowerCase().trim();
-    addRegisteredEmail(cleanEmail);
-    profile = {
-      id: 'goog_owner_' + Date.now(),
-      name: 'Tjandra Xavier Wilson',
-      email: DESIGNATED_OWNER_EMAIL,
-      avatar_url: 'https://lh3.googleusercontent.com/a/default-user',
-      provider: 'google',
-      role: 'user',
-      authenticated_at: new Date().toISOString()
-    };
+      options: {
+        redirectTo: origin,
+        queryParams: {
+          prompt: 'select_account',
+          access_type: 'offline'
+        }
+      }
+    });
+
+    if (error) {
+      console.warn('[Supabase Google Auth Error]:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data };
+  } catch (err) {
+    console.warn('[Supabase Google Auth Exception]:', err.message);
+    return { success: false, error: err.message };
   }
-
-  saveDeviceAccount(profile);
-
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(SINGLE_USER_STORAGE_KEY, JSON.stringify(profile));
-    localStorage.setItem('sakugrosir_is_logged_in', 'true');
-  }
-
-  if (typeof directAccountOrCallback === 'function') {
-    directAccountOrCallback(profile);
-  }
-
-  return { success: true, profile };
 }
 
 /**

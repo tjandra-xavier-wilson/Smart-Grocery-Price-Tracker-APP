@@ -248,7 +248,7 @@ export default function Home() {
             if (email) {
               const profile = {
                 id: payload.sub || 'user-google-' + Date.now(),
-                name: name || 'Tjandra Xavier Wilson',
+                name: name || (email ? email.split('@')[0] : 'Pengguna'),
                 email: email,
                 avatar_url: avatar,
                 provider: 'google',
@@ -275,22 +275,8 @@ export default function Home() {
       }
     }
 
-    // 3. Listener PostMessage dari Google OAuth Popup / Tab Callback
+    // 3. Listener PostMessage dari Google OAuth Callback
     const handleOAuthMessage = async (event) => {
-      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS' && event.data.profile) {
-        const profile = event.data.profile;
-        saveDeviceAccount(profile);
-        setCurrentUser(profile);
-        setIsAuthenticated(true);
-        setActiveTab('cart');
-        setAuthErrorMessage('');
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(STORAGE_KEYS.AUTH, 'true');
-          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(profile));
-        }
-        return;
-      }
-
       if (event.data?.type === 'SUPABASE_OAUTH_TOKEN_TRANSFER') {
         const u = event.data.user || {};
         const meta = u.user_metadata || {};

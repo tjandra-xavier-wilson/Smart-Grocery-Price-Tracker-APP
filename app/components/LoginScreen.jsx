@@ -163,70 +163,23 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
     }
   };
 
-  // Google Sign-In: Membuka tab Google Auth untuk memilih akun (Bukan di halaman), lalu langsung masuk menu utama
-  const handleGoogleSignIn = () => {
+  // Google Sign-In Resmi Supabase (accounts.google.com)
+  const handleGoogleSignIn = async () => {
     playTapSound();
+    setLoading(true);
     setErrorMsg('');
     setInfoMsg('');
 
-    const width = 480;
-    const height = 640;
-    const left = typeof window !== 'undefined' ? Math.round(window.screenX + (window.outerWidth - width) / 2) : 100;
-    const top = typeof window !== 'undefined' ? Math.round(window.screenY + (window.outerHeight - height) / 2) : 100;
-
-    let authWindow = null;
     try {
-      authWindow = window.open(
-        '/auth/google',
-        'GoogleSignInWindow',
-        `width=${width},height=${height},left=${left},top=${top},status=0,toolbar=0,menubar=0,location=1`
-      );
-    } catch (e) {
-      authWindow = null;
-    }
-
-    if (!authWindow || authWindow.closed || typeof authWindow.closed === 'undefined') {
-      window.location.href = '/auth/google';
-      return;
-    }
-
-    // Dengarkan pesan autentikasi sukses dari tab Google Auth
-    const handleAuthMessage = (event) => {
-      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS' && event.data.profile) {
-        window.removeEventListener('message', handleAuthMessage);
-        const profile = event.data.profile;
-        saveDeviceAccount(profile);
-        setDeviceAccounts(getDeviceAccounts());
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(SINGLE_USER_STORAGE_KEY, JSON.stringify(profile));
-          localStorage.setItem('sakugrosir_is_logged_in', 'true');
-        }
-        playSuccessSound();
-        if (onLoginSuccess) {
-          onLoginSuccess(profile);
-        }
+      const res = await signInWithGoogle();
+      if (!res.success) {
+        setErrorMsg(res.error || 'Gagal memulai autentikasi Google. Pastikan Google Provider sudah diaktifkan di Supabase.');
+        setLoading(false);
       }
-    };
-
-    window.addEventListener('message', handleAuthMessage);
-
-    // Fallback deteksi storage lintas tab jika window.opener dibatasi browser
-    const handleStorageChange = (e) => {
-      if (e.key === 'sakugrosir_is_logged_in' && e.newValue === 'true') {
-        window.removeEventListener('storage', handleStorageChange);
-        window.removeEventListener('message', handleAuthMessage);
-        try {
-          const userRaw = localStorage.getItem(SINGLE_USER_STORAGE_KEY);
-          if (userRaw) {
-            const profile = JSON.parse(userRaw);
-            playSuccessSound();
-            if (onLoginSuccess) onLoginSuccess(profile);
-          }
-        } catch (err) {}
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
+    } catch (err) {
+      setErrorMsg(err.message || 'Gagal mengarahkan ke Google OAuth.');
+      setLoading(false);
+    }
   };
 
   return (
