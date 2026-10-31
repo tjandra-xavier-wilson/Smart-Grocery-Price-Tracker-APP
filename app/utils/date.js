@@ -107,3 +107,4 @@ export function formatMonthYearLabel(yearMonthKey) {
   const mName = MONTH_NAMES_ID[mIdx] || parts[1];
   return `${mName} ${y}`;
 }
+
