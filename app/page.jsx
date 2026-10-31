@@ -156,8 +156,17 @@ const MOCKUP_OVERBUDGET_CART = [
 ];
 
 export default function Home() {
-  // Authentication State: First screen shown on load is Login UI (Mockup 1)
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Authentication State: Session persistence across reload / Ctrl+R
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const isAuth = localStorage.getItem(STORAGE_KEYS.AUTH);
+      const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
+      if (isAuth === 'true' && savedUser) {
+        return true;
+      }
+    }
+    return false;
+  });
   const [authErrorMessage, setAuthErrorMessage] = useState('');
 
   // Navigation State: 'cart' | 'input' | 'history'
@@ -169,7 +178,15 @@ export default function Home() {
   const [budgetLimit, setBudgetLimit] = useState(350000);
   const [cartItems, setCartItems] = useState(MOCKUP_NORMAL_CART);
   const [historyList, setHistoryList] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
+        if (savedUser) return JSON.parse(savedUser);
+      } catch (e) {}
+    }
+    return null;
+  });
   const [syncStatus, setSyncStatus] = useState('Online Sync Live');
 
   // Modals state
@@ -209,10 +226,77 @@ export default function Home() {
       console.warn('LocalStorage load error:', e);
     }
 
-    // Load Single User Session
-    getSingleUserSession().then((user) => {
-      setCurrentUser(user);
-    });
+    // 2. Tangani Google OAuth Callback Redirect jika ada di URL hash (#access_token=...)
+    if (typeof window !== 'undefined' && window.location.hash && window.location.hash.includes('access_token')) {
+      try {
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const accessToken = hashParams.get('access_token');
+        if (accessToken) {
+          const payloadBase64 = accessToken.split('.')[1];
+          if (payloadBase64) {
+            const jsonStr = decodeURIComponent(
+              atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/'))
+                .split('')
+                .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                .join('')
+            );
+            const payload = JSON.parse(jsonStr);
+            const email = payload.email || payload.user_metadata?.email;
+            const name = payload.user_metadata?.full_name || payload.user_metadata?.name || email?.split('@')[0];
+            const avatar = payload.user_metadata?.avatar_url || payload.user_metadata?.picture || null;
+
+            if (email) {
+              const profile = {
+                id: payload.sub || 'user-google-' + Date.now(),
+                name: name || 'Tjandra Xavier Wilson',
+                email: email,
+                avatar_url: avatar,
+                provider: 'google',
+                role: 'user',
+                authenticated_at: new Date().toISOString()
+              };
+
+              saveDeviceAccount(profile);
+              setCurrentUser(profile);
+              setIsAuthenticated(true);
+              setActiveTab('cart');
+              setAuthErrorMessage('');
+
+              localStorage.setItem(STORAGE_KEYS.AUTH, 'true');
+              localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(profile));
+
+              // Bersihkan token dari address bar agar URL kembali rapi
+              window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+          }
+        }
+      } catch (oauthErr) {
+        console.warn('[Google OAuth Callback Parse Error]:', oauthErr);
+      }
+    }
+
+    // 3. Sesi Supabase getSession (Auto-Restore jika ada sesi aktif)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const u = session.user;
+        const profile = {
+          id: u.id,
+          name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0],
+          email: u.email,
+          avatar_url: u.user_metadata?.avatar_url || u.user_metadata?.picture || null,
+          provider: session.user.app_metadata?.provider || 'supabase',
+          role: 'user',
+          authenticated_at: new Date().toISOString()
+        };
+        saveDeviceAccount(profile);
+        setCurrentUser(profile);
+        setIsAuthenticated(true);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(STORAGE_KEYS.AUTH, 'true');
+          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(profile));
+        }
+      }
+    }).catch(() => {});
 
     // Setup Multi-tab BroadcastChannel
     if ('BroadcastChannel' in window) {
@@ -260,31 +344,12 @@ export default function Home() {
 
     initFirestoreSync();
 
-    // 4. Live Supabase Auth State Change Listener (SRS Requirement)
+    // 4. Live Supabase Auth State Change Listener
     const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('⚡ [Supabase onAuthStateChange Event]:', event);
 
-      // Hanya proses jika event adalah SIGNED_IN atau USER_UPDATED (bukan sekedar INITIAL_SESSION)
-      // Ini memastikan saat website pertama dibuka/direfresh, pengguna tetap diarahkan ke AuthScreen
-      if (session?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
+      if (session?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION')) {
         const u = session.user;
-        const userEmail = u.email;
-
-        // Requirement 2: Whitelist Akun Google (Hanya Akun yang Sudah Terdaftar yang Boleh Masuk)
-        const isRegistered = await isEmailRegistered(userEmail);
-        if (!isRegistered) {
-          console.warn(`[Supabase Auth Guard] Akun Google ${userEmail} belum terdaftar! Batalkan sesi.`);
-          await supabase.auth.signOut();
-          if (typeof localStorage !== 'undefined') {
-            localStorage.removeItem(STORAGE_KEYS.AUTH);
-            localStorage.removeItem(STORAGE_KEYS.USER);
-          }
-          setIsAuthenticated(false);
-          setCurrentUser(null);
-          setAuthErrorMessage('Akun Google ini belum terdaftar di sistem. Silakan registrasi terlebih dahulu sebelum masuk.');
-          return;
-        }
-
         const profile = {
           id: u.id,
           name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0],
@@ -298,7 +363,6 @@ export default function Home() {
         saveDeviceAccount(profile);
         setCurrentUser(profile);
         setIsAuthenticated(true);
-        setActiveTab('cart');
         setAuthErrorMessage('');
 
         if (typeof localStorage !== 'undefined') {
@@ -308,6 +372,10 @@ export default function Home() {
       } else if (event === 'SIGNED_OUT') {
         setIsAuthenticated(false);
         setCurrentUser(null);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem(STORAGE_KEYS.AUTH);
+          localStorage.removeItem(STORAGE_KEYS.USER);
+        }
       }
     });
 
@@ -347,15 +415,24 @@ export default function Home() {
     setCurrentUser(userProfile);
     setIsAuthenticated(true);
     setActiveTab('cart');
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.AUTH, 'true');
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userProfile));
+    }
   };
 
   const handleLogout = async () => {
-    await signOutUser();
+    playTapSound();
+    try {
+      await signOutUser();
+    } catch (e) {}
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(STORAGE_KEYS.AUTH);
       localStorage.removeItem(STORAGE_KEYS.USER);
     }
+    setCurrentUser(null);
     setIsAuthenticated(false);
+    setIsProfileModalOpen(false);
   };
 
   // Cart Operations

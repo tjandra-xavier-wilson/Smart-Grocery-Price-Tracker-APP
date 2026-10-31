@@ -721,11 +721,10 @@ export function removeDeviceAccount(email) {
 }
 
 /**
- * Sign in with Google via Supabase OAuth / Interactive Google Selector
- * Menghindari pesan error atau layar hitam 400 ketika provider belum diaktifkan di dashboard
+ * Sign in with Google via Google OAuth
+ * Menghubungkan langsung ke Google Auth resmi dengan tampilan pemilih akun Google (Image 2)
  */
 export async function signInWithGoogle(directProfile = null) {
-  // Jika dipanggil langsung dengan profil akun Google terpilih
   if (directProfile && directProfile.email) {
     const cleanEmail = directProfile.email.toLowerCase().trim();
     addRegisteredEmail(cleanEmail);
@@ -742,52 +741,17 @@ export async function signInWithGoogle(directProfile = null) {
     return { success: true, profile };
   }
 
-  try {
-    // 1. Cek ketersediaan Google Provider di backend Supabase
-    let providerEnabled = true;
-    try {
-      const checkRes = await fetch('/api/auth/google-check', { method: 'GET' });
-      const checkData = await checkRes.json();
-      if (!checkData.enabled) {
-        providerEnabled = false;
-      }
-    } catch (e) {
-      providerEnabled = false;
-    }
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://smartgrocerypricetrackerapp.vercel.app';
+  
+  // Hubungkan langsung ke endpoint Google OAuth Supabase terverifikasi
+  // yang membuka jendela resmi Google Chrome "Login dengan Google - Pilih Akun" (szhtgpjvudguknevurfh)
+  const targetOAuthUrl = `https://szhtgpjvudguknevurfh.supabase.co/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(origin)}&scopes=openid%20email%20profile&prompt=select_account&access_type=offline`;
 
-    // Jika provider belum diaktifkan di dashboard Supabase, arahkan ke Google Selector modal
-    if (!providerEnabled) {
-      return {
-        success: false,
-        isProviderDisabled: true,
-        needsSelectorModal: true
-      };
-    }
-
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: origin
-      }
-    });
-
-    if (error) {
-      return { 
-        success: false, 
-        isProviderDisabled: true,
-        needsSelectorModal: true 
-      };
-    }
-
-    return { success: true, data };
-  } catch (err) {
-    return { 
-      success: false, 
-      isProviderDisabled: true,
-      needsSelectorModal: true 
-    };
+  if (typeof window !== 'undefined') {
+    window.location.href = targetOAuthUrl;
   }
+
+  return { success: true, url: targetOAuthUrl };
 }
 
 /**
