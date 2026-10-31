@@ -723,14 +723,39 @@ export function removeDeviceAccount(email) {
 /**
  * Sign in with Google via Supabase OAuth Resmi (accounts.google.com)
  * Memicu flow OAuth resmi Google melalui Supabase Auth Client SDK
+ * Dilengkapi proteksi try-catch & preflight check untuk mencegah error 400 layar hitam kosong jika Google provider belum diaktifkan di Supabase dashboard.
  */
 export async function signInWithGoogle() {
   try {
+    // 1. Preflight check untuk mendeteksi apakah Google Provider sudah diaktifkan di Supabase dashboard
+    // Di dashboard Supabase (https://supabase.com/dashboard/project/ihickxbofezjqxncegda/auth/providers):
+    // Buka menu Authentication -> Providers -> Google, aktifkan toggle "Enable Google provider",
+    // lalu isi Client ID dan Client Secret dari Google Cloud Console.
+    try {
+      const checkRes = await fetch('/api/auth/google-check', { method: 'GET', cache: 'no-store' });
+      if (checkRes.ok) {
+        const checkData = await checkRes.json();
+        if (checkData && !checkData.enabled) {
+          console.warn('[Supabase Google Auth] Google Provider belum aktif di dashboard Supabase:', checkData.error);
+          console.info('👉 Petunjuk Admin: Di dashboard Supabase (https://supabase.com/dashboard), buka Authentication -> Providers -> Google, aktifkan toggle "Enable Google provider", lalu isi Client ID dan Client Secret dari Google Cloud Console.');
+          return {
+            success: false,
+            isProviderDisabled: true,
+            error: 'Login Google belum diaktifkan di konfigurasi Supabase. Silakan hubungi admin atau gunakan login email/password.'
+          };
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[Check Provider API Warning]:', apiErr.message);
+    }
+
+    // 2. Gunakan Supabase OAuth resmi dengan skipBrowserRedirect untuk mencegah layar hitam
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: origin,
+        skipBrowserRedirect: true,
         queryParams: {
           prompt: 'select_account',
           access_type: 'offline'
@@ -740,13 +765,44 @@ export async function signInWithGoogle() {
 
     if (error) {
       console.warn('[Supabase Google Auth Error]:', error.message);
-      return { success: false, error: error.message };
+      return { 
+        success: false, 
+        error: error.message.includes('not enabled') || error.message.includes('validation_failed')
+          ? 'Login Google belum diaktifkan di konfigurasi Supabase. Silakan hubungi admin atau gunakan login email/password.'
+          : error.message 
+      };
     }
 
-    return { success: true, data };
+    // 3. Jika URL authorize tersedia, lakukan verifikasi cepat sebelum redirect browser
+    if (data?.url) {
+      try {
+        const preflight = await fetch(data.url, { method: 'GET', headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+        if (preflight.status === 400) {
+          const body = await preflight.json().catch(() => ({}));
+          console.warn('[Supabase Authorize Endpoint 400]:', body);
+          return {
+            success: false,
+            isProviderDisabled: true,
+            error: 'Login Google belum diaktifkan di konfigurasi Supabase. Silakan hubungi admin atau gunakan login email/password.'
+          };
+        }
+      } catch (e) {
+        // Jika fetch CORS/redirect biasa, abaikan error preflight
+      }
+
+      if (typeof window !== 'undefined') {
+        window.location.href = data.url;
+      }
+      return { success: true, data };
+    }
+
+    return { success: false, error: 'Gagal mendapatkan URL Google OAuth.' };
   } catch (err) {
     console.warn('[Supabase Google Auth Exception]:', err.message);
-    return { success: false, error: err.message };
+    return { 
+      success: false, 
+      error: 'Login Google belum diaktifkan di konfigurasi Supabase. Silakan hubungi admin atau gunakan login email/password.' 
+    };
   }
 }
 
