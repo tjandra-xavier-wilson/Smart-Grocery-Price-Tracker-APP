@@ -58,31 +58,18 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, currentUser 
     setErrorMsg('');
 
     try {
-      const res = await signInWithGoogle();
-      if (!res.success) {
-        // Local single-user owner fallback
-        const singleOwner = {
-          id: 'user-' + Date.now(),
-          name: 'Wilson Tjandra',
-          email: DESIGNATED_OWNER_EMAIL,
-          avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-          provider: 'google',
-          role: 'single_owner',
-          isDesignatedOwner: true,
-          authenticated_at: new Date().toISOString()
-        };
-
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(SINGLE_USER_STORAGE_KEY, JSON.stringify(singleOwner));
-        }
-
+      const res = await signInWithGoogle((profile) => {
+        setLoading(false);
         playSuccessSound();
-        if (onAuthSuccess) onAuthSuccess(singleOwner);
+        if (onAuthSuccess) onAuthSuccess(profile);
         onClose();
+      });
+      if (!res.success) {
+        setErrorMsg('Gagal mengarahkan ke Google OAuth. Silakan coba kembali.');
+        setLoading(false);
       }
     } catch (err) {
       setErrorMsg(err.message || 'Gagal masuk akun Google');
-    } finally {
       setLoading(false);
     }
   };

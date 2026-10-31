@@ -275,7 +275,69 @@ export default function Home() {
       }
     }
 
-    // 3. Sesi Supabase getSession (Auto-Restore jika ada sesi aktif)
+    // 3. Listener PostMessage dari Google OAuth Popup Callback
+    const handleOAuthMessage = async (event) => {
+      if (event.data?.type === 'SUPABASE_OAUTH_TOKEN_TRANSFER') {
+        const u = event.data.user || {};
+        const meta = u.user_metadata || {};
+        let email = u.email || meta.email || '';
+        let name = meta.full_name || meta.name || u.name || '';
+        let avatar = meta.avatar_url || meta.picture || u.avatar_url || null;
+
+        if (event.data.hash && event.data.hash.includes('access_token')) {
+          try {
+            const params = new URLSearchParams(event.data.hash.replace(/^#/, ''));
+            const at = params.get('access_token');
+            const rt = params.get('refresh_token');
+            if (at) {
+              try {
+                await supabase.auth.setSession({
+                  access_token: at,
+                  refresh_token: rt || at
+                });
+              } catch (e) {}
+
+              const payload = JSON.parse(decodeURIComponent(
+                atob(at.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))
+                  .split('')
+                  .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                  .join('')
+              ));
+              email = email || payload.email || payload.user_metadata?.email || '';
+              name = name || payload.user_metadata?.full_name || payload.user_metadata?.name || '';
+              avatar = avatar || payload.user_metadata?.avatar_url || payload.user_metadata?.picture || null;
+            }
+          } catch (e) {}
+        }
+
+        if (email) {
+          const profile = {
+            id: u.id || 'user-google-' + Date.now(),
+            name: name || email.split('@')[0],
+            email: email,
+            avatar_url: avatar,
+            provider: 'google',
+            role: 'user',
+            authenticated_at: new Date().toISOString()
+          };
+
+          saveDeviceAccount(profile);
+          setCurrentUser(profile);
+          setIsAuthenticated(true);
+          setActiveTab('cart');
+          setAuthErrorMessage('');
+
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(STORAGE_KEYS.AUTH, 'true');
+            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(profile));
+          }
+        }
+      }
+    };
+
+    window.addEventListener('message', handleOAuthMessage);
+
+    // 4. Sesi Supabase getSession (Auto-Restore jika ada sesi aktif)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         const u = session.user;
@@ -380,6 +442,7 @@ export default function Home() {
     });
 
     return () => {
+      window.removeEventListener('message', handleOAuthMessage);
       broadcastChannelRef.current?.close();
       if (unsubscribeFirestore) unsubscribeFirestore();
       authSub?.unsubscribe();

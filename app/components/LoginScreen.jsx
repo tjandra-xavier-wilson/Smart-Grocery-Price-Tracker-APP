@@ -159,7 +159,7 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
     }
   };
 
-  // Google OAuth via Supabase: Langsung membuka Google Account Chooser resmi
+  // Google OAuth via Supabase: Langsung membuka Google Account Chooser resmi dalam popup
   const handleGoogleSignIn = async () => {
     playTapSound();
     setLoading(true);
@@ -167,7 +167,21 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
     setInfoMsg('');
 
     try {
-      const res = await signInWithGoogle();
+      const res = await signInWithGoogle((profile) => {
+        // Callback saat popup berhasil mengautentikasi dan mentransfer token
+        setLoading(false);
+        saveDeviceAccount(profile);
+        setDeviceAccounts(getDeviceAccounts());
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(SINGLE_USER_STORAGE_KEY, JSON.stringify(profile));
+          localStorage.setItem('sakugrosir_is_logged_in', 'true');
+        }
+        playSuccessSound();
+        if (onLoginSuccess) {
+          onLoginSuccess(profile);
+        }
+      });
+
       if (!res.success) {
         setErrorMsg('Gagal mengarahkan ke Google OAuth. Silakan coba kembali.');
         setLoading(false);
