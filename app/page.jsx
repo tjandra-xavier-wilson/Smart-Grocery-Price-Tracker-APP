@@ -1017,6 +1017,7 @@ export default function Home() {
                   onCutSecondaryItems={handleCutSecondaryItems}
                   onLoadMockupOverbudget={handleLoadMockupOverbudget}
                   onLoadMockupNormal={handleLoadMockupNormal}
+                  onAddToCart={handleAddToCart}
                 />
               )}
 

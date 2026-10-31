@@ -14,7 +14,9 @@ import {
   RotateCcw,
   Sparkles,
   AlertTriangle,
-  Loader2
+  Loader2,
+  CheckCircle2,
+  ShoppingBag
 } from 'lucide-react';
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
 import { playTapSound, playSuccessSound } from '../utils/sound';
@@ -364,8 +366,102 @@ export function CheckoutModal({
   onConfirmCheckout,
   isCheckoutLoading = false 
 }) {
+  const [modalStage, setModalStage] = useState('confirm'); // 'confirm' | 'processing' | 'success'
+
+  useEffect(() => {
+    if (!isOpen) {
+      setModalStage('confirm');
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
+  const handleStartCheckout = () => {
+    playTapSound();
+    setModalStage('processing');
+
+    // 1. Durasi 1.5 detik pemrosesan transaksi (spinner & ikon keranjang bergerak)
+    setTimeout(() => {
+      playSuccessSound();
+      setModalStage('success');
+
+      // 2. Durasi 1.0 detik menampilkan tanda centang hijau besar 'Pembayaran Berhasil!'
+      setTimeout(async () => {
+        if (onConfirmCheckout) {
+          await onConfirmCheckout();
+        }
+      }, 1000);
+    }, 1500);
+  };
+
+  // Stage 1: Animasi Pemrosesan Transaksi (Overlay menutupi layar, spinner & keranjang berjalan)
+  if (modalStage === 'processing') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+        <div 
+          className="w-full max-w-[360px] bg-white rounded-3xl p-8 shadow-2xl border border-slate-100 text-center space-y-5 animate-slide-up"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Animated cart container with pulsing aura */}
+          <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
+            <div className="absolute inset-0 rounded-full bg-emerald-100 animate-ping opacity-60" />
+            <div className="relative w-20 h-20 rounded-full bg-emerald-50 border-2 border-emerald-300 flex items-center justify-center text-emerald-800 shadow-inner">
+              <ShoppingBag className="w-10 h-10 animate-cart-move text-emerald-800" />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-center space-x-2">
+              <Loader2 className="w-4 h-4 animate-spin text-emerald-700" />
+              <h3 className="text-base font-black text-slate-900 tracking-tight">
+                Memproses Transaksi...
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500 font-medium">
+              Menghubungkan &amp; menyinkronkan data belanjaan ke server...
+            </p>
+          </div>
+
+          {/* Animated progress bar */}
+          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200">
+            <div className="bg-emerald-600 h-full w-3/4 animate-pulse rounded-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Stage 2: Tanda Centang Hijau Besar (Pembayaran Berhasil!) dengan animasi scale-in
+  if (modalStage === 'success') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+        <div 
+          className="w-full max-w-[360px] bg-white rounded-3xl p-8 shadow-2xl border border-slate-100 text-center space-y-5 animate-scale-in"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Big Green Checkmark with scale-in animation */}
+          <div className="w-20 h-20 mx-auto rounded-full bg-emerald-100 border-2 border-emerald-400 flex items-center justify-center text-emerald-600 shadow-md">
+            <CheckCircle2 className="w-12 h-12 text-emerald-600 stroke-[2.5] animate-scale-in" />
+          </div>
+
+          <div className="space-y-1.5">
+            <h3 className="text-lg font-black text-emerald-800 tracking-tight">
+              Pembayaran Berhasil!
+            </h3>
+            <p className="text-xs text-slate-500 font-medium">
+              Struk belanja Anda telah aman diarsipkan ke tab Riwayat.
+            </p>
+          </div>
+
+          <div className="bg-emerald-50 py-2 px-3 rounded-xl border border-emerald-200 text-xs font-extrabold text-emerald-800 flex items-center justify-center space-x-1.5 shadow-2xs">
+            <span>✨ Transaksi Selesai &amp; Tersinkron</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Stage 0: Modal Konfirmasi Checkout Normal
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4 animate-fade-in">
       <div 
@@ -404,12 +500,7 @@ export function CheckoutModal({
           <button
             type="button"
             disabled={isCheckoutLoading}
-            onClick={async () => {
-              playSuccessSound();
-              if (onConfirmCheckout) {
-                await onConfirmCheckout();
-              }
-            }}
+            onClick={handleStartCheckout}
             className={`flex-1 py-3 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center space-x-1.5 ${
               isCheckoutLoading ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
             }`}

@@ -53,3 +53,23 @@ html, body {
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(6px);
 }
+
+/* Checkout Transaction UX Animations */
+@keyframes scaleInCheck {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.18); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes cartMoveLoop {
+  0%, 100% { transform: translateX(-5px); }
+  50% { transform: translateX(5px); }
+}
+
+.animate-scale-in {
+  animation: scaleInCheck 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.animate-cart-move {
+  animation: cartMoveLoop 1.2s ease-in-out infinite;
+}
