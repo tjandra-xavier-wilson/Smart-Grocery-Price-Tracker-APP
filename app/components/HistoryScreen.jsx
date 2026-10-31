@@ -35,11 +35,38 @@ export default function HistoryScreen({
 }) {
   const [selectedMonth, setSelectedMonth] = useState('all'); // 'all' atau 'YYYY-MM' (contoh: '2026-10')
 
-  // 1. Ekstraksi daftar bulan unik secara DINAMIS HANYA dari data riwayat belanja yang benar-benar ada
+  // 1. Deduplikasi array transaksi berdasarkan ID unik (Single Source of Truth pengaman render)
+  // Mencegah transaksi yang sama dirender lebih dari satu kali dan membersihkan ghost duplicate sesi lokal
+  const uniqueHistoryList = useMemo(() => {
+    const rawData = historyList || [];
+    // A. Deduplikasi ID persis menggunakan Map
+    const byId = Array.from(new Map(rawData.map(item => [item?.id || Math.random(), item])).values());
+
+    // B. Cegah ghost duplicate antara sesi lokal (sesi-*) vs uuid cloud dengan store, total, dan tanggal identik
+    const cloudTrips = byId.filter(item => !String(item?.id || '').startsWith('sesi-'));
+    const cleanList = byId.filter(item => {
+      if (String(item?.id || '').startsWith('sesi-')) {
+        const itemStore = item.storeName || item.store_name;
+        const itemSpent = Number(item.totalSpent || item.total_spent);
+        const itemDate = item.shopping_date || item.date;
+        const isDuplicateOfCloud = cloudTrips.some(c => 
+          (c.storeName || c.store_name) === itemStore &&
+          Number(c.totalSpent || c.total_spent) === itemSpent &&
+          (c.shopping_date === itemDate || c.date === itemDate)
+        );
+        if (isDuplicateOfCloud) return false;
+      }
+      return true;
+    });
+
+    return cleanList;
+  }, [historyList]);
+
+  // 2. Ekstraksi daftar bulan unik secara DINAMIS HANYA dari data riwayat belanja yang benar-benar ada
   // DILARANG menambahkan bulan hardcoded / dummy jika transaksi pada bulan tersebut tidak ada!
   const availableMonths = useMemo(() => {
     const set = new Set();
-    (historyList || []).forEach((item) => {
+    uniqueHistoryList.forEach((item) => {
       const dateVal = item.shopping_date || item.date;
       if (dateVal) {
         const ym = toYearMonthKey(dateVal);
@@ -49,7 +76,7 @@ export default function HistoryScreen({
       }
     });
     return Array.from(set).sort().reverse();
-  }, [historyList]);
+  }, [uniqueHistoryList]);
 
   // Jika bulan yang dipilih sudah tidak ada dalam daftar (misal setelah riwayat dihapus), reset ke 'all'
   useEffect(() => {
@@ -58,17 +85,16 @@ export default function HistoryScreen({
     }
   }, [availableMonths, selectedMonth]);
 
-  // 2. Filter riwayat transaksi berdasarkan Bulan Terpilih (Month-Year Picker)
+  // 3. Filter riwayat transaksi berdasarkan Bulan Terpilih (Month-Year Picker)
   // Murni 100% menggunakan data dinamis (Supabase / LocalStorage), tanpa data statis tiruan
   const displayList = useMemo(() => {
-    const rawList = historyList || [];
-    if (selectedMonth === 'all') return rawList;
+    if (selectedMonth === 'all') return uniqueHistoryList;
 
-    return rawList.filter((item) => {
+    return uniqueHistoryList.filter((item) => {
       const dateVal = item.shopping_date || item.date;
       return toYearMonthKey(dateVal) === selectedMonth;
     });
-  }, [historyList, selectedMonth]);
+  }, [uniqueHistoryList, selectedMonth]);
 
   // 3. Kalkulasi dinamis & reaktif total pengeluaran untuk bulan yang dipilih
   // Nilai ini otomatis berkurang saat transaksi dihapus

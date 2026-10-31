@@ -200,6 +200,7 @@ export default function Home() {
   const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteTargetItem, setDeleteTargetItem] = useState(null);
@@ -234,7 +235,15 @@ export default function Home() {
       if (savedDate) setTransactionDate(savedDate);
 
       const savedHistory = localStorage.getItem(STORAGE_KEYS.HISTORY);
-      if (savedHistory) setHistoryList(JSON.parse(savedHistory));
+      if (savedHistory) {
+        try {
+          const parsed = JSON.parse(savedHistory);
+          if (Array.isArray(parsed)) {
+            const unique = Array.from(new Map(parsed.map(item => [item?.id || Math.random(), item])).values());
+            setHistoryList(unique);
+          }
+        } catch (e) {}
+      }
     } catch (e) {
       console.warn('LocalStorage load error:', e);
     }
@@ -373,20 +382,20 @@ export default function Home() {
       }
     }).catch(() => {});
 
-    // Multi-Device Cloud History Synchronization
+    // Multi-Device Cloud History Synchronization (Single Source of Truth)
     const fetchCloudHistory = async () => {
       try {
         const cloudHistory = await getShoppingHistoryList();
-        if (cloudHistory && cloudHistory.length > 0) {
-          setHistoryList(prev => {
-            const prevList = prev || [];
-            const cloudIds = new Set(cloudHistory.map(h => h.id));
-            const localOnly = prevList.filter(h => !cloudIds.has(h.id));
-            const merged = [...cloudHistory, ...localOnly];
+        if (cloudHistory && Array.isArray(cloudHistory)) {
+          setHistoryList(() => {
+            // Deduplikasi array berdasarkan ID unik - Cloud sebagai Single Source of Truth
+            const uniqueHistory = Array.from(
+              new Map(cloudHistory.map(item => [item?.id, item])).values()
+            ).filter(Boolean);
             if (typeof localStorage !== 'undefined') {
-              localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(merged));
+              localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(uniqueHistory));
             }
-            return merged;
+            return uniqueHistory;
           });
         }
       } catch (e) {
@@ -450,21 +459,14 @@ export default function Home() {
         }
         setSyncStatus('Realtime Multi-Device Live');
       })
-      .on('broadcast', { event: 'REALTIME_CHECKOUT_EVENT' }, (payload) => {
-        const receipt = payload?.payload?.receipt;
-        if (receipt) {
-          console.log('⚡ [Realtime Checkout Sync Event]:', receipt);
-          setHistoryList(prev => {
-            const updated = [receipt, ...(prev || []).filter(h => h.id !== receipt.id)];
-            if (typeof localStorage !== 'undefined') {
-              localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(updated));
-            }
-            return updated;
-          });
-          setCartItems([]);
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify([]));
-          }
+      .on('broadcast', { event: 'REALTIME_CHECKOUT_EVENT' }, () => {
+        // Multi-device: Ambil history terupdate dari cloud dan kosongkan keranjang aktif
+        if (typeof loadCloudHistoryRef.current === 'function') {
+          loadCloudHistoryRef.current();
+        }
+        setCartItems([]);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify([]));
         }
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'grocery_history' }, () => {
@@ -855,41 +857,21 @@ export default function Home() {
     setActiveTab('input');
   };
 
-  // Checkout Save
+  // Checkout Save & Double Submit Prevention
   const totalCartPrice = cartItems.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   const handleConfirmCheckout = async () => {
-    const newSession = {
-      id: 'sesi-' + Date.now(),
-      storeName: currentStore,
-      totalSpent: totalCartPrice,
-      savings: 65500,
-      date: transactionDate,
-      time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
-      itemCount: cartItems.reduce((acc, i) => acc + i.quantity, 0),
-      statusTier: 'safe',
-      statusBadge: 'Dalam Batas Budget (Hemat Rp 65.500)',
-      items: cartItems
-    };
+    // 1. Cegah eksekusi ganda jika sedang proses simpan atau keranjang kosong
+    if (isCheckoutLoading || cartItems.length === 0) return;
+    setIsCheckoutLoading(true);
 
-    const updatedHistory = [newSession, ...historyList];
-    setHistoryList(updatedHistory);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(updatedHistory));
-    }
-
-    // 1. Broadcast event checkout seketika ke HP / Laptop lain via Realtime Channel
     try {
-      supabaseSyncChannelRef.current?.send({
-        type: 'broadcast',
-        event: 'REALTIME_CHECKOUT_EVENT',
-        payload: { receipt: newSession }
-      });
-    } catch (e) {}
-
-    // 2. Simpan transaksi secara permanen ke Supabase Cloud PostgreSQL
-    try {
-      await saveShoppingTrip({
-        shopping_date: new Date().toISOString().split('T')[0],
+      // 2. Simpan transaksi secara permanen ke Supabase Cloud PostgreSQL
+      // Hapus penambahan array manual secara paksa (optimistic update) agar tidak terjadi duplikasi.
+      // Supabase bertindak sebagai Single Source of Truth.
+      const saveRes = await saveShoppingTrip({
+        shopping_date: transactionDate && transactionDate.includes('-')
+          ? transactionDate
+          : new Date().toISOString().split('T')[0],
         total_spent: totalCartPrice,
         notes: currentStore
       }, cartItems.map(i => ({
@@ -901,15 +883,58 @@ export default function Home() {
         harga_akhir_per_satuan: i.price,
         total_harga_item: i.price * i.quantity
       })));
+
+      // 3. Broadcast sinyal checkout ke perangkat lain via Realtime Channel
+      try {
+        supabaseSyncChannelRef.current?.send({
+          type: 'broadcast',
+          event: 'REALTIME_CHECKOUT_EVENT',
+          payload: { timestamp: Date.now() }
+        });
+      } catch (e) {}
+
+      // 4. Update data Single Source of Truth:
+      // Jika offline fallback terjadi (saveRes.source === 'local'), simpan sesi lokal.
+      // Jika berhasil ke Supabase Cloud, panggil loadCloudHistoryRef() untuk memuat satu data resmi dari server.
+      if (saveRes?.source === 'local') {
+        const fallbackSession = {
+          id: saveRes.historyId || ('sesi-' + Date.now()),
+          storeName: currentStore,
+          store_name: currentStore,
+          totalSpent: totalCartPrice,
+          total_spent: totalCartPrice,
+          savings: 0,
+          date: transactionDate || new Date().toISOString().split('T')[0],
+          shopping_date: transactionDate && transactionDate.includes('-') ? transactionDate : new Date().toISOString().split('T')[0],
+          time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
+          itemCount: cartItems.reduce((acc, i) => acc + i.quantity, 0),
+          statusTier: 'safe',
+          statusBadge: 'Tersimpan Offline',
+          items: cartItems
+        };
+        setHistoryList(prev => {
+          const list = [fallbackSession, ...(prev || []).filter(h => h.id !== fallbackSession.id)];
+          const unique = Array.from(new Map(list.map(item => [item.id, item])).values());
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(unique));
+          }
+          return unique;
+        });
+      } else {
+        if (typeof loadCloudHistoryRef.current === 'function') {
+          await loadCloudHistoryRef.current();
+        }
+      }
+
+      setCartItems([]);
+      persistState([]);
+      setActiveTab('history');
     } catch (err) {
       console.warn('[Checkout Cloud Save Error]:', err);
-    }
-
-    setCartItems([]);
-    persistState([]);
-    setActiveTab('history');
-    if (typeof loadCloudHistoryRef.current === 'function') {
-      loadCloudHistoryRef.current();
+    } finally {
+      // 5. Kembalikan state loading ke false dan tutup modal checkout
+      setIsCheckoutLoading(false);
+      setIsCheckoutModalOpen(false);
     }
   };
 
@@ -1052,11 +1077,12 @@ export default function Home() {
 
             <CheckoutModal
               isOpen={isCheckoutModalOpen}
-              onClose={() => setIsCheckoutModalOpen(false)}
+              onClose={() => !isCheckoutLoading && setIsCheckoutModalOpen(false)}
               totalSpent={totalCartPrice}
               storeName={currentStore}
               itemCount={cartItems.length}
               onConfirmCheckout={handleConfirmCheckout}
+              isCheckoutLoading={isCheckoutLoading}
             />
 
             <DeleteConfirmationModal

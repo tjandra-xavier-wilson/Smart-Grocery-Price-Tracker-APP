@@ -13,7 +13,8 @@ import {
   Trash2, 
   RotateCcw,
   Sparkles,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
 import { playTapSound, playSuccessSound } from '../utils/sound';
@@ -354,7 +355,15 @@ export function ReceiptDetailModal({ isOpen, onClose, session }) {
 /**
  * 5. Modal Konfirmasi Checkout
  */
-export function CheckoutModal({ isOpen, onClose, totalSpent, storeName, itemCount, onConfirmCheckout }) {
+export function CheckoutModal({ 
+  isOpen, 
+  onClose, 
+  totalSpent, 
+  storeName, 
+  itemCount, 
+  onConfirmCheckout,
+  isCheckoutLoading = false 
+}) {
   if (!isOpen) return null;
 
   return (
@@ -384,21 +393,35 @@ export function CheckoutModal({ isOpen, onClose, totalSpent, storeName, itemCoun
         <div className="flex space-x-2 pt-1">
           <button
             type="button"
+            disabled={isCheckoutLoading}
             onClick={() => { playTapSound(); onClose(); }}
-            className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors"
+            className={`flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors ${
+              isCheckoutLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+            }`}
           >
             Batal
           </button>
           <button
             type="button"
-            onClick={() => {
+            disabled={isCheckoutLoading}
+            onClick={async () => {
               playSuccessSound();
-              onConfirmCheckout();
-              onClose();
+              if (onConfirmCheckout) {
+                await onConfirmCheckout();
+              }
             }}
-            className="flex-1 py-3 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors"
+            className={`flex-1 py-3 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center space-x-1.5 ${
+              isCheckoutLoading ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+            }`}
           >
-            Ya, Simpan Struk
+            {isCheckoutLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                <span>Menyimpan...</span>
+              </>
+            ) : (
+              <span>Ya, Simpan Struk</span>
+            )}
           </button>
         </div>
       </div>
