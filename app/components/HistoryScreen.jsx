@@ -196,7 +196,7 @@ export default function HistoryScreen({
             <option value="all">
               {availableMonths.length === 0
                 ? 'Semua Bulan (Belum Ada Riwayat Transaksi)'
-                : `Semua Bulan (${historyList.length} Transaksi Tersimpan)`}
+                : `Semua Bulan (${uniqueHistoryList.length} Transaksi Tersimpan)`}
             </option>
             {availableMonths.map((ymKey) => (
               <option key={ymKey} value={ymKey}>

@@ -79,7 +79,7 @@ export async function getLastPrice(namaBarang) {
  */
 export async function saveShoppingTrip(historyData, itemsList) {
   const payloadHistory = {
-    shopping_date: historyData.shopping_date || new Date().toISOString().split('T')[0],
+    shopping_date: historyData.shopping_date || (function() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(),
     total_spent: Number(historyData.total_spent) || 0,
     notes: historyData.notes || 'Supermarket Grosir'
   };
@@ -277,7 +277,7 @@ export async function getShoppingHistoryList() {
         if (row.shopping_date && row.shopping_date.includes('-')) {
           const parts = row.shopping_date.split('-');
           if (parts.length === 3) {
-            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+            const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
             const mIdx = parseInt(parts[1], 10) - 1;
             dateDisplay = `${parseInt(parts[2], 10)} ${months[mIdx] || parts[1]} ${parts[0]}`;
           }
@@ -384,7 +384,7 @@ function saveOfflineTrip(historyData, itemsList) {
     const trip = {
       id: 'trip_offline_' + Date.now(),
       store_name: historyData.notes || 'Supermarket Grosir',
-      date: historyData.shopping_date || new Date().toISOString().split('T')[0],
+      date: historyData.shopping_date || (function() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(),
       total_spent: historyData.total_spent || 0,
       items_count: itemsList.length,
       items: itemsList

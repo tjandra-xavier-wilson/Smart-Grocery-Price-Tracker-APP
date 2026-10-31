@@ -179,7 +179,15 @@ export default function Home() {
 
   // Core App State
   const [currentStore, setCurrentStore] = useState('Lotte Mart - Puri Indah');
-  const [transactionDate, setTransactionDate] = useState('24 Mei 2025');
+  const [transactionDate, setTransactionDate] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEYS.DATE);
+        if (saved) return saved;
+      } catch (e) {}
+    }
+    return toIndoDisplayDate(new Date());
+  });
   const [budgetLimit, setBudgetLimit] = useState(350000);
   const [cartItems, setCartItems] = useState(MOCKUP_NORMAL_CART);
   const [historyList, setHistoryList] = useState([]);
@@ -866,12 +874,12 @@ export default function Home() {
 
     try {
       // 2. Simpan transaksi secara permanen ke Supabase Cloud PostgreSQL
-      // Hapus penambahan array manual secara paksa (optimistic update) agar tidak terjadi duplikasi.
-      // Supabase bertindak sebagai Single Source of Truth.
+      // Ambil string tanggal ISO (YYYY-MM-DD) murni dari state transactionDate
+      // Mencegah pergeseran timezone UTC yang mengubah tanggal (misal 1 November menjadi 31 Oktober)
+      const safeShoppingDate = toISODateString(transactionDate);
+
       const saveRes = await saveShoppingTrip({
-        shopping_date: transactionDate && transactionDate.includes('-')
-          ? transactionDate
-          : new Date().toISOString().split('T')[0],
+        shopping_date: safeShoppingDate,
         total_spent: totalCartPrice,
         notes: currentStore
       }, cartItems.map(i => ({
@@ -904,8 +912,8 @@ export default function Home() {
           totalSpent: totalCartPrice,
           total_spent: totalCartPrice,
           savings: 0,
-          date: transactionDate || new Date().toISOString().split('T')[0],
-          shopping_date: transactionDate && transactionDate.includes('-') ? transactionDate : new Date().toISOString().split('T')[0],
+          date: toIndoDisplayDate(safeShoppingDate),
+          shopping_date: safeShoppingDate,
           time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
           itemCount: cartItems.reduce((acc, i) => acc + i.quantity, 0),
           statusTier: 'safe',

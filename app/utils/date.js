@@ -10,27 +10,48 @@ export const MONTH_NAMES_ID = [
 ];
 
 const MONTHS_MAP = {
-  'januari': 1, 'jan': 1,
-  'februari': 2, 'feb': 2,
-  'maret': 3, 'mar': 3,
+  'januari': 1, 'jan': 1, 'january': 1,
+  'februari': 2, 'feb': 2, 'february': 2,
+  'maret': 3, 'mar': 3, 'march': 3,
   'april': 4, 'apr': 4,
   'mei': 5, 'may': 5,
-  'juni': 6, 'jun': 6,
-  'juli': 7, 'jul': 7,
-  'agustus': 8, 'agu': 8, 'ags': 8,
-  'september': 9, 'sep': 9,
-  'oktober': 10, 'okt': 10,
+  'juni': 6, 'jun': 6, 'june': 6,
+  'juli': 7, 'jul': 7, 'july': 7,
+  'agustus': 8, 'agu': 8, 'ags': 8, 'august': 8, 'aug': 8,
+  'september': 9, 'sep': 9, 'sept': 9,
+  'oktober': 10, 'okt': 10, 'october': 10, 'oct': 10,
   'november': 11, 'nov': 11,
-  'desember': 12, 'des': 12
+  'desember': 12, 'des': 12, 'december': 12, 'dec': 12
 };
 
 /**
- * Mengurai string tanggal ke objek { year, month (1-12), day (1-31) }
+ * Mengambil tanggal hari ini dalam format ISO lokal (YYYY-MM-DD)
+ * Menghindari pergeseran zona waktu UTC (misal jam 00:13 WIB tidak bergeser mundur ke hari kemarin)
+ */
+export function getTodayLocalDateString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Mengurai string tanggal atau objek Date ke komponen lokal { year, month (1-12), day (1-31) }
+ * Mencegah pergeseran timezone UTC yang terjadi saat memanggil new Date("YYYY-MM-DD")
  */
 export function parseDateComponents(dateStr) {
   if (!dateStr) {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
+  }
+
+  if (dateStr instanceof Date) {
+    return {
+      year: dateStr.getFullYear(),
+      month: dateStr.getMonth() + 1,
+      day: dateStr.getDate()
+    };
   }
 
   const str = String(dateStr).trim();
@@ -45,8 +66,8 @@ export function parseDateComponents(dateStr) {
     };
   }
 
-  // Pola 2: Format Indonesia "24 Mei 2025" atau "31 Oktober 2026"
-  const indoMatch = str.toLowerCase().match(/^(\d{1,2})\s+([a-z]+)\s+(\d{4})/);
+  // Pola 2: Format Indonesia "24 Mei 2025" atau "1 November 2026" (opsional diawali nama hari)
+  const indoMatch = str.toLowerCase().match(/(?:[a-z]+,\s*)?(\d{1,2})\s+([a-z]+)\s+(\d{4})/);
   if (indoMatch) {
     const day = parseInt(indoMatch[1], 10);
     const mNum = MONTHS_MAP[indoMatch[2]] || 1;
@@ -54,18 +75,28 @@ export function parseDateComponents(dateStr) {
     return { year, month: mNum, day };
   }
 
-  // Pola 3: Fallback ke objek Date bawaan JavaScript
-  const parsed = new Date(str);
-  if (!isNaN(parsed.getTime())) {
+  // Pola 3: DD/MM/YYYY atau DD-MM-YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmyMatch) {
     return {
-      year: parsed.getFullYear(),
-      month: parsed.getMonth() + 1,
-      day: parsed.getDate()
+      day: parseInt(dmyMatch[1], 10),
+      month: parseInt(dmyMatch[2], 10),
+      year: parseInt(dmyMatch[3], 10)
     };
   }
 
+  // Pola 4: Fallback aman dengan waktu lokal sekarang
   const now = new Date();
   return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
+}
+
+/**
+ * Mengonversi string tanggal ke objek Date lokal murni (new Date(year, month - 1, day))
+ * Mencegah pergeseran timezone UTC
+ */
+export function toLocalDate(dateStr) {
+  const { year, month, day } = parseDateComponents(dateStr);
+  return new Date(year, month - 1, day, 12, 0, 0); // Jam 12:00 siang lokal aman dari pergeseran hari
 }
 
 /**

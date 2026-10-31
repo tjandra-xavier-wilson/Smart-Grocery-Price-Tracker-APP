@@ -96,6 +96,24 @@ assert(!html.includes('<table>'), 'DILARANG menggunakan tabel desktop; terbukti 
 assert(html.includes('nav-btn-belanja') && html.includes('nav-btn-riwayat') && html.includes('nav-btn-anggaran'), '3 Menu Bottom Navigation Bar utama hadir');
 assert(css.includes('--stepper-btn-size: 46px') || css.includes('--min-touch-target: 48px'), 'Ukuran touch targets stepper ramah jempol');
 
+console.log('\n--- TEST GROUP 6: Timezone-Safe Date Parsing & Month-Year Filter ---');
+const { parseDateComponents, toISODateString, toIndoDisplayDate, toYearMonthKey, formatMonthYearLabel } = require('./app/utils/date.js');
+
+const comp1 = parseDateComponents('1 November 2026');
+assert(comp1.year === 2026 && comp1.month === 11 && comp1.day === 1, 'Parsing "1 November 2026" menghasilkan year 2026, month 11, day 1');
+
+const iso1 = toISODateString('1 November 2026');
+assert(iso1 === '2026-11-01', 'Konversi "1 November 2026" ke ISO menghasilkan "2026-11-01" tanpa mundur ke 31 Oktober');
+
+const ymKey1 = toYearMonthKey('1 November 2026');
+assert(ymKey1 === '2026-11', 'Key filter periode dari "1 November 2026" adalah "2026-11"');
+
+const label1 = formatMonthYearLabel('2026-11');
+assert(label1 === 'November 2026', 'Label dropdown untuk "2026-11" adalah "November 2026"');
+
+const indoFromIso = toIndoDisplayDate('2026-11-01');
+assert(indoFromIso === '1 November 2026', 'Format display dari ISO "2026-11-01" menghasilkan "1 November 2026"');
+
 console.log(`\n========================================================`);
 console.log(`🏁 HASIL PENGUJIAN: ${passedTests} / ${totalTests} TEST BERHASIL LULUS 100%!`);
 console.log(`========================================================`);
