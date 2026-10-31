@@ -298,8 +298,8 @@ export function ReceiptDetailModal({ isOpen, onClose, session }) {
           <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
             {(session.items || []).map((i, idx) => (
               <div key={idx} className="flex justify-between items-center text-xs p-2 bg-slate-50 rounded-lg">
-                <span className="font-bold text-slate-800">{i.name} x {i.quantity || 1}</span>
-                <span className="font-bold text-slate-900">Rp {((i.price || 0) * (i.quantity || 1)).toLocaleString('id-ID')}</span>
+                <span className="font-bold text-slate-800">{i.name || i.nama_barang || "Item"} x {i.quantity || i.kuantitas || 1}</span>
+                <span className="font-bold text-slate-900">Rp {(((i.price || i.harga_akhir_per_satuan || 0) * (i.quantity || i.kuantitas || 1))).toLocaleString('id-ID')}</span>
               </div>
             ))}
           </div>

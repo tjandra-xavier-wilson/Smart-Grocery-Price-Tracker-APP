@@ -259,7 +259,7 @@ export async function getShoppingHistoryList() {
           harga_bulan_lalu
         )
       `)
-      .order('shopping_date', { ascending: false });
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.warn('[Supabase getShoppingHistoryList] Error, using local fallback:', error.message);
@@ -267,14 +267,58 @@ export async function getShoppingHistoryList() {
     }
 
     if (data && data.length > 0) {
-      return data.map(row => ({
-        id: row.id,
-        store_name: row.notes || 'Supermarket Grosir',
-        date: row.shopping_date,
-        total_spent: Number(row.total_spent),
-        items_count: row.grocery_items?.length || 0,
-        items: row.grocery_items || []
-      }));
+      return data.map(row => {
+        const dateObj = new Date(row.created_at || row.shopping_date);
+        const timeStr = !isNaN(dateObj.getTime())
+          ? dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB'
+          : '10:00 WIB';
+        
+        let dateDisplay = row.shopping_date;
+        if (row.shopping_date && row.shopping_date.includes('-')) {
+          const parts = row.shopping_date.split('-');
+          if (parts.length === 3) {
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+            const mIdx = parseInt(parts[1], 10) - 1;
+            dateDisplay = `${parseInt(parts[2], 10)} ${months[mIdx] || parts[1]} ${parts[0]}`;
+          }
+        }
+
+        const items = (row.grocery_items || []).map(it => ({
+          id: it.id,
+          name: it.nama_barang,
+          nama_barang: it.nama_barang,
+          price: Number(it.harga_akhir_per_satuan) || Number(it.harga_satuan) || 0,
+          harga_akhir_per_satuan: Number(it.harga_akhir_per_satuan) || Number(it.harga_satuan) || 0,
+          originalPrice: Number(it.harga_satuan) || 0,
+          harga_satuan: Number(it.harga_satuan) || 0,
+          quantity: Number(it.kuantitas) || 1,
+          kuantitas: Number(it.kuantitas) || 1,
+          unit: it.satuan || 'pcs',
+          satuan: it.satuan || 'pcs',
+          category: it.kategori || 'Bahan Pokok',
+          total_harga_item: Number(it.total_harga_item) || (Number(it.harga_akhir_per_satuan || it.harga_satuan || 0) * Number(it.kuantitas || 1))
+        }));
+
+        const totalItems = items.reduce((acc, curr) => acc + curr.quantity, 0);
+
+        return {
+          id: row.id,
+          storeName: row.notes || 'Supermarket Grosir',
+          store_name: row.notes || 'Supermarket Grosir',
+          date: dateDisplay,
+          shopping_date: row.shopping_date,
+          time: timeStr,
+          totalSpent: Number(row.total_spent) || 0,
+          total_spent: Number(row.total_spent) || 0,
+          savings: 0,
+          itemCount: totalItems || items.length,
+          items_count: totalItems || items.length,
+          statusTier: 'safe',
+          statusBadge: 'Tersimpan di Cloud',
+          iconType: 'cart',
+          items: items
+        };
+      });
     }
 
     return getOfflineHistory();

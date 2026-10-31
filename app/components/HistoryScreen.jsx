@@ -229,7 +229,7 @@ export default function HistoryScreen({
             Riwayat Sesi Terakhir
           </h3>
           <span className="text-[10px] text-slate-400 font-medium">
-            {displayList.length} dari 4 ditampilkan
+            {displayList.length} sesi ditampilkan
           </span>
         </div>
 
@@ -243,7 +243,7 @@ export default function HistoryScreen({
           </div>
         ) : (
           <div className="space-y-2.5">
-            {displayList.slice(0, 3).map((session) => (
+            {displayList.map((session) => (
               <div
                 key={session.id}
                 onClick={() => {

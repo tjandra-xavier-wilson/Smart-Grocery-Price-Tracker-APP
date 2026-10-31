@@ -20,6 +20,7 @@ import {
   getSingleUserSession, 
   signOutUser, 
   saveShoppingTrip, 
+  getShoppingHistoryList,
   updateBudgetSettings,
   saveDeviceAccount,
   isEmailRegistered
@@ -200,7 +201,12 @@ export default function Home() {
   // Quick autofill state for input tab
   const [inputInitialValues, setInputInitialValues] = useState(null);
 
-  // Broadcast channel for instantaneous multi-tab sync
+  // Refs for Multi-Device Realtime Sync & Firestore onSnapshot
+  const isLocalMutatingRef = useRef(false);
+  const firestoreDocRef = useRef(null);
+  const firestoreSetDocRef = useRef(null);
+  const supabaseSyncChannelRef = useRef(null);
+  const loadCloudHistoryRef = useRef(null);
   const broadcastChannelRef = useRef(null);
 
   // 1. Initialize State & LocalStorage Persistence
@@ -360,47 +366,167 @@ export default function Home() {
       }
     }).catch(() => {});
 
-    // Setup Multi-tab BroadcastChannel
+    // Multi-Device Cloud History Synchronization
+    const fetchCloudHistory = async () => {
+      try {
+        const cloudHistory = await getShoppingHistoryList();
+        if (cloudHistory && cloudHistory.length > 0) {
+          setHistoryList(prev => {
+            const prevList = prev || [];
+            const cloudIds = new Set(cloudHistory.map(h => h.id));
+            const localOnly = prevList.filter(h => !cloudIds.has(h.id));
+            const merged = [...cloudHistory, ...localOnly];
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(merged));
+            }
+            return merged;
+          });
+        }
+      } catch (e) {
+        console.warn('[CloudHistory] Fetch error:', e);
+      }
+    };
+    loadCloudHistoryRef.current = fetchCloudHistory;
+    fetchCloudHistory();
+
+    // Setup Multi-tab BroadcastChannel (Same Machine / Browser Tabs)
     if ('BroadcastChannel' in window) {
       try {
         const bc = new BroadcastChannel('smart_grocery_sentinel_sync');
         bc.onmessage = (event) => {
-          if (event.data?.type === 'SYNC_STATE') {
+          if (event.data?.type === 'SYNC_STATE' && !isLocalMutatingRef.current) {
             if (event.data.cart) setCartItems(event.data.cart);
             if (event.data.budget) setBudgetLimit(event.data.budget);
             if (event.data.store) setCurrentStore(event.data.store);
+            if (event.data.date) setTransactionDate(event.data.date);
           }
         };
         broadcastChannelRef.current = bc;
       } catch (e) {}
     }
 
-    // Live Cloud Firestore onSnapshot Integration (SRS F-06B)
+    // 1. Supabase Realtime Multi-Device Sync Channel (Instant Cross-Device Sync)
+    const realtimeChannel = supabase.channel('shopping_session_sync', {
+      config: { broadcast: { self: false } }
+    });
+
+    realtimeChannel
+      .on('broadcast', { event: 'REALTIME_CART_SYNC' }, (payload) => {
+        const data = payload?.payload;
+        if (!data || isLocalMutatingRef.current) return;
+        console.log('⚡ [Realtime Cart Sync Event]:', data);
+
+        if (data.cart && Array.isArray(data.cart)) {
+          setCartItems(data.cart);
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(data.cart));
+          }
+        }
+        if (data.budget !== undefined) {
+          const b = Number(data.budget);
+          setBudgetLimit(b);
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(STORAGE_KEYS.BUDGET, String(b));
+          }
+        }
+        if (data.store) {
+          setCurrentStore(data.store);
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(STORAGE_KEYS.STORE, data.store);
+          }
+        }
+        if (data.date) {
+          setTransactionDate(data.date);
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(STORAGE_KEYS.DATE, data.date);
+          }
+        }
+        setSyncStatus('Realtime Multi-Device Live');
+      })
+      .on('broadcast', { event: 'REALTIME_CHECKOUT_EVENT' }, (payload) => {
+        const receipt = payload?.payload?.receipt;
+        if (receipt) {
+          console.log('⚡ [Realtime Checkout Sync Event]:', receipt);
+          setHistoryList(prev => {
+            const updated = [receipt, ...(prev || []).filter(h => h.id !== receipt.id)];
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(updated));
+            }
+            return updated;
+          });
+          setCartItems([]);
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify([]));
+          }
+        }
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'grocery_history' }, () => {
+        fetchCloudHistory();
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setSyncStatus('Realtime Multi-Device Live');
+        }
+      });
+
+    supabaseSyncChannelRef.current = realtimeChannel;
+
+    // 2. Firebase Cloud Firestore onSnapshot Realtime Listener (SRS F-06B)
+    // DILARANG menggunakan getDoc() / getDocs() sekali panggil!
+    // Wajib menggunakan onSnapshot() untuk mendengarkan mutasi data seketika tanpa reload browser
     let unsubscribeFirestore = null;
     const initFirestoreSync = async () => {
       try {
         const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
-        const { getFirestore, doc, onSnapshot } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+        const { getFirestore, doc, onSnapshot, setDoc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
         
         const app = initializeApp({
           apiKey: "AIzaSyDemoSmartGroceryTracker2026Mb2",
           projectId: "smart-grocery-price-tracker"
-        }, 'sentinel_app');
+        }, 'sentinel_app_' + Date.now());
         
         const db = getFirestore(app);
         const sessionRef = doc(db, 'shopping_sessions', 'lotte_mart_puri_indah_dt2');
+        firestoreDocRef.current = sessionRef;
+        firestoreSetDocRef.current = setDoc;
 
         unsubscribeFirestore = onSnapshot(sessionRef, (snap) => {
-          if (snap.exists()) {
+          if (snap.exists() && !isLocalMutatingRef.current) {
             const data = snap.data();
+            console.log('⚡ [Firestore onSnapshot Event]:', data);
             setSyncStatus('Firestore Live');
-            if (data.budget_limit) setBudgetLimit(data.budget_limit);
+
+            if (data.items && Array.isArray(data.items)) {
+              setCartItems(data.items);
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(data.items));
+              }
+            }
+            if (data.budget_limit) {
+              const b = Number(data.budget_limit);
+              setBudgetLimit(b);
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(STORAGE_KEYS.BUDGET, String(b));
+              }
+            }
+            if (data.store_name) {
+              setCurrentStore(data.store_name);
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(STORAGE_KEYS.STORE, data.store_name);
+              }
+            }
+            if (data.transaction_date) {
+              setTransactionDate(data.transaction_date);
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(STORAGE_KEYS.DATE, data.transaction_date);
+              }
+            }
           }
-        }, () => {
-          setSyncStatus('Online Sync Live');
+        }, (err) => {
+          console.warn('[Firestore onSnapshot Status]:', err.message);
         });
       } catch (err) {
-        setSyncStatus('Online Sync Live');
+        console.warn('[Firestore Init Error]:', err.message);
       }
     };
 
@@ -444,14 +570,30 @@ export default function Home() {
     return () => {
       window.removeEventListener('message', handleOAuthMessage);
       broadcastChannelRef.current?.close();
+      if (supabaseSyncChannelRef.current) {
+        supabase.removeChannel(supabaseSyncChannelRef.current);
+      }
       if (unsubscribeFirestore) unsubscribeFirestore();
       authSub?.unsubscribe();
     };
   }, []);
 
-  // Broadcast & Save changes to LocalStorage
-  const persistState = (newCart, newBudget, newStore) => {
+  // Auto-Sync Riwayat Belanja saat pengguna membuka tab Riwayat
+  useEffect(() => {
+    if (activeTab === 'history' && typeof loadCloudHistoryRef.current === 'function') {
+      loadCloudHistoryRef.current();
+    }
+  }, [activeTab]);
+
+  // Broadcast & Save changes to LocalStorage & Realtime Cloud (Multi-Device Sync)
+  const persistState = (newCart, newBudget, newStore, newDate) => {
     if (typeof localStorage === 'undefined') return;
+
+    const finalCart = newCart !== undefined ? newCart : cartItems;
+    const finalBudget = newBudget !== undefined ? newBudget : budgetLimit;
+    const finalStore = newStore !== undefined ? newStore : currentStore;
+    const finalDate = newDate !== undefined ? newDate : transactionDate;
+
     if (newCart !== undefined) {
       localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(newCart));
     }
@@ -461,14 +603,49 @@ export default function Home() {
     if (newStore !== undefined) {
       localStorage.setItem(STORAGE_KEYS.STORE, newStore);
     }
+    if (newDate !== undefined) {
+      localStorage.setItem(STORAGE_KEYS.DATE, newDate);
+    }
 
-    // Broadcast to other tabs
+    // Flag mutasi lokal sementara agar listener realtime tidak memicu echo-loop
+    isLocalMutatingRef.current = true;
+    setTimeout(() => { isLocalMutatingRef.current = false; }, 400);
+
+    const payload = {
+      cart: finalCart,
+      budget: finalBudget,
+      store: finalStore,
+      date: finalDate,
+      timestamp: Date.now()
+    };
+
+    // 1. Broadcast ke perangkat lain seketika via Supabase Realtime WebSocket
+    try {
+      supabaseSyncChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'REALTIME_CART_SYNC',
+        payload: payload
+      });
+    } catch (e) {}
+
+    // 2. Simpan ke dokumen sesi Cloud Firestore
+    if (firestoreDocRef.current && firestoreSetDocRef.current) {
+      try {
+        firestoreSetDocRef.current(firestoreDocRef.current, {
+          store_name: finalStore,
+          transaction_date: finalDate,
+          budget_limit: finalBudget,
+          items: finalCart,
+          timestamp: Date.now()
+        }, { merge: true }).catch(() => {});
+      } catch (e) {}
+    }
+
+    // 3. Broadcast ke tab lain di browser perangkat yang sama
     try {
       broadcastChannelRef.current?.postMessage({
         type: 'SYNC_STATE',
-        cart: newCart,
-        budget: newBudget,
-        store: newStore
+        ...payload
       });
     } catch (e) {}
   };
@@ -576,10 +753,7 @@ export default function Home() {
   const handleSaveStore = (store, date) => {
     setCurrentStore(store);
     setTransactionDate(date);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.STORE, store);
-      localStorage.setItem(STORAGE_KEYS.DATE, date);
-    }
+    persistState(undefined, undefined, store, date);
   };
 
   // Barcode scanned item
@@ -616,24 +790,40 @@ export default function Home() {
       localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(updatedHistory));
     }
 
-    // Save to Supabase Cloud
-    await saveShoppingTrip({
-      shopping_date: new Date().toISOString().split('T')[0],
-      total_spent: totalCartPrice,
-      notes: currentStore
-    }, cartItems.map(i => ({
-      nama_barang: i.name,
-      kategori: i.category,
-      satuan: i.unit,
-      kuantitas: i.quantity,
-      harga_satuan: i.originalPrice || i.price,
-      harga_akhir_per_satuan: i.price,
-      total_harga_item: i.price * i.quantity
-    })));
+    // 1. Broadcast event checkout seketika ke HP / Laptop lain via Realtime Channel
+    try {
+      supabaseSyncChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'REALTIME_CHECKOUT_EVENT',
+        payload: { receipt: newSession }
+      });
+    } catch (e) {}
+
+    // 2. Simpan transaksi secara permanen ke Supabase Cloud PostgreSQL
+    try {
+      await saveShoppingTrip({
+        shopping_date: new Date().toISOString().split('T')[0],
+        total_spent: totalCartPrice,
+        notes: currentStore
+      }, cartItems.map(i => ({
+        nama_barang: i.name,
+        kategori: i.category,
+        satuan: i.unit,
+        kuantitas: i.quantity,
+        harga_satuan: i.originalPrice || i.price,
+        harga_akhir_per_satuan: i.price,
+        total_harga_item: i.price * i.quantity
+      })));
+    } catch (err) {
+      console.warn('[Checkout Cloud Save Error]:', err);
+    }
 
     setCartItems([]);
     persistState([]);
     setActiveTab('history');
+    if (typeof loadCloudHistoryRef.current === 'function') {
+      loadCloudHistoryRef.current();
+    }
   };
 
   const getActiveTabTitle = () => {

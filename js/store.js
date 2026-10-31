@@ -57,6 +57,21 @@ class GroceryStore {
         this.notify();
       }
 
+      // Sinkronisasi riwayat transaksi belanja multi-device dari cloud
+      if (typeof window.SupabaseHelper.getShoppingHistoryList === 'function') {
+        const cloudHistory = await window.SupabaseHelper.getShoppingHistoryList();
+        if (cloudHistory && cloudHistory.length > 0) {
+          const localHistory = this.getHistory();
+          const existingIds = new Set(localHistory.map(h => h.id));
+          const newEntries = cloudHistory.filter(h => !existingIds.has(h.id));
+          if (newEntries.length > 0 || localHistory.length === 0) {
+            const merged = [...newEntries, ...localHistory];
+            localStorage.setItem(this.STORAGE_KEYS.HISTORY, JSON.stringify(merged));
+            this.notify();
+          }
+        }
+      }
+
       const syncBadge = document.getElementById('cloud-sync-badge');
       const syncText = document.getElementById('sync-text');
       if (syncBadge && syncText) {
