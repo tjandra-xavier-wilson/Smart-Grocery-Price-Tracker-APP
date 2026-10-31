@@ -43,6 +43,22 @@ export default function ActiveCartScreen({
   onLoadMockupOverbudget,
   onLoadMockupNormal
 }) {
+  const dateInputRef = useRef(null);
+
+  const handleOpenDatePicker = () => {
+    playTapSound();
+    if (dateInputRef.current) {
+      if (typeof dateInputRef.current.showPicker === 'function') {
+        try {
+          dateInputRef.current.showPicker();
+          return;
+        } catch (err) {}
+      }
+      dateInputRef.current.focus();
+      dateInputRef.current.click();
+    }
+  };
+
   // Calculations
   const totalCartPrice = cartItems.reduce((acc, item) => {
     const itemPrice = item.price || 0;
@@ -179,17 +195,32 @@ export default function ActiveCartScreen({
           </button>
         </div>
 
-        <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px] text-slate-600 font-medium">
-          <div className="flex items-center space-x-1.5">
-            <Calendar className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-            <span className="font-bold text-slate-800">📅 {transactionDate}</span>
+        {/* Date Row: Interactive Date Picker Pop-up */}
+        <div 
+          onClick={handleOpenDatePicker}
+          className="relative flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-600 font-medium cursor-pointer hover:bg-slate-50/80 -mx-1 px-1.5 py-1.5 rounded-xl transition-all group"
+          title="Klik di sini untuk langsung memilih tanggal dari kalender"
+        >
+          <div className="flex items-center space-x-2">
+            <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+              <Calendar className="w-3.5 h-3.5 shrink-0" />
+            </div>
+            <div>
+              <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider block">Tanggal Transaksi</span>
+              <span className="font-extrabold text-slate-900 group-hover:text-emerald-800 transition-colors">
+                📅 {transactionDate}
+              </span>
+            </div>
           </div>
-          <label 
-            className="flex items-center space-x-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[10px] font-bold cursor-pointer transition-colors"
-            title="Klik untuk memilih tanggal belanja"
-          >
-            <span>Ubah Tanggal</span>
+
+          <div className="relative">
+            <div className="flex items-center space-x-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-lg text-[10.5px] font-extrabold transition-all shadow-2xs">
+              <span>📅 Ubah Tanggal</span>
+            </div>
+
+            {/* Hidden native Date Picker overlay input */}
             <input
+              ref={dateInputRef}
               type="date"
               value={toISODateString(transactionDate)}
               onChange={(e) => {
@@ -198,9 +229,10 @@ export default function ActiveCartScreen({
                   onDateChange(toIndoDisplayDate(e.target.value), e.target.value);
                 }
               }}
-              className="sr-only"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              title="Pilih tanggal transaksi dari kalender"
             />
-          </label>
+          </div>
         </div>
       </div>
 

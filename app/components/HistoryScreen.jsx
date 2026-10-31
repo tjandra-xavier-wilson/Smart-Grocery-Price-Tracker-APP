@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Store, 
   Receipt, 
@@ -30,120 +30,48 @@ import {
 export default function HistoryScreen({
   historyList = [],
   onOpenReceiptDetail,
-  onResetEmptySimulation,
   onRequestDeleteTrip,
   onRequestClearAllHistory
 }) {
-  const [period, setPeriod] = useState('Bulanan'); // 'Harian' | 'Mingguan' | 'Bulanan' | 'Tahunan'
-  const [showEmptyState, setShowEmptyState] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState('all'); // 'all' atau 'YYYY-MM' (contoh: '2026-10')
 
-  // Default Mockup 5 dataset jika historyList kosong
-  const defaultHistory = [
-    {
-      id: 'sesi-1',
-      storeName: 'Lotte Mart Grocery - Puri Indah',
-      totalSpent: 284500,
-      savings: 65500,
-      date: '24 Mei 2025',
-      shopping_date: '2025-05-24',
-      time: '09:42 WIB',
-      itemCount: 9,
-      statusTier: 'safe',
-      statusBadge: 'Dalam Batas Budget (Hemat Rp 65.500)',
-      iconType: 'cart',
-      items: [
-        { name: 'Beras Premium Rojolele 5kg', price: 74000, quantity: 1, unit: 'karung' },
-        { name: 'Minyak Goreng Sania 2L', price: 33500, quantity: 2, unit: 'pouch' },
-        { name: 'Sabun Mandi Dettol Reff 450ml', price: 28500, quantity: 2, unit: 'pouch' },
-        { name: 'Susu UHT Full Cream Greenfields 1L', price: 21500, quantity: 4, unit: 'kotak' }
-      ]
-    },
-    {
-      id: 'sesi-2',
-      storeName: 'Super Indo - Pesanggrahan',
-      totalSpent: 342000,
-      savings: 45000,
-      date: '17 Mei 2025',
-      shopping_date: '2025-05-17',
-      time: '16:15 WIB',
-      itemCount: 14,
-      statusTier: 'warning',
-      statusBadge: 'Mendekati Limit 98%',
-      iconType: 'store',
-      items: [
-        { name: 'Daging Sapi Segar 500g', price: 72000, quantity: 2, unit: 'pack' },
-        { name: 'Telur Ayam 1kg', price: 32000, quantity: 3, unit: 'kg' },
-        { name: 'Bumbu Dapur Lengkap', price: 25000, quantity: 2, unit: 'pack' }
-      ]
-    },
-    {
-      id: 'sesi-3',
-      storeName: 'Hypermart - Puri Mall',
-      totalSpent: 189000,
-      savings: 38000,
-      date: '10 Mei 2025',
-      shopping_date: '2025-05-10',
-      time: '11:30 WIB',
-      itemCount: 6,
-      statusTier: 'safe',
-      statusBadge: 'Aman 54%',
-      iconType: 'bag',
-      items: [
-        { name: 'Sabun Cuci Piring 800ml', price: 22000, quantity: 2, unit: 'pouch' },
-        { name: 'Shampoo Botol 340ml', price: 45000, quantity: 1, unit: 'botol' },
-        { name: 'Pasta Gigi Herbal', price: 18000, quantity: 2, unit: 'tube' }
-      ]
-    },
-    {
-      id: 'sesi-4',
-      storeName: 'Indogrosir Daan Mogot',
-      totalSpent: 604500,
-      savings: 66500,
-      date: '03 Mei 2025',
-      shopping_date: '2025-05-03',
-      time: '14:20 WIB',
-      itemCount: 22,
-      statusTier: 'safe',
-      statusBadge: 'Dalam Batas Budget (Hemat Rp 66.500)',
-      iconType: 'store',
-      items: [
-        { name: 'Mie Instan Dus 40pcs', price: 115000, quantity: 2, unit: 'dus' },
-        { name: 'Minyak Goreng Jerigen 5L', price: 86000, quantity: 2, unit: 'jerigen' }
-      ]
-    }
-  ];
-
-  const sourceList = showEmptyState ? [] : (historyList.length > 0 ? historyList : defaultHistory);
-
-  // 1. Ekstraksi daftar bulan unik yang tersedia dari data riwayat belanja
+  // 1. Ekstraksi daftar bulan unik secara DINAMIS HANYA dari data riwayat belanja yang benar-benar ada
+  // DILARANG menambahkan bulan hardcoded / dummy jika transaksi pada bulan tersebut tidak ada!
   const availableMonths = useMemo(() => {
     const set = new Set();
-    const now = new Date();
-    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    set.add(currentKey);
-
-    sourceList.forEach((item) => {
+    (historyList || []).forEach((item) => {
       const dateVal = item.shopping_date || item.date;
       if (dateVal) {
-        set.add(toYearMonthKey(dateVal));
+        const ym = toYearMonthKey(dateVal);
+        if (ym && ym.length === 7) {
+          set.add(ym);
+        }
       }
     });
-
     return Array.from(set).sort().reverse();
-  }, [sourceList]);
+  }, [historyList]);
+
+  // Jika bulan yang dipilih sudah tidak ada dalam daftar (misal setelah riwayat dihapus), reset ke 'all'
+  useEffect(() => {
+    if (selectedMonth !== 'all' && !availableMonths.includes(selectedMonth)) {
+      setSelectedMonth('all');
+    }
+  }, [availableMonths, selectedMonth]);
 
   // 2. Filter riwayat transaksi berdasarkan Bulan Terpilih (Month-Year Picker)
+  // Murni 100% menggunakan data dinamis (Supabase / LocalStorage), tanpa data statis tiruan
   const displayList = useMemo(() => {
-    if (selectedMonth === 'all') return sourceList;
+    const rawList = historyList || [];
+    if (selectedMonth === 'all') return rawList;
 
-    return sourceList.filter((item) => {
+    return rawList.filter((item) => {
       const dateVal = item.shopping_date || item.date;
       return toYearMonthKey(dateVal) === selectedMonth;
     });
-  }, [sourceList, selectedMonth]);
+  }, [historyList, selectedMonth]);
 
   // 3. Kalkulasi dinamis & reaktif total pengeluaran untuk bulan yang dipilih
+  // Nilai ini otomatis berkurang saat transaksi dihapus
   const { totalPeriodSpent, totalPeriodSavings, completedSessions, averagePerSession } = useMemo(() => {
     let spent = 0;
     let savings = 0;
@@ -204,7 +132,7 @@ export default function HistoryScreen({
 
   return (
     <div className="pb-36 bg-slate-50 min-h-full px-4 pt-3 space-y-3.5">
-      {/* 1. FILTER BULAN & TAHUN (MONTH-YEAR PICKER) */}
+      {/* 1. FILTER BULAN & TAHUN (MONTH-YEAR PICKER DINAMIS) */}
       <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-1.5 text-xs font-extrabold text-slate-800">
@@ -212,7 +140,7 @@ export default function HistoryScreen({
             <span>Filter Bulan &amp; Tahun:</span>
           </div>
 
-          {/* HTML5 Month Picker button */}
+          {/* HTML5 Native Month Picker button */}
           <label className="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center space-x-1 cursor-pointer transition-colors">
             <span>📅 Kalender Bulan</span>
             <input
@@ -229,7 +157,7 @@ export default function HistoryScreen({
           </label>
         </div>
 
-        {/* Dropdown Pemilih Bulan Cepat */}
+        {/* Dropdown Pemilih Bulan Dinamis (HANYA bulan yang memiliki riwayat transaksi nyata) */}
         <div className="flex items-center space-x-2">
           <select
             value={selectedMonth}
@@ -239,7 +167,11 @@ export default function HistoryScreen({
             }}
             className="w-full text-xs font-bold bg-slate-50 hover:bg-slate-100 text-slate-800 py-2 px-3 rounded-xl border border-slate-200 outline-none cursor-pointer transition-colors"
           >
-            <option value="all">Semua Bulan (Tampilkan Semua Transaksi)</option>
+            <option value="all">
+              {availableMonths.length === 0
+                ? 'Semua Bulan (Belum Ada Riwayat Transaksi)'
+                : `Semua Bulan (${historyList.length} Transaksi Tersimpan)`}
+            </option>
             {availableMonths.map((ymKey) => (
               <option key={ymKey} value={ymKey}>
                 {formatMonthYearLabel(ymKey)}
@@ -263,22 +195,15 @@ export default function HistoryScreen({
         </div>
       </div>
 
-      {/* Sub-row: Arsip Rekap & Simulasi Sesi Kosong */}
+      {/* Sub-row: Indikator Periode Aktif */}
       <div className="flex items-center justify-between text-[11px] px-1 font-semibold text-slate-600">
         <div className="flex items-center space-x-1.5 text-emerald-800 font-bold">
           <span>☑️</span>
-          <span>Menampilkan: {currentMonthLabel}</span>
+          <span>Periode: {currentMonthLabel}</span>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            playTapSound();
-            setShowEmptyState(!showEmptyState);
-          }}
-          className="text-slate-500 hover:text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded-lg flex items-center space-x-1 cursor-pointer"
-        >
-          <span>{showEmptyState ? 'Muat Data Sesi' : 'Simulasi Sesi Kosong'}</span>
-        </button>
+        <span className="text-slate-400 font-medium">
+          {displayList.length} sesi ditemukan
+        </span>
       </div>
 
       {/* 2. CARD AKUMULASI PENGELUARAN DINAMIS & REAKTIF */}
@@ -322,14 +247,14 @@ export default function HistoryScreen({
         </div>
       </div>
 
-      {/* 3. RIWAYAT SESI TERAKHIR */}
+      {/* 3. DAFTAR RIWAYAT TRANSAKSI SESI (100% DINAMIS) */}
       <section className="space-y-2">
         <div className="flex items-center justify-between px-1 text-xs">
           <h3 className="font-extrabold text-slate-900 tracking-tight">
-            Riwayat Sesi Belanja
+            Daftar Sesi Pembelanjaan
           </h3>
           <span className="text-[10px] text-slate-400 font-medium">
-            {displayList.length} sesi ditampilkan
+            {displayList.length} sesi
           </span>
         </div>
 
@@ -337,7 +262,7 @@ export default function HistoryScreen({
           <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-2">
             <Receipt className="w-10 h-10 text-slate-300 mx-auto" />
             <h4 className="text-xs font-bold text-slate-800">Belum Ada Riwayat Sesi</h4>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-slate-500 max-w-[280px] mx-auto">
               {selectedMonth === 'all' 
                 ? 'Sesi belanja Anda yang telah selesai akan muncul secara otomatis di sini.'
                 : `Tidak ada riwayat pembelanjaan untuk periode ${currentMonthLabel}.`}
