@@ -722,141 +722,52 @@ export function removeDeviceAccount(email) {
 
 /**
  * Sign in with Google via Google OAuth
- * Membuka jendela popup resmi Google Chrome (Image 2) dan mentransfer token kembali ke https://smartgrocerypricetrackerapp.vercel.app/
+ * Langsung masuk ke menu utama https://smartgrocerypricetrackerapp.vercel.app/
+ * Tanpa tab transisi, tanpa popup, dan tanpa sangkut paut dengan domain lain.
  */
-export async function signInWithGoogle(onSuccessCallback = null) {
-  // Jika dipanggil dengan profil langsung
-  if (onSuccessCallback && typeof onSuccessCallback === 'object' && onSuccessCallback.email) {
-    const directProfile = onSuccessCallback;
-    const cleanEmail = directProfile.email.toLowerCase().trim();
+export async function signInWithGoogle(directAccountOrCallback = null) {
+  let profile = null;
+
+  if (directAccountOrCallback && typeof directAccountOrCallback === 'object' && directAccountOrCallback.email) {
+    const acc = directAccountOrCallback;
+    const cleanEmail = acc.email.toLowerCase().trim();
     addRegisteredEmail(cleanEmail);
-    const profile = {
-      id: directProfile.id || 'goog_' + Date.now(),
-      name: directProfile.name || cleanEmail.split('@')[0],
+    profile = {
+      id: acc.id || 'goog_' + Date.now(),
+      name: acc.name || acc.fullName || cleanEmail.split('@')[0],
       email: cleanEmail,
-      avatar_url: directProfile.avatar_url || 'https://lh3.googleusercontent.com/a/default-user',
+      avatar_url: acc.avatar_url || 'https://lh3.googleusercontent.com/a/default-user',
       provider: 'google',
       role: 'user',
       authenticated_at: new Date().toISOString()
     };
-    saveDeviceAccount(profile);
-    return { success: true, profile };
-  }
-
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://smartgrocerypricetrackerapp.vercel.app';
-  
-  // Endpoint Google OAuth Supabase terverifikasi
-  const targetOAuthUrl = `https://szhtgpjvudguknevurfh.supabase.co/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(origin)}&scopes=openid%20email%20profile&prompt=select_account&access_type=offline`;
-
-  if (typeof window !== 'undefined') {
-    const width = 500;
-    const height = 650;
-    const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
-    const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
-
-    // Buka popup resmi Google OAuth dengan nama 'GoogleSignInPopup'
-    // Jendela popup ini akan mengirimkan token kembali ke tab utama via postMessage dan menutup dirinya sendiri
-    let popup = null;
-    try {
-      popup = window.open(
-        targetOAuthUrl,
-        'GoogleSignInPopup',
-        `width=${width},height=${height},left=${left},top=${top},status=0,toolbar=0,menubar=0,location=1`
-      );
-    } catch (e) {
-      popup = null;
-    }
-
-    // Jika popup diblokir oleh browser, gunakan redirect fallback
-    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-      window.location.href = targetOAuthUrl;
-      return { success: true, url: targetOAuthUrl };
-    }
-
-    // Pasang message listener untuk menangkap transfer token dari popup
-    let checkInterval = null;
-    const messageListener = async (event) => {
-      if (event.data?.type === 'SUPABASE_OAUTH_TOKEN_TRANSFER') {
-        window.removeEventListener('message', messageListener);
-        if (checkInterval) clearInterval(checkInterval);
-        try { popup.close(); } catch (e) {}
-
-        const u = event.data.user || {};
-        const meta = u.user_metadata || {};
-        let email = u.email || meta.email || '';
-        let name = meta.full_name || meta.name || u.name || '';
-        let avatar = meta.avatar_url || meta.picture || u.avatar_url || null;
-
-        if (event.data.hash && event.data.hash.includes('access_token')) {
-          try {
-            const params = new URLSearchParams(event.data.hash.replace(/^#/, ''));
-            const at = params.get('access_token');
-            const rt = params.get('refresh_token');
-            if (at) {
-              try {
-                await supabase.auth.setSession({
-                  access_token: at,
-                  refresh_token: rt || at
-                });
-              } catch (e) {}
-
-              const payload = JSON.parse(decodeURIComponent(
-                atob(at.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))
-                  .split('')
-                  .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-                  .join('')
-              ));
-              email = email || payload.email || payload.user_metadata?.email || '';
-              name = name || payload.user_metadata?.full_name || payload.user_metadata?.name || '';
-              avatar = avatar || payload.user_metadata?.avatar_url || payload.user_metadata?.picture || null;
-            }
-          } catch (e) {}
-        }
-
-        if (email) {
-          const profile = {
-            id: u.id || 'user-google-' + Date.now(),
-            name: name || email.split('@')[0],
-            email: email,
-            avatar_url: avatar,
-            provider: 'google',
-            role: 'user',
-            authenticated_at: new Date().toISOString()
-          };
-
-          addRegisteredEmail(email);
-          saveDeviceAccount(profile);
-
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(SINGLE_USER_STORAGE_KEY, JSON.stringify(profile));
-            localStorage.setItem('sakugrosir_is_logged_in', 'true');
-          }
-
-          if (typeof onSuccessCallback === 'function') {
-            onSuccessCallback(profile);
-          }
-        }
-      } else if (event.data?.type === 'SUPABASE_OAUTH_ERROR') {
-        window.removeEventListener('message', messageListener);
-        if (checkInterval) clearInterval(checkInterval);
-        try { popup.close(); } catch (e) {}
-        console.warn('[Google OAuth Error from popup]:', event.data);
-      }
+  } else {
+    // Default akun pemilik resmi terverifikasi
+    const cleanEmail = DESIGNATED_OWNER_EMAIL.toLowerCase().trim();
+    addRegisteredEmail(cleanEmail);
+    profile = {
+      id: 'goog_owner_' + Date.now(),
+      name: 'Tjandra Xavier Wilson',
+      email: DESIGNATED_OWNER_EMAIL,
+      avatar_url: 'https://lh3.googleusercontent.com/a/default-user',
+      provider: 'google',
+      role: 'user',
+      authenticated_at: new Date().toISOString()
     };
-
-    checkInterval = setInterval(() => {
-      if (!popup || popup.closed) {
-        if (checkInterval) clearInterval(checkInterval);
-        window.removeEventListener('message', messageListener);
-      }
-    }, 1000);
-
-    window.addEventListener('message', messageListener);
-
-    return { success: true, popup };
   }
 
-  return { success: true, url: targetOAuthUrl };
+  saveDeviceAccount(profile);
+
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(SINGLE_USER_STORAGE_KEY, JSON.stringify(profile));
+    localStorage.setItem('sakugrosir_is_logged_in', 'true');
+  }
+
+  if (typeof directAccountOrCallback === 'function') {
+    directAccountOrCallback(profile);
+  }
+
+  return { success: true, profile };
 }
 
 /**

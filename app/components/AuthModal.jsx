@@ -58,14 +58,14 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, currentUser 
     setErrorMsg('');
 
     try {
-      const res = await signInWithGoogle((profile) => {
+      const res = await signInWithGoogle();
+      if (res.success && res.profile) {
         setLoading(false);
         playSuccessSound();
-        if (onAuthSuccess) onAuthSuccess(profile);
+        if (onAuthSuccess) onAuthSuccess(res.profile);
         onClose();
-      });
-      if (!res.success) {
-        setErrorMsg('Gagal mengarahkan ke Google OAuth. Silakan coba kembali.');
+      } else {
+        setErrorMsg('Gagal memproses login Google');
         setLoading(false);
       }
     } catch (err) {
