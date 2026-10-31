@@ -73,3 +73,92 @@ html, body {
 .animate-cart-move {
   animation: cartMoveLoop 1.2s ease-in-out infinite;
 }
+
+/* Parabolic Arc Throw Animations for Checkout Items */
+@keyframes parabolicArcLeft {
+  0% {
+    transform: translate(-100px, 35px) scale(0.4);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-50px, -80px) scale(1.15) rotate(-15deg);
+    opacity: 1;
+  }
+  85% {
+    transform: translate(-10px, -5px) scale(0.9) rotate(5deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0px, 15px) scale(0.15);
+    opacity: 0;
+  }
+}
+
+@keyframes parabolicArcRight {
+  0% {
+    transform: translate(100px, 35px) scale(0.4);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  50% {
+    transform: translate(50px, -85px) scale(1.15) rotate(15deg);
+    opacity: 1;
+  }
+  85% {
+    transform: translate(10px, -5px) scale(0.9) rotate(-5deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0px, 15px) scale(0.15);
+    opacity: 0;
+  }
+}
+
+@keyframes parabolicArcCenter {
+  0% {
+    transform: translate(-15px, -110px) scale(0.4);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-5px, -85px) scale(1.2) rotate(8deg);
+    opacity: 1;
+  }
+  85% {
+    transform: translate(0px, -10px) scale(0.9) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0px, 15px) scale(0.15);
+    opacity: 0;
+  }
+}
+
+@keyframes trolleyShake {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  30% { transform: scale(1.05) rotate(-2deg); }
+  70% { transform: scale(1.05) rotate(2deg); }
+}
+
+.animate-arc-left {
+  animation: parabolicArcLeft 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.animate-arc-right {
+  animation: parabolicArcRight 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.animate-arc-center {
+  animation: parabolicArcCenter 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.animate-trolley-shake {
+  animation: trolleyShake 0.35s ease-in-out infinite;
+}

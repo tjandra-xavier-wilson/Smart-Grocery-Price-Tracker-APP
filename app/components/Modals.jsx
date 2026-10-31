@@ -16,7 +16,8 @@ import {
   AlertTriangle,
   Loader2,
   CheckCircle2,
-  ShoppingBag
+  ShoppingBag,
+  ShoppingCart
 } from 'lucide-react';
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
 import { playTapSound, playSuccessSound } from '../utils/sound';
@@ -355,165 +356,203 @@ export function ReceiptDetailModal({ isOpen, onClose, session }) {
 }
 
 /**
- * 5. Modal Konfirmasi Checkout
+ * Helper icon/emoji untuk barang belanjaan aktual
+ * Kategori Sayuran -> 🥦, Bahan Pokok -> 🍚, Daging -> 🥩, fallback -> 📦
+ */
+export function getItemIcon(category = '', name = '') {
+  const cat = String(category || '').toLowerCase();
+  const n = String(name || '').toLowerCase();
+
+  // Pencocokan nama produk spesifik
+  if (n.includes('beras') || n.includes('rice')) return '🍚';
+  if (n.includes('minyak') || n.includes('oil')) return '🌻';
+  if (n.includes('telur') || n.includes('egg')) return '🥚';
+  if (n.includes('gula') || n.includes('sugar')) return '🍬';
+  if (n.includes('tepung') || n.includes('flour')) return '🌾';
+  if (n.includes('susu') || n.includes('milk')) return '🥛';
+  if (n.includes('kopi') || n.includes('coffee')) return '☕';
+  if (n.includes('wortel') || n.includes('carrot')) return '🥕';
+  if (n.includes('bayam') || n.includes('spinach') || n.includes('sayur') || n.includes('brokoli')) return '🥦';
+  if (n.includes('tomat') || n.includes('tomato')) return '🍅';
+  if (n.includes('apel') || n.includes('apple')) return '🍎';
+  if (n.includes('pisang') || n.includes('banana')) return '🍌';
+  if (n.includes('jeruk') || n.includes('orange')) return '🍊';
+  if (n.includes('semangka') || n.includes('watermelon')) return '🍉';
+  if (n.includes('daging') || n.includes('sapi') || n.includes('beef') || n.includes('meat')) return '🥩';
+  if (n.includes('ayam') || n.includes('chicken')) return '🍗';
+  if (n.includes('ikan') || n.includes('fish') || n.includes('salmon')) return '🐟';
+  if (n.includes('udang') || n.includes('shrimp')) return '🦐';
+  if (n.includes('mie') || n.includes('noodle')) return '🍜';
+
+  // Fallback kategori
+  if (cat.includes('sayur')) return '🥦';
+  if (cat.includes('buah')) return '🍎';
+  if (cat.includes('pokok') || cat.includes('sembako')) return '🍚';
+  if (cat.includes('daging') || cat.includes('ikan')) return '🥩';
+  if (cat.includes('minum')) return '🧃';
+  if (cat.includes('snack') || cat.includes('promo')) return '🍪';
+
+  return '📦';
+}
+
+/**
+ * 5. Modal Animasi Checkout ("Barang Masuk Troli" & "Troli Meluncur")
  */
 export function CheckoutModal({ 
   isOpen, 
   onClose, 
-  totalSpent, 
-  storeName, 
-  itemCount, 
+  totalSpent = 0, 
+  storeName = 'Supermarket Grosir', 
+  itemCount = 0, 
+  cartItems = [], 
   onConfirmCheckout,
   isCheckoutLoading = false 
 }) {
-  const [modalStage, setModalStage] = useState('confirm'); // 'confirm' | 'processing' | 'success'
+  const [phase, setPhase] = useState(1); // 1: Barang Masuk (0 - 1.2s), 2: Troli Meluncur (1.2 - 1.7s), 3: Centang Sukses (1.7 - 2.5s)
+
+  // Ambil maksimal 3 barang pertama dari array keranjang
+  const displayItems = (cartItems && cartItems.length > 0) 
+    ? cartItems.slice(0, 3) 
+    : [{ name: 'Belanjaan', category: 'sembako' }];
 
   useEffect(() => {
     if (!isOpen) {
-      setModalStage('confirm');
+      setPhase(1);
+      return;
     }
+
+    setPhase(1);
+
+    // 1. Fase 2: Troli Meluncur cepat ke kanan setelah ~1.2 detik
+    const timerPhase2 = setTimeout(() => {
+      setPhase(2);
+    }, 1200);
+
+    // 2. Fase 3: Centang Hijau Sukses membesar di tengah layar setelah ~1.7 detik
+    const timerPhase3 = setTimeout(() => {
+      playSuccessSound();
+      setPhase(3);
+    }, 1700);
+
+    // 3. Fase Cleanup: Tutup modal & eksekusi simpan ke Supabase setelah ~2.6 detik
+    const timerCleanup = setTimeout(async () => {
+      if (onConfirmCheckout) {
+        await onConfirmCheckout();
+      }
+      onClose();
+    }, 2600);
+
+    return () => {
+      clearTimeout(timerPhase2);
+      clearTimeout(timerPhase3);
+      clearTimeout(timerCleanup);
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleStartCheckout = () => {
-    playTapSound();
-    setModalStage('processing');
-
-    // 1. Durasi 1.5 detik pemrosesan transaksi (spinner & ikon keranjang bergerak)
-    setTimeout(() => {
-      playSuccessSound();
-      setModalStage('success');
-
-      // 2. Durasi 1.0 detik menampilkan tanda centang hijau besar 'Pembayaran Berhasil!'
-      setTimeout(async () => {
-        if (onConfirmCheckout) {
-          await onConfirmCheckout();
-        }
-      }, 1000);
-    }, 1500);
-  };
-
-  // Stage 1: Animasi Pemrosesan Transaksi (Overlay menutupi layar, spinner & keranjang berjalan)
-  if (modalStage === 'processing') {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
-        <div 
-          className="w-full max-w-[360px] bg-white rounded-3xl p-8 shadow-2xl border border-slate-100 text-center space-y-5 animate-slide-up"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Animated cart container with pulsing aura */}
-          <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
-            <div className="absolute inset-0 rounded-full bg-emerald-100 animate-ping opacity-60" />
-            <div className="relative w-20 h-20 rounded-full bg-emerald-50 border-2 border-emerald-300 flex items-center justify-center text-emerald-800 shadow-inner">
-              <ShoppingBag className="w-10 h-10 animate-cart-move text-emerald-800" />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-center space-x-2">
-              <Loader2 className="w-4 h-4 animate-spin text-emerald-700" />
-              <h3 className="text-base font-black text-slate-900 tracking-tight">
-                Memproses Transaksi...
-              </h3>
-            </div>
-            <p className="text-xs text-slate-500 font-medium">
-              Menghubungkan &amp; menyinkronkan data belanjaan ke server...
-            </p>
-          </div>
-
-          {/* Animated progress bar */}
-          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200">
-            <div className="bg-emerald-600 h-full w-3/4 animate-pulse rounded-full" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Stage 2: Tanda Centang Hijau Besar (Pembayaran Berhasil!) dengan animasi scale-in
-  if (modalStage === 'success') {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
-        <div 
-          className="w-full max-w-[360px] bg-white rounded-3xl p-8 shadow-2xl border border-slate-100 text-center space-y-5 animate-scale-in"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Big Green Checkmark with scale-in animation */}
-          <div className="w-20 h-20 mx-auto rounded-full bg-emerald-100 border-2 border-emerald-400 flex items-center justify-center text-emerald-600 shadow-md">
-            <CheckCircle2 className="w-12 h-12 text-emerald-600 stroke-[2.5] animate-scale-in" />
-          </div>
-
-          <div className="space-y-1.5">
-            <h3 className="text-lg font-black text-emerald-800 tracking-tight">
-              Pembayaran Berhasil!
-            </h3>
-            <p className="text-xs text-slate-500 font-medium">
-              Struk belanja Anda telah aman diarsipkan ke tab Riwayat.
-            </p>
-          </div>
-
-          <div className="bg-emerald-50 py-2 px-3 rounded-xl border border-emerald-200 text-xs font-extrabold text-emerald-800 flex items-center justify-center space-x-1.5 shadow-2xs">
-            <span>✨ Transaksi Selesai &amp; Tersinkron</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Stage 0: Modal Konfirmasi Checkout Normal
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4 animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in select-none">
       <div 
-        className="w-full max-w-[380px] bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 animate-slide-up text-center space-y-4"
+        className="w-full max-w-[380px] text-center relative overflow-hidden py-8 px-4 flex flex-col items-center justify-center min-h-[360px]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="w-14 h-14 bg-emerald-100 text-emerald-800 rounded-full flex items-center justify-center mx-auto">
-          <Receipt className="w-7 h-7" />
-        </div>
+        {/* ======================================================== */}
+        {/* FASE 1 & 2: TROLI BESAR & BARANG MELOMPAT (PARABOLIC ARC) */}
+        {/* ======================================================== */}
+        <div
+          className={`flex flex-col items-center justify-center w-full transition-all duration-500 ease-in ${
+            phase === 2
+              ? 'translate-x-[200%] opacity-0'
+              : phase === 3
+              ? 'hidden'
+              : 'translate-x-0 opacity-100'
+          }`}
+        >
+          {/* Wadah Troli dan Titik Jatuh Barang */}
+          <div className="relative w-36 h-36 flex items-center justify-center">
+            {/* Glow Aura */}
+            <div className="absolute inset-2 rounded-3xl bg-emerald-500/25 blur-xl -z-10 animate-pulse" />
 
-        <div>
-          <h3 className="text-base font-extrabold text-slate-900">Selesai Belanja &amp; Simpan Struk?</h3>
-          <p className="text-xs text-slate-500 mt-1">
-            Data belanjaan sebanyak {itemCount} barang di <strong>{storeName}</strong> akan diarsipkan ke Riwayat dan tersinkronisasi ke cloud.
-          </p>
-        </div>
+            {/* Ikon Troli Besar di Tengah Layar */}
+            <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-emerald-600 to-teal-800 text-white flex items-center justify-center shadow-2xl border-2 border-emerald-400/40 relative">
+              <ShoppingCart className="w-14 h-14 text-white stroke-[2.3] animate-trolley-shake" />
 
-        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
-          <span className="text-[11px] text-slate-500 block">Total Pengeluaran Kasir:</span>
-          <span className="text-xl font-black text-emerald-800">
-            Rp {totalSpent.toLocaleString('id-ID')}
-          </span>
-        </div>
+              {/* Badge Jumlah Item */}
+              <span className="absolute -top-2 -right-2 bg-amber-400 text-slate-950 text-xs font-black px-2.5 py-0.5 rounded-full shadow-md border-2 border-white animate-bounce">
+                {itemCount || cartItems.length}
+              </span>
+            </div>
 
-        <div className="flex space-x-2 pt-1">
-          <button
-            type="button"
-            disabled={isCheckoutLoading}
-            onClick={() => { playTapSound(); onClose(); }}
-            className={`flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors ${
-              isCheckoutLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-            }`}
-          >
-            Batal
-          </button>
-          <button
-            type="button"
-            disabled={isCheckoutLoading}
-            onClick={handleStartCheckout}
-            className={`flex-1 py-3 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center space-x-1.5 ${
-              isCheckoutLoading ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
-            }`}
-          >
-            {isCheckoutLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-white" />
-                <span>Menyimpan...</span>
-              </>
-            ) : (
-              <span>Ya, Simpan Struk</span>
+            {/* Animasi Barang-barang Aktual Melompat Masuk ke Troli (Parabolic Arc) */}
+            {phase === 1 && (
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                {displayItems.map((item, idx) => {
+                  const emoji = getItemIcon(item.category, item.name);
+                  // Pola lompatan melengkung berurutan
+                  const arcClass = idx === 0 
+                    ? 'animate-arc-left' 
+                    : idx === 1 
+                    ? 'animate-arc-right' 
+                    : 'animate-arc-center';
+                  const delayStyle = { animationDelay: `${idx * 360}ms` };
+
+                  return (
+                    <div
+                      key={item.id || idx}
+                      style={delayStyle}
+                      className={`absolute flex flex-col items-center justify-center z-30 ${arcClass}`}
+                    >
+                      <div className="w-12 h-12 rounded-2xl bg-white shadow-2xl border-2 border-emerald-300 flex items-center justify-center text-2xl">
+                        <span>{emoji}</span>
+                      </div>
+                      <span className="text-[9.5px] font-extrabold text-slate-900 bg-white/95 px-2 py-0.5 rounded-full shadow-md mt-1 max-w-[75px] truncate border border-slate-200">
+                        {item.name}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             )}
-          </button>
+          </div>
+
+          {/* Teks Status Fase 1 & 2 */}
+          <div className="mt-6 space-y-1 text-center">
+            <h3 className="text-lg font-black text-white tracking-tight drop-shadow-md">
+              {phase === 1 ? 'Memasukkan Barang ke Troli...' : 'Troli Meluncur Cepat...'}
+            </h3>
+            <p className="text-xs text-emerald-200/90 font-medium">
+              {storeName} • Total Rp {totalSpent.toLocaleString('id-ID')}
+            </p>
+          </div>
+        </div>
+
+        {/* ======================================================== */}
+        {/* FASE 3: CENTANG HIJAU SUKSES & TEKS PEMBAYARAN BERHASIL  */}
+        {/* ======================================================== */}
+        <div
+          className={`flex flex-col items-center justify-center w-full transition-all duration-300 ease-out transform ${
+            phase === 3
+              ? 'scale-100 opacity-100'
+              : 'scale-0 opacity-0 pointer-events-none absolute'
+          }`}
+        >
+          {/* Ikon Centang Hijau Solid Membesar di Tengah Layar */}
+          <div className="w-24 h-24 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-2xl ring-8 ring-emerald-400/30 animate-scale-in">
+            <Check className="w-14 h-14 text-white stroke-[3.5]" />
+          </div>
+
+          <div className="mt-5 space-y-1.5 text-center">
+            <h3 className="text-2xl font-black text-white tracking-tight drop-shadow-md">
+              Pembayaran Berhasil!
+            </h3>
+            <p className="text-xs text-emerald-100 font-medium">
+              Total Transaksi: <strong className="text-white font-black">Rp {totalSpent.toLocaleString('id-ID')}</strong>
+            </p>
+            <div className="inline-flex items-center space-x-1.5 px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-[11px] font-bold text-white border border-white/30 mt-1 shadow-xs">
+              <span>✨ Menyinkronkan struk ke cloud...</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

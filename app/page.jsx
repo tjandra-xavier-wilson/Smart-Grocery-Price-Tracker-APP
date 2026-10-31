@@ -1090,6 +1090,7 @@ export default function Home() {
               totalSpent={totalCartPrice}
               storeName={currentStore}
               itemCount={cartItems.length}
+              cartItems={cartItems}
               onConfirmCheckout={handleConfirmCheckout}
               isCheckoutLoading={isCheckoutLoading}
             />
