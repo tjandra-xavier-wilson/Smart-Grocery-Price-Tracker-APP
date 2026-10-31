@@ -272,6 +272,41 @@
         return [];
       }
     }
+    /**
+     * 6. Menghapus sesi transaksi belanja
+     */
+    async deleteShoppingTrip(tripId) {
+      const sb = getClient();
+      if (!sb || !tripId) return false;
+
+      try {
+        const { error } = await sb
+          .from('grocery_history')
+          .delete()
+          .eq('id', tripId);
+        return !error;
+      } catch (e) {
+        return false;
+      }
+    },
+
+    /**
+     * 7. Menghapus seluruh riwayat transaksi belanja
+     */
+    async clearAllShoppingHistory() {
+      const sb = getClient();
+      if (!sb) return false;
+
+      try {
+        const { error } = await sb
+          .from('grocery_history')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
+        return !error;
+      } catch (e) {
+        return false;
+      }
+    }
   };
 
   window.SupabaseHelper = SupabaseHelper;

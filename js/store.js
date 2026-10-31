@@ -396,6 +396,9 @@ class GroceryStore {
   deleteHistoryTrip(tripId) {
     const history = this.getHistory().filter(h => h.id !== tripId);
     localStorage.setItem(this.STORAGE_KEYS.HISTORY, JSON.stringify(history));
+    if (window.SupabaseHelper && typeof window.SupabaseHelper.deleteShoppingTrip === 'function') {
+      window.SupabaseHelper.deleteShoppingTrip(tripId);
+    }
     this.notify();
   }
 

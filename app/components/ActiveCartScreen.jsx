@@ -24,12 +24,14 @@ import {
   Scissors
 } from 'lucide-react';
 import { playTapSound, playSuccessSound, playWarningBeep } from '../utils/sound';
+import { toISODateString, toIndoDisplayDate } from '../utils/date';
 
 export default function ActiveCartScreen({
   cartItems = [],
   budgetLimit = 350000,
   currentStore = 'Lotte Mart - Puri Indah',
   transactionDate = '24 Mei 2025',
+  onDateChange,
   onUpdateQuantity,
   onRemoveItem,
   onClearCart,
@@ -177,14 +179,28 @@ export default function ActiveCartScreen({
           </button>
         </div>
 
-        <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px] text-slate-500 font-medium">
+        <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px] text-slate-600 font-medium">
           <div className="flex items-center space-x-1.5">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            <span>Hari ini, {transactionDate}</span>
+            <Calendar className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+            <span className="font-bold text-slate-800">📅 {transactionDate}</span>
           </div>
-          <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md text-[10px] font-semibold">
-            🕒 Sesi #04-JKT
-          </span>
+          <label 
+            className="flex items-center space-x-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[10px] font-bold cursor-pointer transition-colors"
+            title="Klik untuk memilih tanggal belanja"
+          >
+            <span>Ubah Tanggal</span>
+            <input
+              type="date"
+              value={toISODateString(transactionDate)}
+              onChange={(e) => {
+                if (e.target.value && onDateChange) {
+                  playTapSound();
+                  onDateChange(toIndoDisplayDate(e.target.value), e.target.value);
+                }
+              }}
+              className="sr-only"
+            />
+          </label>
         </div>
       </div>
 

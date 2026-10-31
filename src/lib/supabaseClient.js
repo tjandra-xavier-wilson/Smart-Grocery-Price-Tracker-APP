@@ -397,6 +397,68 @@ function saveOfflineTrip(historyData, itemsList) {
 // ==============================================================================
 // 6. SUPABASE AUTHENTICATION & SESSION MANAGEMENT
 // ==============================================================================
+
+/**
+ * 6. MENGHAPUS SATU SESI TRANSAKSI BELANJA DARI SUPABASE & LOCALSTORAGE
+ */
+export async function deleteShoppingTrip(tripId) {
+  if (!tripId) return { success: false };
+
+  try {
+    // A. Hapus dari Supabase PostgreSQL (grocery_items akan terhapus via CASCADE)
+    const { error } = await supabase
+      .from('grocery_history')
+      .delete()
+      .eq('id', tripId);
+
+    if (error) {
+      console.warn('[Supabase deleteShoppingTrip] Warning:', error.message);
+    }
+
+    // B. Hapus dari LocalStorage fallback
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const raw = localStorage.getItem(FALLBACK_KEYS.HISTORY);
+        if (raw) {
+          const list = JSON.parse(raw);
+          const updated = list.filter(item => item.id !== tripId);
+          localStorage.setItem(FALLBACK_KEYS.HISTORY, JSON.stringify(updated));
+        }
+      } catch (e) {}
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.warn('[Supabase deleteShoppingTrip] Exception caught:', err.message);
+    return { success: true };
+  }
+}
+
+/**
+ * 7. MENGHAPUS SELURUH RIWAYAT BELANJA
+ */
+export async function clearAllShoppingHistory() {
+  try {
+    const { error } = await supabase
+      .from('grocery_history')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    if (error) {
+      console.warn('[Supabase clearAllShoppingHistory] Warning:', error.message);
+    }
+
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(FALLBACK_KEYS.HISTORY);
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.warn('[Supabase clearAllShoppingHistory] Exception caught:', err.message);
+    return { success: true };
+  }
+}
+
 export const SINGLE_USER_STORAGE_KEY = 'sakugrosir_single_user_v1';
 export const DEVICE_ACCOUNTS_STORAGE_KEY = 'sakugrosir_device_accounts_v1';
 export const REGISTERED_USERS_STORAGE_KEY = 'sakugrosir_registered_users_v1';

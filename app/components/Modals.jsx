@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Wallet, 
@@ -12,8 +12,10 @@ import {
   Copy, 
   Trash2, 
   RotateCcw,
-  Sparkles
+  Sparkles,
+  AlertTriangle
 } from 'lucide-react';
+import { toISODateString, toIndoDisplayDate } from '../utils/date';
 import { playTapSound, playSuccessSound } from '../utils/sound';
 
 /**
@@ -100,9 +102,18 @@ export function BudgetLimitModal({ isOpen, onClose, currentLimit, onSaveLimit })
  */
 export function StoreModal({ isOpen, onClose, currentStore, currentDate, onSaveStore }) {
   const [store, setStore] = useState(currentStore || 'Lotte Mart - Puri Indah');
-  const [date, setDate] = useState(currentDate || '24 Mei 2025');
+  const [isoDate, setIsoDate] = useState(() => toISODateString(currentDate || new Date()));
+
+  useEffect(() => {
+    if (isOpen) {
+      setStore(currentStore || 'Lotte Mart - Puri Indah');
+      setIsoDate(toISODateString(currentDate || new Date()));
+    }
+  }, [isOpen, currentStore, currentDate]);
 
   if (!isOpen) return null;
+
+  const displayDate = toIndoDisplayDate(isoDate);
 
   const stores = [
     'Lotte Mart - Puri Indah',
@@ -126,7 +137,7 @@ export function StoreModal({ isOpen, onClose, currentStore, currentDate, onSaveS
           </div>
           <button 
             onClick={() => { playTapSound(); onClose(); }}
-            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center"
+            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -141,7 +152,7 @@ export function StoreModal({ isOpen, onClose, currentStore, currentDate, onSaveS
                   key={s}
                   type="button"
                   onClick={() => { playTapSound(); setStore(s); }}
-                  className={`w-full py-2.5 px-3 rounded-xl text-left text-xs font-bold border transition-colors flex items-center justify-between ${
+                  className={`w-full py-2.5 px-3 rounded-xl text-left text-xs font-bold border transition-colors flex items-center justify-between cursor-pointer ${
                     store === s 
                       ? 'bg-emerald-50 text-emerald-900 border-emerald-300' 
                       : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
@@ -155,19 +166,42 @@ export function StoreModal({ isOpen, onClose, currentStore, currentDate, onSaveS
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-800 mb-1 block">Tanggal Transaksi</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+                <Calendar className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Pilih Tanggal Transaksi:</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  playTapSound();
+                  setIsoDate(toISODateString(new Date()));
+                }}
+                className="text-[10px] font-bold text-emerald-700 hover:underline cursor-pointer"
+              >
+                Hari Ini
+              </button>
+            </div>
+
+            {/* Date Picker Interaktif */}
             <input
-              type="text"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-700"
+              type="date"
+              value={isoDate}
+              onChange={(e) => setIsoDate(e.target.value)}
+              className="w-full py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-700 cursor-pointer"
             />
+
+            {/* Format Terstandarisasi Indonesia */}
+            <div className="mt-1.5 px-3 py-1.5 bg-emerald-50/70 border border-emerald-200/60 rounded-lg flex items-center justify-between text-[11px]">
+              <span className="text-slate-500 font-medium">Format Terstandarisasi:</span>
+              <span className="font-extrabold text-emerald-800">📅 {displayDate}</span>
+            </div>
           </div>
 
           <button
             onClick={() => {
               playSuccessSound();
-              onSaveStore(store, date);
+              onSaveStore(store, displayDate, isoDate);
               onClose();
             }}
             className="w-full py-3 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
@@ -428,3 +462,73 @@ export function UserProfileModal({ isOpen, onClose, currentUser, onLogout }) {
   );
 }
 
+/**
+ * 6. Modal Konfirmasi Hapus Riwayat Belanja (Safety Warning)
+ */
+export function DeleteConfirmationModal({
+  isOpen,
+  onClose,
+  onConfirmDelete,
+  targetItem = null,
+  isDeletingAll = false
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4 animate-fade-in">
+      <div 
+        className="w-full max-w-[390px] bg-white rounded-3xl p-6 shadow-2xl border border-rose-100 animate-slide-up text-center space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-14 h-14 mx-auto rounded-full bg-rose-100 text-rose-600 flex items-center justify-center ring-8 ring-rose-50">
+          <Trash2 className="w-7 h-7" />
+        </div>
+
+        <div>
+          <h3 className="font-extrabold text-base text-slate-900">
+            {isDeletingAll ? 'Hapus Seluruh Riwayat Belanja?' : 'Hapus Riwayat Belanja Ini?'}
+          </h3>
+          <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+            Apakah Anda yakin ingin menghapus {isDeletingAll ? 'seluruh ' : ''}riwayat pembelanjaan ini? Tindakan ini permanen dan data tidak dapat dikembalikan.
+          </p>
+        </div>
+
+        {targetItem && !isDeletingAll && (
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 text-left space-y-1">
+            <div className="text-xs font-bold text-slate-900">{targetItem.storeName || targetItem.store_name}</div>
+            <div className="text-[11px] text-slate-500 font-medium">
+              {targetItem.date || targetItem.shopping_date} • {targetItem.itemCount || targetItem.items_count || 1} Item
+            </div>
+            <div className="text-xs font-black text-rose-600">
+              Rp {Number(targetItem.totalSpent || targetItem.total_spent || 0).toLocaleString('id-ID')}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-2.5 pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              playTapSound();
+              onClose();
+            }}
+            className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              playTapSound();
+              onConfirmDelete();
+            }}
+            className="w-full py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Hapus Permanen</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

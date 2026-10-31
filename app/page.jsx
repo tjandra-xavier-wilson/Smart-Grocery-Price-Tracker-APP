@@ -13,7 +13,8 @@ import {
   BarcodeScannerModal, 
   ReceiptDetailModal, 
   CheckoutModal,
-  UserProfileModal
+  UserProfileModal,
+  DeleteConfirmationModal
 } from './components/Modals';
 import { 
   supabase, 
@@ -21,10 +22,13 @@ import {
   signOutUser, 
   saveShoppingTrip, 
   getShoppingHistoryList,
+  deleteShoppingTrip,
+  clearAllShoppingHistory,
   updateBudgetSettings,
   saveDeviceAccount,
   isEmailRegistered
 } from '../src/lib/supabaseClient';
+import { toIndoDisplayDate, toISODateString } from './utils/date';
 import { playTapSound, playSuccessSound } from './utils/sound';
 
 // Storage Keys for LocalStorage Persistence
@@ -197,6 +201,9 @@ export default function Home() {
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteTargetItem, setDeleteTargetItem] = useState(null);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   // Quick autofill state for input tab
   const [inputInitialValues, setInputInitialValues] = useState(null);
@@ -462,6 +469,27 @@ export default function Home() {
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'grocery_history' }, () => {
         fetchCloudHistory();
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'grocery_history' }, () => {
+        fetchCloudHistory();
+      })
+      .on('broadcast', { event: 'REALTIME_DELETE_EVENT' }, (payload) => {
+        const tripId = payload?.payload?.tripId;
+        if (tripId) {
+          setHistoryList(prev => {
+            const updated = (prev || []).filter(h => h.id !== tripId);
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(updated));
+            }
+            return updated;
+          });
+        }
+      })
+      .on('broadcast', { event: 'REALTIME_CLEAR_ALL_HISTORY_EVENT' }, () => {
+        setHistoryList([]);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem(STORAGE_KEYS.HISTORY);
+        }
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
@@ -749,11 +777,70 @@ export default function Home() {
     updateBudgetSettings(newLimit);
   };
 
-  // Store & Date Save
-  const handleSaveStore = (store, date) => {
+  // Store & Date Save with Date Picker Standardization
+  const handleSaveStore = (store, displayDate, isoDate) => {
     setCurrentStore(store);
-    setTransactionDate(date);
-    persistState(undefined, undefined, store, date);
+    const finalDate = displayDate || toIndoDisplayDate(isoDate || new Date());
+    setTransactionDate(finalDate);
+    persistState(undefined, undefined, store, finalDate);
+  };
+
+  const handleDateChange = (displayDate, isoDate) => {
+    const finalDate = displayDate || toIndoDisplayDate(isoDate || new Date());
+    setTransactionDate(finalDate);
+    persistState(undefined, undefined, undefined, finalDate);
+  };
+
+  // Delete History Handlers (Safety Modal Confirmation)
+  const handleRequestDeleteTrip = (trip) => {
+    setDeleteTargetItem(trip);
+    setIsDeletingAll(false);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleRequestClearAll = () => {
+    setDeleteTargetItem(null);
+    setIsDeletingAll(true);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    playSuccessSound();
+    setIsDeleteModalOpen(false);
+
+    if (isDeletingAll) {
+      setHistoryList([]);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEYS.HISTORY);
+      }
+      try {
+        supabaseSyncChannelRef.current?.send({
+          type: 'broadcast',
+          event: 'REALTIME_CLEAR_ALL_HISTORY_EVENT',
+          payload: {}
+        });
+      } catch (e) {}
+      await clearAllShoppingHistory();
+    } else if (deleteTargetItem?.id) {
+      const targetId = deleteTargetItem.id;
+      setHistoryList(prev => {
+        const updated = (prev || []).filter(h => h.id !== targetId);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(updated));
+        }
+        return updated;
+      });
+      try {
+        supabaseSyncChannelRef.current?.send({
+          type: 'broadcast',
+          event: 'REALTIME_DELETE_EVENT',
+          payload: { tripId: targetId }
+        });
+      } catch (e) {}
+      await deleteShoppingTrip(targetId);
+    }
+    setDeleteTargetItem(null);
+    setIsDeletingAll(false);
   };
 
   // Barcode scanned item
@@ -886,6 +973,7 @@ export default function Home() {
                   budgetLimit={budgetLimit}
                   currentStore={currentStore}
                   transactionDate={transactionDate}
+                  onDateChange={handleDateChange}
                   onUpdateQuantity={handleUpdateQuantity}
                   onRemoveItem={handleRemoveItem}
                   onClearCart={handleClearCart}
@@ -913,6 +1001,8 @@ export default function Home() {
                 <HistoryScreen
                   historyList={historyList}
                   onOpenReceiptDetail={(session) => setSelectedReceipt(session)}
+                  onRequestDeleteTrip={handleRequestDeleteTrip}
+                  onRequestClearAllHistory={handleRequestClearAll}
                 />
               )}
             </div>
@@ -967,6 +1057,14 @@ export default function Home() {
               storeName={currentStore}
               itemCount={cartItems.length}
               onConfirmCheckout={handleConfirmCheckout}
+            />
+
+            <DeleteConfirmationModal
+              isOpen={isDeleteModalOpen}
+              onClose={() => setIsDeleteModalOpen(false)}
+              onConfirmDelete={handleConfirmDelete}
+              targetItem={deleteTargetItem}
+              isDeletingAll={isDeletingAll}
             />
           </>
         )}
