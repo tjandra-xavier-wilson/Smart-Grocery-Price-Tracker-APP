@@ -22,11 +22,13 @@ import {
   RotateCcw,
   Flag,
   Scissors,
-  Flame,
   ShoppingBag,
   Carrot,
   Apple,
-  Fish
+  Fish,
+  Cookie,
+  Coffee,
+  Brush
 } from 'lucide-react';
 import { playTapSound, playSuccessSound, playWarningBeep } from '../utils/sound';
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
@@ -49,204 +51,262 @@ export default function ActiveCartScreen({
   onLoadMockupNormal,
   onAddToCart
 }) {
-  const dateInputRef = useRef(null);
   const [activeCategory, setActiveCategory] = useState('all');
 
-  // 1. Menu Kategori Horizontal (Scrollable Carousel)
+  // 1. Menu Kategori Horizontal (Scrollable Carousel sesuai urutan spesifikasi)
   const CART_CATEGORIES = [
     { id: 'all', name: 'Semua', icon: Sparkles },
-    { id: 'promo', name: 'Promo Hemat', icon: Flame, badge: 'Diskon' },
     { id: 'sembako', name: 'Bahan Pokok', icon: ShoppingBag },
     { id: 'sayur', name: 'Sayuran Segar', icon: Carrot },
     { id: 'buah', name: 'Buah-buahan', icon: Apple },
-    { id: 'daging', name: 'Daging & Ikan', icon: Fish }
+    { id: 'daging', name: 'Daging dan Lauk', icon: Fish },
+    { id: 'camilan', name: 'Camilan', icon: Cookie },
+    { id: 'minuman', name: 'Minuman', icon: Coffee },
+    { id: 'kebersihan', name: 'Peralatan Kebersihan', icon: Brush }
   ];
 
-  // 2. Data Katalog Rekomendasi Belanja Berdasarkan Kategori
-  const RECOMMENDED_PRODUCTS = {
-    all: [
-      {
-        id: 'rec-1',
-        name: 'Beras Rojolele Super Pulen',
-        category: 'Bahan Pokok',
-        unit: '5kg',
-        price: 74000,
-        description: 'Pulen alami tanpa pengawet & pemutih',
-        image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&auto=format&fit=crop&q=80'
-      },
-      {
-        id: 'rec-2',
-        name: 'Apel Fuji Manis Segar',
-        category: 'Buah-buahan',
-        unit: '1 kg',
-        price: 34000,
-        description: 'Renyah manis kaya serat & vitamin alami',
-        image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300&auto=format&fit=crop&q=80'
-      },
-      {
-        id: 'rec-3',
-        name: 'Telur Ayam Ras Segar Pilihan',
-        category: 'Bahan Pokok',
-        unit: '1 kg',
-        price: 28000,
-        description: 'Segar langsung dari peternak mitra',
-        image: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=300&auto=format&fit=crop&q=80'
-      },
-      {
-        id: 'rec-4',
-        name: 'Fillet Dada Ayam Broiler',
-        category: 'Daging & Ikan',
-        unit: '1 kg',
-        price: 46000,
-        description: 'Dada ayam tanpa tulang tinggi protein',
-        image: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=300&auto=format&fit=crop&q=80'
-      }
-    ],
-    promo: [
-      {
-        id: 'rec-promo-1',
-        name: 'Minyak Goreng Sawit Murni 2L',
-        category: 'Bahan Pokok',
-        unit: '2L',
-        price: 43000,
-        description: 'Diskon hemat 10% jernih tahan panas',
-        image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=300&auto=format&fit=crop&q=80'
-      },
-      {
-        id: 'rec-promo-2',
-        name: 'Susu UHT Full Cream 1L',
-        category: 'Minuman',
-        unit: '1L',
-        price: 18900,
-        description: 'Promo beli hemat kaya kalsium alami',
-        image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&auto=format&fit=crop&q=80'
-      },
-      {
-        id: 'rec-promo-3',
-        name: 'Kopi Kapal Api Special Mix',
-        category: 'Kebutuhan Harian',
-        unit: '10 sachet',
-        price: 14500,
-        description: 'Paket hemat kopi tubruk mantap',
-        image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300&auto=format&fit=crop&q=80'
-      }
-    ],
-    sembako: [
-      {
-        id: 'rec-sembako-1',
-        name: 'Beras Rojolele Super Pulen',
-        category: 'Bahan Pokok',
-        unit: '5kg',
-        price: 74000,
-        description: 'Pulen alami tanpa pengawet & pemutih',
-        image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&auto=format&fit=crop&q=80'
-      },
-      {
-        id: 'rec-sembako-2',
-        name: 'Gula Pasir Kristal Putih',
-        category: 'Bahan Pokok',
-        unit: '1 kg',
-        price: 17500,
-        description: 'Gula tebu butiran bersih standar SNI',
-        image: 'https://images.unsplash.com/photo-1622484212850-eb596d769edc?w=300&auto=format&fit=crop&q=80'
-      },
-      {
-        id: 'rec-sembako-3',
-        name: 'Tepung Terigu Segitiga Biru',
-        category: 'Bahan Pokok',
-        unit: '1 kg',
-        price: 13000,
-        description: 'Protein sedang serbaguna masakan',
-        image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&auto=format&fit=crop&q=80'
-      }
-    ],
-    sayur: [
-      {
-        id: 'rec-sayur-1',
-        name: 'Wortel Berastagi Segar',
-        category: 'Sayuran Segar',
-        unit: '500g',
-        price: 9500,
-        description: 'Manis renyah kaya beta-karoten',
-        image: 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=300&auto=format&fit=crop&q=80'
-      },
-      {
-        id: 'rec-sayur-2',
-        name: 'Bayam Hijau Hidroponik',
-        category: 'Sayuran Segar',
-        unit: '1 ikat',
-        price: 6000,
-        description: 'Segar bebas pestisida kaya zat besi',
-        image: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=300&auto=format&fit=crop&q=80'
-      },
-      {
-        id: 'rec-sayur-3',
-        name: 'Brokoli Hijau Organik',
-        category: 'Sayuran Segar',
-        unit: '500g',
-        price: 16000,
-        description: 'Brokoli segar kaya antioksidan sehat',
-        image: 'https://images.unsplash.com/photo-1459411621453-7b03977f4bfc?w=300&auto=format&fit=crop&q=80'
-      }
-    ],
-    buah: [
-      {
-        id: 'rec-buah-1',
-        name: 'Apel Fuji Manis Segar',
-        category: 'Buah-buahan',
-        unit: '1 kg',
-        price: 34000,
-        description: 'Renyah segar kaya vitamin alami',
-        image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300&auto=format&fit=crop&q=80'
-      },
-      {
-        id: 'rec-buah-2',
-        name: 'Pisang Cavendish Super',
-        category: 'Buah-buahan',
-        unit: '1 sisir',
-        price: 22000,
-        description: 'Manis legit sumber energi harian',
-        image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300&auto=format&fit=crop&q=80'
-      },
-      {
-        id: 'rec-buah-3',
-        name: 'Jeruk Medan Manis',
-        category: 'Buah-buahan',
-        unit: '1 kg',
-        price: 26000,
-        description: 'Bulir berair manis menyegarkan',
-        image: 'https://images.unsplash.com/photo-1547514701-42782101795e?w=300&auto=format&fit=crop&q=80'
-      }
-    ],
-    daging: [
-      {
-        id: 'rec-daging-1',
-        name: 'Daging Sapi Paha Segar',
-        category: 'Daging & Ikan',
-        unit: '500g',
-        price: 68000,
-        description: 'Sapi lokal empuk rendah lemak',
-        image: 'https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=300&auto=format&fit=crop&q=80'
-      },
-      {
-        id: 'rec-daging-2',
-        name: 'Fillet Dada Ayam Broiler',
-        category: 'Daging & Ikan',
-        unit: '1 kg',
-        price: 46000,
-        description: 'Tanpa tulang tinggi protein hewani',
-        image: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=300&auto=format&fit=crop&q=80'
-      },
-      {
-        id: 'rec-daging-3',
-        name: 'Ikan Salmon Fillet Fresh',
-        category: 'Daging & Ikan',
-        unit: '200g',
-        price: 55000,
-        description: 'Kaya Omega-3 untuk kesehatan jantung',
-        image: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=300&auto=format&fit=crop&q=80'
-      }
-    ]
+  // 2. Data Katalog Rekomendasi Belanja Berdasarkan Kategori Lengkap
+  const RECOMMENDED_PRODUCTS_BY_CATEGORY = {
+    sembako: {
+      categoryName: 'Bahan Pokok',
+      iconEmoji: '🌾',
+      items: [
+        {
+          id: 'rec-sembako-1',
+          name: 'Beras Rojolele Super Pulen',
+          category: 'Bahan Pokok',
+          unit: '5kg',
+          price: 74000,
+          description: 'Pulen alami tanpa pengawet & pemutih',
+          image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&auto=format&fit=crop&q=80'
+        },
+        {
+          id: 'rec-sembako-2',
+          name: 'Minyak Goreng Sawit Murni',
+          category: 'Bahan Pokok',
+          unit: '2L',
+          price: 38500,
+          description: 'Jernih tahan panas dengan vitamin E',
+          image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=300&auto=format&fit=crop&q=80'
+        },
+        {
+          id: 'rec-sembako-3',
+          name: 'Telur Ayam Ras Segar Pilihan',
+          category: 'Bahan Pokok',
+          unit: '1 kg',
+          price: 28000,
+          description: 'Segar langsung dari peternak mitra',
+          image: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=300&auto=format&fit=crop&q=80'
+        },
+        {
+          id: 'rec-sembako-4',
+          name: 'Gula Pasir Kristal Putih',
+          category: 'Bahan Pokok',
+          unit: '1 kg',
+          price: 17500,
+          description: 'Gula tebu butiran bersih standar SNI',
+          image: 'https://images.unsplash.com/photo-1622484212850-eb596d769edc?w=300&auto=format&fit=crop&q=80'
+        }
+      ]
+    },
+    sayur: {
+      categoryName: 'Sayuran Segar',
+      iconEmoji: '🥕',
+      items: [
+        {
+          id: 'rec-sayur-1',
+          name: 'Wortel Berastagi Segar',
+          category: 'Sayuran Segar',
+          unit: '500g',
+          price: 9500,
+          description: 'Manis renyah kaya beta-karoten',
+          image: 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=300&auto=format&fit=crop&q=80'
+        },
+        {
+          id: 'rec-sayur-2',
+          name: 'Bayam Hijau Hidroponik',
+          category: 'Sayuran Segar',
+          unit: '1 ikat',
+          price: 6000,
+          description: 'Segar bebas pestisida kaya zat besi',
+          image: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=300&auto=format&fit=crop&q=80'
+        },
+        {
+          id: 'rec-sayur-3',
+          name: 'Brokoli Hijau Organik',
+          category: 'Sayuran Segar',
+          unit: '500g',
+          price: 16000,
+          description: 'Brokoli segar kaya antioksidan sehat',
+          image: 'https://images.unsplash.com/photo-1459411621453-7b03977f4bfc?w=300&auto=format&fit=crop&q=80'
+        }
+      ]
+    },
+    buah: {
+      categoryName: 'Buah-buahan',
+      iconEmoji: '🍎',
+      items: [
+        {
+          id: 'rec-buah-1',
+          name: 'Apel Fuji Manis Segar',
+          category: 'Buah-buahan',
+          unit: '1 kg',
+          price: 34000,
+          description: 'Renyah manis kaya serat & vitamin alami',
+          image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300&auto=format&fit=crop&q=80'
+        },
+        {
+          id: 'rec-buah-2',
+          name: 'Pisang Cavendish Super',
+          category: 'Buah-buahan',
+          unit: '1 sisir',
+          price: 22000,
+          description: 'Manis legit sumber energi harian',
+          image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300&auto=format&fit=crop&q=80'
+        },
+        {
+          id: 'rec-buah-3',
+          name: 'Jeruk Medan Manis',
+          category: 'Buah-buahan',
+          unit: '1 kg',
+          price: 26000,
+          description: 'Bulir berair manis menyegarkan',
+          image: 'https://images.unsplash.com/photo-1547514701-42782101795e?w=300&auto=format&fit=crop&q=80'
+        }
+      ]
+    },
+    daging: {
+      categoryName: 'Daging dan Lauk',
+      iconEmoji: '🥩',
+      items: [
+        {
+          id: 'rec-daging-1',
+          name: 'Fillet Dada Ayam Broiler',
+          category: 'Daging dan Lauk',
+          unit: '1 kg',
+          price: 46000,
+          description: 'Dada ayam tanpa tulang tinggi protein',
+          image: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=300&auto=format&fit=crop&q=80'
+        },
+        {
+          id: 'rec-daging-2',
+          name: 'Daging Sapi Paha Segar',
+          category: 'Daging dan Lauk',
+          unit: '500g',
+          price: 68000,
+          description: 'Sapi lokal empuk rendah lemak',
+          image: 'https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=300&auto=format&fit=crop&q=80'
+        },
+        {
+          id: 'rec-daging-3',
+          name: 'Ikan Salmon Fillet Fresh',
+          category: 'Daging dan Lauk',
+          unit: '200g',
+          price: 55000,
+          description: 'Kaya Omega-3 untuk kesehatan jantung',
+          image: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=300&auto=format&fit=crop&q=80'
+        }
+      ]
+    },
+    camilan: {
+      categoryName: 'Camilan',
+      iconEmoji: '🍪',
+      items: [
+        {
+          id: 'rec-camilan-1',
+          name: 'Biskuit Roma Kelapa Gurih',
+          category: 'Camilan',
+          unit: '300g',
+          price: 11500,
+          description: 'Biskuit kelapa renyah kaya vitamin',
+          image: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=300&auto=format&fit=crop&q=80'
+        },
+        {
+          id: 'rec-camilan-2',
+          name: 'Chitato Keripik Sapi Panggang',
+          category: 'Camilan',
+          unit: '68g',
+          price: 12000,
+          description: 'Keripik kentang bergelombang gurih',
+          image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=300&auto=format&fit=crop&q=80'
+        },
+        {
+          id: 'rec-camilan-3',
+          name: 'Oreo Biskuit Krim Vanila',
+          category: 'Camilan',
+          unit: '133g',
+          price: 9800,
+          description: 'Biskuit cokelat sandwich krim lezat',
+          image: 'https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?w=300&auto=format&fit=crop&q=80'
+        }
+      ]
+    },
+    minuman: {
+      categoryName: 'Minuman',
+      iconEmoji: '🧃',
+      items: [
+        {
+          id: 'rec-minuman-1',
+          name: 'Susu UHT Full Cream Ultra Milk',
+          category: 'Minuman',
+          unit: '1L',
+          price: 19500,
+          description: 'Susu sapi murni kaya kalsium alami',
+          image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&auto=format&fit=crop&q=80'
+        },
+        {
+          id: 'rec-minuman-2',
+          name: 'Kopi Kapal Api Special Mix',
+          category: 'Minuman',
+          unit: '10 sachet',
+          price: 14500,
+          description: 'Kopi tubruk gula mantap harum',
+          image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300&auto=format&fit=crop&q=80'
+        },
+        {
+          id: 'rec-minuman-3',
+          name: 'Teh Melati Wangi Segar Kotak',
+          category: 'Minuman',
+          unit: '1L',
+          price: 9500,
+          description: 'Seduhan daun teh melati asli alami',
+          image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=300&auto=format&fit=crop&q=80'
+        }
+      ]
+    },
+    kebersihan: {
+      categoryName: 'Peralatan Kebersihan',
+      iconEmoji: '🧼',
+      items: [
+        {
+          id: 'rec-kebersihan-1',
+          name: 'Sabun Mandi Detoff 400ml',
+          category: 'Peralatan Kebersihan',
+          unit: '400ml',
+          price: 26500,
+          description: 'Sabun cair antiseptik perlindungan kuman',
+          image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&auto=format&fit=crop&q=80'
+        },
+        {
+          id: 'rec-kebersihan-2',
+          name: 'Deterjen Cair Rinso Konsentrat',
+          category: 'Peralatan Kebersihan',
+          unit: '750ml',
+          price: 21500,
+          description: 'Hilangkan noda membandel 1x kucek',
+          image: 'https://images.unsplash.com/photo-1585421514738-01798e348b17?w=300&auto=format&fit=crop&q=80'
+        },
+        {
+          id: 'rec-kebersihan-3',
+          name: 'Sabun Cuci Piring Jeruk Nipis',
+          category: 'Peralatan Kebersihan',
+          unit: '700ml',
+          price: 15500,
+          description: 'Bersihkan lemak membandel seketika',
+          image: 'https://images.unsplash.com/photo-1585670210693-e7fdd16b142e?w=300&auto=format&fit=crop&q=80'
+        }
+      ]
+    }
   };
 
   const handleAddRecommended = (prod) => {
@@ -265,21 +325,61 @@ export default function ActiveCartScreen({
     }
   };
 
-  const currentRecommendations = RECOMMENDED_PRODUCTS[activeCategory] || RECOMMENDED_PRODUCTS.all;
+  const renderProductCard = (prod) => (
+    <div 
+      key={prod.id}
+      className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-emerald-50/40 hover:border-emerald-200 flex items-center justify-between gap-3 transition-all group"
+    >
+      {/* Bagian Kiri: Gambar kecil produk (w-16 h-16, object-cover, rounded-lg) dengan onError fallback */}
+      <div className="w-16 h-16 rounded-xl bg-white border border-slate-200 overflow-hidden shrink-0 relative flex items-center justify-center">
+        <img 
+          src={prod.image} 
+          alt={prod.name} 
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
+          onError={(e) => { 
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&auto=format&fit=crop&q=80'; 
+          }}
+          loading="lazy"
+        />
+      </div>
 
-  const handleOpenDatePicker = () => {
-    playTapSound();
-    if (dateInputRef.current) {
-      if (typeof dateInputRef.current.showPicker === 'function') {
-        try {
-          dateInputRef.current.showPicker();
-          return;
-        } catch (err) {}
-      }
-      dateInputRef.current.focus();
-      dateInputRef.current.click();
-    }
-  };
+      {/* Bagian Tengah: Judul produk & Deskripsi singkat */}
+      <div className="flex-1 min-w-0">
+        <h5 className="text-xs font-bold text-slate-900 truncate leading-snug">
+          {prod.name}
+        </h5>
+        <p className="text-[10.5px] text-slate-500 line-clamp-1 mt-0.5">
+          {prod.description}
+        </p>
+        <div className="flex items-center space-x-1.5 mt-1">
+          <span className="text-[9px] font-semibold text-slate-500 bg-white border border-slate-200 px-1.5 py-0.2 rounded">
+            {prod.unit}
+          </span>
+          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
+            {prod.category}
+          </span>
+        </div>
+      </div>
+
+      {/* Bagian Kanan: Nominal harga & Tombol "+" */}
+      <div className="text-right shrink-0 flex items-center space-x-2">
+        <div>
+          <span className="text-xs font-black text-slate-900 block">
+            Rp {prod.price.toLocaleString('id-ID')}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => handleAddRecommended(prod)}
+          className="w-8 h-8 rounded-xl bg-emerald-800 hover:bg-emerald-900 active:scale-95 text-white flex items-center justify-center shadow-xs transition-all cursor-pointer"
+          title="Tambah ke Keranjang Belanja"
+        >
+          <Plus className="w-4 h-4 stroke-[2.5]" />
+        </button>
+      </div>
+    </div>
+  );
 
   // Calculations
   const totalCartPrice = cartItems.reduce((acc, item) => {
@@ -390,74 +490,6 @@ export default function ActiveCartScreen({
         </div>
       )}
 
-      {/* 3. STORE & DATE CARD */}
-      <div className="mx-4 mt-3 bg-white rounded-2xl p-3.5 border border-slate-200 shadow-xs space-y-2.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center">
-              <Store className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
-                Supermarket Terpilih
-              </span>
-              <h3 className="text-xs font-bold text-slate-900 leading-tight">
-                {currentStore}
-              </h3>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              playTapSound();
-              if (onOpenStoreModal) onOpenStoreModal();
-            }}
-            className="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-700 text-[11px] font-bold rounded-lg border border-sky-200 transition-colors cursor-pointer"
-          >
-            Ganti ⇄
-          </button>
-        </div>
-
-        {/* Date Row: Interactive Date Picker Pop-up */}
-        <div 
-          onClick={handleOpenDatePicker}
-          className="relative flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-600 font-medium cursor-pointer hover:bg-slate-50/80 -mx-1 px-1.5 py-1.5 rounded-xl transition-all group"
-          title="Klik di sini untuk langsung memilih tanggal dari kalender"
-        >
-          <div className="flex items-center space-x-2">
-            <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
-              <Calendar className="w-3.5 h-3.5 shrink-0" />
-            </div>
-            <div>
-              <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider block">Tanggal Transaksi</span>
-              <span className="font-extrabold text-slate-900 group-hover:text-emerald-800 transition-colors">
-                📅 {transactionDate}
-              </span>
-            </div>
-          </div>
-
-          <div className="relative">
-            <div className="flex items-center space-x-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-lg text-[10.5px] font-extrabold transition-all shadow-2xs">
-              <span>📅 Ubah Tanggal</span>
-            </div>
-
-            {/* Hidden native Date Picker overlay input */}
-            <input
-              ref={dateInputRef}
-              type="date"
-              value={toISODateString(transactionDate)}
-              onChange={(e) => {
-                if (e.target.value && onDateChange) {
-                  playTapSound();
-                  onDateChange(toIndoDisplayDate(e.target.value), e.target.value);
-                }
-              }}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              title="Pilih tanggal transaksi dari kalender"
-            />
-          </div>
-        </div>
-      </div>
-
       {/* 4. BUDGET CARD (Batas Saldo Dompet) */}
       <div className="mx-4 mt-3 bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
@@ -559,11 +591,11 @@ export default function ActiveCartScreen({
             <span>Kategori Belanja</span>
           </div>
           <span className="text-[10px] text-slate-400 font-medium">
-            Geser kategori →
+            Geser kategori ke samping →
           </span>
         </div>
 
-        {/* 1. Baris Menu Kategori Horizontal (Scrollable Carousel: rounded-2xl, badges, overflow-x-auto scrollbar-hide) */}
+        {/* 1. Baris Menu Kategori Horizontal (Scroll Wheel ke Samping: 8 Kategori Berurutan) */}
         <div className="flex items-center space-x-3 overflow-x-auto no-scrollbar scrollbar-hide px-4 py-1.5 scroll-smooth">
           {CART_CATEGORIES.map((cat) => {
             const isSelected = activeCategory === cat.id;
@@ -589,16 +621,9 @@ export default function ActiveCartScreen({
                   <Icon className={`w-6 h-6 transition-transform group-hover:scale-110 ${
                     isSelected ? 'stroke-[2.5]' : 'stroke-2 text-slate-700'
                   }`} />
-
-                  {/* Badge Merah 'Diskon' di sudut atas Menu Promo Hemat */}
-                  {cat.badge && (
-                    <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full shadow-xs border border-white">
-                      {cat.badge}
-                    </span>
-                  )}
                 </div>
 
-                <span className={`text-[10.5px] mt-1.5 text-center leading-tight transition-colors ${
+                <span className={`text-[10px] mt-1.5 text-center leading-tight transition-colors whitespace-nowrap px-0.5 ${
                   isSelected 
                     ? 'text-emerald-900 font-black' 
                     : 'text-slate-500 font-semibold group-hover:text-slate-800'
@@ -610,7 +635,7 @@ export default function ActiveCartScreen({
           })}
         </div>
 
-        {/* 2. KATALOG REKOMENDASI BELANJA (3-4 Bahan Belanjaan Random/Rekomendasi) */}
+        {/* 2. KATALOG REKOMENDASI BELANJA DENGAN SCROLL VERTICAL */}
         <div className="mx-4 bg-white rounded-2xl p-3.5 border border-slate-200 shadow-xs space-y-2.5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <div className="flex items-center space-x-1.5">
@@ -622,63 +647,35 @@ export default function ActiveCartScreen({
               </h4>
             </div>
             <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/80">
-              {activeCategory === 'all' ? 'Paling Populer' : CART_CATEGORIES.find(c => c.id === activeCategory)?.name}
+              {activeCategory === 'all' 
+                ? 'Semua Kategori' 
+                : CART_CATEGORIES.find(c => c.id === activeCategory)?.name}
             </span>
           </div>
 
-          {/* Product Items: Flexbox Horizontal Layout (Kiri: Thumbnail, Tengah: Judul & Deskripsi, Kanan: Harga & Tombol +) */}
-          <div className="space-y-2">
-            {currentRecommendations.map((prod) => (
-              <div 
-                key={prod.id}
-                className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-emerald-50/40 hover:border-emerald-200 flex items-center justify-between gap-3 transition-all group"
-              >
-                {/* Bagian Kiri: Gambar kecil produk (w-16 h-16, object-cover, rounded-lg) */}
-                <img 
-                  src={prod.image} 
-                  alt={prod.name} 
-                  className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-200 bg-slate-100 shadow-2xs group-hover:scale-102 transition-transform" 
-                  onError={(e) => { 
-                    e.target.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(prod.name) + '&background=065f46&color=fff'; 
-                  }}
-                />
+          {/* Kontainer Vertikal Scrollable (Scroll wheel ke bawah) */}
+          <div className="max-h-[380px] overflow-y-auto pr-1 space-y-3 scroll-smooth no-scrollbar">
+            {activeCategory === 'all' ? (
+              // Mode 'Semua': Tampilkan seluruh barang dari segala kategori, dikelompokkan berdasarkan kategorinya
+              Object.entries(RECOMMENDED_PRODUCTS_BY_CATEGORY).map(([catKey, catGroup]) => (
+                <div key={catKey} className="space-y-2">
+                  <div className="flex items-center space-x-1.5 pt-1 pb-1 border-b border-slate-100 text-slate-800 font-extrabold text-[11px] sticky top-0 bg-white/95 backdrop-blur-xs z-10">
+                    <span>{catGroup.iconEmoji}</span>
+                    <span>{catGroup.categoryName}</span>
+                    <span className="text-[9.5px] font-bold text-slate-400">({catGroup.items.length})</span>
+                  </div>
 
-                {/* Bagian Tengah: Judul produk & Deskripsi singkat */}
-                <div className="flex-1 min-w-0">
-                  <h5 className="text-xs font-bold text-slate-900 truncate leading-snug">
-                    {prod.name}
-                  </h5>
-                  <p className="text-[10.5px] text-slate-500 line-clamp-1 mt-0.5">
-                    {prod.description}
-                  </p>
-                  <div className="flex items-center space-x-1.5 mt-1">
-                    <span className="text-[9px] font-semibold text-slate-500 bg-white border border-slate-200 px-1.5 py-0.2 rounded">
-                      {prod.unit}
-                    </span>
-                    <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
-                      {prod.category}
-                    </span>
+                  <div className="space-y-2">
+                    {catGroup.items.map((prod) => renderProductCard(prod))}
                   </div>
                 </div>
-
-                {/* Bagian Kanan: Nominal harga & Tombol "+" */}
-                <div className="text-right shrink-0 flex items-center space-x-2">
-                  <div>
-                    <span className="text-xs font-black text-slate-900 block">
-                      Rp {prod.price.toLocaleString('id-ID')}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleAddRecommended(prod)}
-                    className="w-8 h-8 rounded-xl bg-emerald-800 hover:bg-emerald-900 active:scale-95 text-white flex items-center justify-center shadow-xs transition-all cursor-pointer"
-                    title="Tambah ke Keranjang Belanja"
-                  >
-                    <Plus className="w-4 h-4 stroke-[2.5]" />
-                  </button>
-                </div>
+              ))
+            ) : (
+              // Mode Kategori Spesifik: Tampilkan daftar produk kategori terkait
+              <div className="space-y-2">
+                {(RECOMMENDED_PRODUCTS_BY_CATEGORY[activeCategory]?.items || []).map((prod) => renderProductCard(prod))}
               </div>
-            ))}
+            )}
           </div>
         </div>
       </section>

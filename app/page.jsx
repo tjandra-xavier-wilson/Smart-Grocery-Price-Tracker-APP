@@ -1002,6 +1002,10 @@ export default function Home() {
               currentUser={currentUser}
               onOpenAuthModal={() => setIsProfileModalOpen(true)}
               syncStatus={syncStatus}
+              transactionDate={transactionDate}
+              onDateChange={handleDateChange}
+              budgetLimit={budgetLimit}
+              onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
             />
 
             {/* Scrollable Viewport Content */}
