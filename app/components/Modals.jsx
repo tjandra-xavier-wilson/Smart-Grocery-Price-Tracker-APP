@@ -514,7 +514,7 @@ export function ThreeDimensionalCart({ itemCount = 0 }) {
       </div>
 
       {/* Realistic 3D Ground Motion Blur Shadow */}
-      <div className="w-32 h-3.5 bg-black/50 rounded-full blur-xs mt-[-6px] -z-10 animate-pulse" />
+      <div className="w-32 h-3.5 bg-slate-900/25 rounded-full blur-xs mt-[-6px] -z-10 animate-pulse" />
     </div>
   );
 }
@@ -570,7 +570,7 @@ export function CheckoutModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-fade-in select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 animate-fade-in select-none">
       {/* Custom Style Injections for Keyframe Synchronizations */}
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes cartDriveThroughConstant {
@@ -711,12 +711,12 @@ export function CheckoutModal({
       ` }} />
 
       <div 
-        className="w-full max-w-[400px] bg-slate-900/95 rounded-3xl p-6 shadow-2xl border border-slate-700/60 relative overflow-hidden text-center min-h-[360px] flex flex-col items-center justify-center"
+        className="w-full max-w-[400px] bg-white rounded-3xl p-6 shadow-2xl border border-emerald-100 relative overflow-hidden text-center min-h-[360px] flex flex-col items-center justify-center animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Glow ambient background */}
-        <div className="absolute -top-16 -left-16 w-40 h-40 bg-emerald-500/20 rounded-full blur-3xl -z-10 pointer-events-none" />
-        <div className="absolute -bottom-16 -right-16 w-40 h-40 bg-teal-500/20 rounded-full blur-3xl -z-10 pointer-events-none" />
+        {/* Glow ambient background tematik */}
+        <div className="absolute -top-16 -left-16 w-44 h-44 bg-emerald-100/70 rounded-full blur-3xl -z-10 pointer-events-none" />
+        <div className="absolute -bottom-16 -right-16 w-44 h-44 bg-teal-100/60 rounded-full blur-3xl -z-10 pointer-events-none" />
 
         {/* ======================================================== */}
         {/* FASE 1: TROLI 3D BERJALAN KONTINU & BARANG JATUH (PARABOLA) */}
@@ -725,23 +725,23 @@ export function CheckoutModal({
           <div className="flex flex-col items-center justify-center w-full animate-fade-in">
             {/* Header Status Saat Troli Bergerak */}
             <div className="mb-4 text-center space-y-1">
-              <div className="inline-flex items-center space-x-1.5 px-3 py-1 bg-emerald-500/20 rounded-full text-emerald-300 text-xs font-black border border-emerald-500/30">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping mr-1" />
+              <div className="inline-flex items-center space-x-1.5 px-3 py-1 bg-emerald-50 rounded-full text-emerald-800 text-xs font-black border border-emerald-200 shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping mr-1" />
                 <span>Memproses Checkout...</span>
               </div>
-              <h3 className="text-base font-extrabold text-white tracking-tight">
+              <h3 className="text-base font-extrabold text-slate-900 tracking-tight">
                 Troli 3D Membawa Barang ke Kasir
               </h3>
-              <p className="text-[11px] text-slate-300">
+              <p className="text-[11px] text-slate-500 font-medium">
                 {storeName} • {itemCount || cartItems.length} Item
               </p>
             </div>
 
-            {/* Lintasan Animasi (Runway) */}
-            <div className="relative w-full h-44 overflow-hidden rounded-2xl bg-gradient-to-b from-slate-900/60 to-slate-950/90 border border-slate-700/50 shadow-inner flex items-center">
+            {/* Lintasan Animasi (Runway Tematik Supermarket) */}
+            <div className="relative w-full h-44 overflow-hidden rounded-2xl bg-gradient-to-b from-emerald-50/70 via-slate-50 to-emerald-50/40 border border-emerald-100/90 shadow-inner flex items-center">
               {/* Garis Aisle Supermarket & Lantai */}
-              <div className="absolute bottom-5 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent" />
-              <div className="absolute bottom-4 left-0 right-0 h-[2px] bg-emerald-400/20" />
+              <div className="absolute bottom-5 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-emerald-400/50 to-transparent" />
+              <div className="absolute bottom-4 left-0 right-0 h-[2px] bg-emerald-200" />
 
               {/* Troli 3D Berjalan Bergerak Konstan Linear dari Kiri ke Kanan */}
               <div className="absolute bottom-3 animate-cart-drive-linear pointer-events-none z-20">
@@ -765,7 +765,7 @@ export function CheckoutModal({
                       style={{ left: leftPos, top: '24px' }}
                       className={`absolute z-30 flex flex-col items-center justify-center -translate-x-1/2 ${dropClass}`}
                     >
-                      <div className="w-11 h-11 rounded-2xl bg-white shadow-2xl border-2 border-emerald-400 flex items-center justify-center text-xl relative">
+                      <div className="w-11 h-11 rounded-2xl bg-white shadow-xl border-2 border-emerald-400 flex items-center justify-center text-xl relative">
                         <span>{emoji}</span>
                       </div>
                       <span className="text-[9px] font-black text-slate-900 bg-white/95 px-2 py-0.5 rounded-full shadow-md mt-1 max-w-[80px] truncate border border-slate-200">
@@ -788,8 +788,8 @@ export function CheckoutModal({
               </div>
             </div>
 
-            <div className="mt-3 text-[11px] text-slate-400 font-medium">
-              Total Tagihan: <strong className="text-emerald-400 font-bold">Rp {totalSpent.toLocaleString('id-ID')}</strong>
+            <div className="mt-3 text-xs text-slate-600 font-medium">
+              Total Tagihan: <strong className="text-emerald-800 font-black">Rp {totalSpent.toLocaleString('id-ID')}</strong>
             </div>
           </div>
         )}
@@ -800,19 +800,19 @@ export function CheckoutModal({
         {stage === 'success' && (
           <div className="flex flex-col items-center justify-center w-full animate-success-pop text-center space-y-4 py-4">
             {/* Ikon Centang Hijau Solid Membesar */}
-            <div className="w-24 h-24 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-2xl ring-8 ring-emerald-400/30 mx-auto">
+            <div className="w-24 h-24 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-2xl ring-8 ring-emerald-100 mx-auto">
               <Check className="w-14 h-14 text-white stroke-[3.5]" />
             </div>
 
             <div className="space-y-1.5 text-center">
-              <h3 className="text-2xl font-black text-white tracking-tight drop-shadow-md">
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">
                 Transaksi Berhasil!
               </h3>
-              <p className="text-xs text-emerald-100 font-medium">
-                {storeName} • Total <strong className="text-white font-black">Rp {totalSpent.toLocaleString('id-ID')}</strong>
+              <p className="text-xs text-slate-600 font-medium">
+                {storeName} • Total <strong className="text-emerald-800 font-black">Rp {totalSpent.toLocaleString('id-ID')}</strong>
               </p>
-              <div className="inline-flex items-center space-x-1.5 px-3.5 py-1 bg-white/20 backdrop-blur-sm rounded-full text-[11px] font-bold text-white border border-white/30 mt-2 shadow-xs">
-                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <div className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-[11px] font-extrabold text-emerald-800 mt-2 shadow-2xs">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Struk Tersimpan ke Cloud Supabase</span>
               </div>
             </div>
