@@ -14,7 +14,8 @@ import {
   ReceiptDetailModal, 
   CheckoutModal,
   UserProfileModal,
-  DeleteConfirmationModal
+  DeleteConfirmationModal,
+  EmptyCartModal
 } from './components/Modals';
 import { 
   supabase, 
@@ -208,6 +209,7 @@ export default function Home() {
   const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [isEmptyCartModalOpen, setIsEmptyCartModalOpen] = useState(false);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -869,7 +871,11 @@ export default function Home() {
   const totalCartPrice = cartItems.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   const handleConfirmCheckout = async () => {
     // 1. Cegah eksekusi ganda jika sedang proses simpan atau keranjang kosong
-    if (isCheckoutLoading || cartItems.length === 0) return;
+    if (isCheckoutLoading) return;
+    if (!cartItems || cartItems.length === 0) {
+      setIsEmptyCartModalOpen(true);
+      return;
+    }
     setIsCheckoutLoading(true);
 
     try {
@@ -1012,7 +1018,13 @@ export default function Home() {
                   onClearCart={handleClearCart}
                   onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
                   onOpenStoreModal={() => setIsStoreModalOpen(true)}
-                  onOpenCheckout={() => setIsCheckoutModalOpen(true)}
+                  onOpenCheckout={() => {
+                    if (!cartItems || cartItems.length === 0) {
+                      setIsEmptyCartModalOpen(true);
+                      return;
+                    }
+                    setIsCheckoutModalOpen(true);
+                  }}
                   onOpenBarcodeModal={() => setIsBarcodeModalOpen(true)}
                   onCutSecondaryItems={handleCutSecondaryItems}
                   onLoadMockupOverbudget={handleLoadMockupOverbudget}
@@ -1093,6 +1105,11 @@ export default function Home() {
               cartItems={cartItems}
               onConfirmCheckout={handleConfirmCheckout}
               isCheckoutLoading={isCheckoutLoading}
+            />
+
+            <EmptyCartModal
+              isOpen={isEmptyCartModalOpen}
+              onClose={() => setIsEmptyCartModalOpen(false)}
             />
 
             <DeleteConfirmationModal

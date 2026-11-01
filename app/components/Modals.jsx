@@ -20,7 +20,7 @@ import {
   ShoppingCart
 } from 'lucide-react';
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
-import { playTapSound, playSuccessSound } from '../utils/sound';
+import { playTapSound, playSuccessSound, playWarningBeep } from '../utils/sound';
 
 /**
  * 1. Modal Edit Batas Saldo Dompet
@@ -944,6 +944,122 @@ export function DeleteConfirmationModal({
             <Trash2 className="w-3.5 h-3.5" />
             <span>Hapus Permanen</span>
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 7. Modal Peringatan Troli Kosong (Shake Animation + Warning + Auto-Close 1.8s)
+ */
+export function EmptyCartModal({ isOpen, onClose }) {
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Mainkan audio notifikasi peringatan
+    playWarningBeep();
+
+    // Auto-close setelah 1.8 detik (antara 1.5 hingga 2 detik sesuai spesifikasi)
+    const timer = setTimeout(() => {
+      onClose();
+    }, 1800);
+
+    return () => clearTimeout(timer);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 animate-fade-in select-none">
+      {/* Injeksi Keyframes Shake / Wiggle untuk Troli 3D */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes trolleyShakeReject {
+          0%, 100% {
+            transform: translateX(0) rotate(0deg);
+          }
+          15% {
+            transform: translateX(-14px) rotate(-8deg);
+          }
+          30% {
+            transform: translateX(12px) rotate(7deg);
+          }
+          45% {
+            transform: translateX(-10px) rotate(-5deg);
+          }
+          60% {
+            transform: translateX(8px) rotate(4deg);
+          }
+          75% {
+            transform: translateX(-5px) rotate(-2deg);
+          }
+          90% {
+            transform: translateX(2px) rotate(1deg);
+          }
+        }
+        @keyframes warningBadgePulse {
+          0%, 100% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.18);
+          }
+        }
+        @keyframes emptyProgressCountdown {
+          from { width: 100%; }
+          to { width: 0%; }
+        }
+        .animate-trolley-shake-reject {
+          animation: trolleyShakeReject 0.6s ease-in-out infinite;
+        }
+        .animate-warning-pulse {
+          animation: warningBadgePulse 0.8s ease-in-out infinite;
+        }
+      ` }} />
+
+      <div 
+        className="w-full max-w-[360px] bg-white rounded-3xl p-6 shadow-2xl border border-amber-200/90 relative overflow-hidden text-center flex flex-col items-center justify-center animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Glow ambient background bernuansa amber / kuning */}
+        <div className="absolute -top-12 -right-12 w-36 h-36 bg-amber-100/70 rounded-full blur-2xl -z-10 pointer-events-none" />
+        <div className="absolute -bottom-12 -left-12 w-36 h-36 bg-rose-100/50 rounded-full blur-2xl -z-10 pointer-events-none" />
+
+        {/* Badge Peringatan ⚠️ */}
+        <div className="inline-flex items-center space-x-1.5 px-3 py-1 bg-amber-50 border border-amber-200 rounded-full text-[11px] font-black text-amber-800 shadow-2xs mb-2">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-600 animate-warning-pulse" />
+          <span>Checkout Ditolak</span>
+        </div>
+
+        {/* Wadah Ikon Troli 3D Berukuran Besar dengan Efek Shake / Wiggle Penolakan */}
+        <div className="relative my-3 flex items-center justify-center">
+          {/* Ikon Peringatan Kuning Mengambang di Sudut Troli */}
+          <div className="absolute -top-2 -right-2 z-30 w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-lg border-2 border-white ring-2 ring-amber-300/40 animate-warning-pulse text-sm font-bold">
+            ⚠️
+          </div>
+
+          {/* Ikon Troli 3D yang Bergoyang (Shake) Cepat */}
+          <div className="animate-trolley-shake-reject">
+            <ThreeDimensionalCart itemCount={0} />
+          </div>
+        </div>
+
+        {/* Teks Pesan Sesuai Spesifikasi Persis */}
+        <div className="mt-3 space-y-1 text-center">
+          <h3 className="text-base font-black text-slate-900 tracking-tight">
+            Keranjang Belanja Kosong!
+          </h3>
+          <p className="text-xs text-slate-600 leading-relaxed font-medium px-2">
+            Troli masih kosong! Silakan tambahkan barang belanjaan terlebih dahulu.
+          </p>
+        </div>
+
+        {/* Indikator auto-close countdown bar */}
+        <div className="w-full bg-amber-100/80 h-1.5 rounded-full overflow-hidden mt-5">
+          <div 
+            className="bg-amber-500 h-full rounded-full w-full"
+            style={{ animation: 'emptyProgressCountdown 1.8s linear forwards' }}
+          />
         </div>
       </div>
     </div>
