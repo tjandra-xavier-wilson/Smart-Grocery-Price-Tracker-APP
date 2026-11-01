@@ -162,3 +162,31 @@ html, body {
 .animate-trolley-shake {
   animation: trolleyShake 0.35s ease-in-out infinite;
 }
+
+/* 3D Continuous Moving Cart Keyframes */
+@keyframes cartDriveThroughConstant {
+  0% {
+    left: -160px;
+  }
+  100% {
+    left: calc(100% + 50px);
+  }
+}
+
+@keyframes wheelSpinRapid {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(1080deg);
+  }
+}
+
+.animate-cart-drive-linear {
+  animation: cartDriveThroughConstant 2.3s linear forwards;
+  will-change: left;
+}
+
+.animate-spin-wheel-fast {
+  animation: wheelSpinRapid 2.3s linear infinite;
+}
