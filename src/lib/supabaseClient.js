@@ -909,6 +909,8 @@ export async function signInWithGoogle() {
       success: false, 
       error: 'Login Google belum diaktifkan di konfigurasi Supabase. Silakan hubungi admin atau gunakan login email/password.' 
     };
+  } finally {
+    console.log('[Supabase Google Auth Request Completed]');
   }
 }
 

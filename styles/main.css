@@ -153,6 +153,102 @@ html, body {
   margin: 0 auto;
 }
 
+/* Animasi Troli Melaju dengan Angin di Header */
+@keyframes cartVibrate {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  25% { transform: translateY(-1.2px) rotate(-1deg); }
+  75% { transform: translateY(0.8px) rotate(0.8deg); }
+}
+@keyframes windTop {
+  0% { transform: translateX(20px); opacity: 0; }
+  25% { opacity: 0.95; }
+  80% { opacity: 0.7; }
+  100% { transform: translateX(-24px); opacity: 0; }
+}
+@keyframes windMid {
+  0% { transform: translateX(16px); opacity: 0; }
+  30% { opacity: 0.85; }
+  85% { opacity: 0.6; }
+  100% { transform: translateX(-28px); opacity: 0; }
+}
+@keyframes windBottom {
+  0% { transform: translateX(22px); opacity: 0; }
+  25% { opacity: 0.9; }
+  80% { opacity: 0.7; }
+  100% { transform: translateX(-22px); opacity: 0; }
+}
+@keyframes roadMove {
+  0% { background-position: 16px 0; }
+  100% { background-position: 0 0; }
+}
+
+.status-bar-cart-anim {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  margin: 0 auto;
+}
+
+.trolley-track {
+  position: relative;
+  width: 86px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.trolley-icon {
+  font-size: 13px;
+  line-height: 1;
+  display: inline-block;
+  animation: cartVibrate 0.38s ease-in-out infinite;
+  z-index: 2;
+}
+
+.wind-line {
+  position: absolute;
+  height: 1.2px;
+  background-color: #10b981;
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
+.wind-1 {
+  top: 2px;
+  right: 28px;
+  width: 14px;
+  animation: windTop 0.48s linear infinite;
+}
+
+.wind-2 {
+  top: 8px;
+  right: 22px;
+  width: 18px;
+  background-color: #14b8a6;
+  animation: windMid 0.58s linear infinite 0.16s;
+}
+
+.wind-3 {
+  top: 14px;
+  right: 26px;
+  width: 13px;
+  animation: windBottom 0.44s linear infinite 0.28s;
+}
+
+.trolley-road {
+  width: 58px;
+  height: 1.5px;
+  border-radius: 9999px;
+  background: repeating-linear-gradient(90deg, #10b981 0px, #10b981 4px, transparent 4px, transparent 8px);
+  background-size: 8px 1.5px;
+  animation: roadMove 0.28s linear infinite;
+  margin-top: -2px;
+}
+
 .status-bar-icons {
   display: flex;
   align-items: center;

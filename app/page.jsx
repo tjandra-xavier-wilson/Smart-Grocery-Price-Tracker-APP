@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import TopStatusBar from './components/TopStatusBar';
 import HeaderBar from './components/HeaderBar';
 import BottomNav from './components/BottomNav';
 import LoginScreen from './components/LoginScreen';
@@ -966,18 +967,8 @@ export default function Home() {
       {/* Mobile Shell Mockup Wrapper (iPhone 16 Pro Max 430px Standard) */}
       <div className="w-full max-w-[430px] bg-white min-h-screen md:min-h-[900px] md:max-h-[920px] md:rounded-[44px] shadow-2xl md:ring-12 md:ring-slate-800/90 overflow-hidden flex flex-col relative transition-all duration-300">
         
-        {/* Simulated Mobile Status Bar (09:41, Notch, 5G Battery) */}
-        <div className="bg-white px-6 pt-3 pb-1 flex items-center justify-between text-xs text-slate-800 font-semibold shrink-0 select-none border-b border-slate-50">
-          <span className="font-extrabold tracking-tight">09:41</span>
-          <div className="w-20 h-4 bg-slate-200/80 rounded-full flex items-center justify-center">
-            <span className="w-2.5 h-2.5 bg-slate-700 rounded-full" />
-          </div>
-          <div className="flex items-center space-x-1.5 text-[11px] text-slate-700 font-bold">
-            <span>5G</span>
-            <span>●●●</span>
-            <span>🔋 98%</span>
-          </div>
-        </div>
+        {/* Top Status Bar: WIB Real-time Clock, Moving Cart Wind Animation & Clean Signal (Tanpa Baterai) */}
+        <TopStatusBar />
 
         {/* ============================================================== */}
         {/* VIEW 1: INITIAL LOGIN SCREEN (MOCKUP 1 - SMART GROCERY SENTINEL) */}

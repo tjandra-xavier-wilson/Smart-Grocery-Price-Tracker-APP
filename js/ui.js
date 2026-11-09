@@ -8,14 +8,25 @@ const GroceryUI = {
   init() {
     this.bindEvents();
     this.updateClock();
-    setInterval(() => this.updateClock(), 30000);
+    setInterval(() => this.updateClock(), 1000);
   },
 
   updateClock() {
     const el = document.getElementById('status-bar-time');
     if (el) {
-      const d = new Date();
-      el.textContent = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+      try {
+        el.textContent = new Date().toLocaleTimeString('en-GB', {
+          timeZone: 'Asia/Jakarta',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+      } catch (e) {
+        const d = new Date();
+        const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+        const wib = new Date(utc + 3600000 * 7);
+        el.textContent = `${wib.getHours().toString().padStart(2, '0')}:${wib.getMinutes().toString().padStart(2, '0')}`;
+      }
     }
   },
 
