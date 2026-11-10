@@ -194,7 +194,22 @@ export default function Home() {
     return toIndoDisplayDate(new Date());
   });
   const [budgetLimit, setBudgetLimit] = useState(350000);
-  const [cartItems, setCartItems] = useState(MOCKUP_NORMAL_CART);
+  // State keranjang belanja terisolasi per akun (akun baru tanpa transaksi mulai dari state kosong [])
+  const [cartItems, setCartItems] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedAuth = localStorage.getItem(STORAGE_KEYS.AUTH);
+        const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
+        if (savedAuth === 'true' && savedUser) {
+          const parsed = JSON.parse(savedUser);
+          const userCartKey = `${STORAGE_KEYS.CART}_${parsed.id}`;
+          const savedCart = localStorage.getItem(userCartKey) || localStorage.getItem(STORAGE_KEYS.CART);
+          if (savedCart) return JSON.parse(savedCart);
+        }
+      } catch (e) {}
+    }
+    return [];
+  });
   const [historyList, setHistoryList] = useState([]);
   const [currentUser, setCurrentUser] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -452,10 +467,16 @@ export default function Home() {
       }
     }).catch(() => {});
 
-    // Multi-Device Cloud History Synchronization (Single Source of Truth)
-    const fetchCloudHistory = async () => {
+    // Multi-Device Cloud History Synchronization Terisolasi per User ID (Pencegahan Data Bleeding)
+    const fetchCloudHistory = async (overrideUserId = null) => {
       try {
-        const cloudHistory = await getShoppingHistoryList();
+        const activeUid = overrideUserId || currentUser?.id;
+        if (!activeUid) {
+          setHistoryList([]);
+          return;
+        }
+
+        const cloudHistory = await getShoppingHistoryList(activeUid);
         if (cloudHistory && Array.isArray(cloudHistory)) {
           setHistoryList(() => {
             // Deduplikasi array berdasarkan ID unik - Cloud sebagai Single Source of Truth
@@ -464,16 +485,21 @@ export default function Home() {
             ).filter(Boolean);
             if (typeof localStorage !== 'undefined') {
               localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(uniqueHistory));
+              localStorage.setItem(`${STORAGE_KEYS.HISTORY}_${activeUid}`, JSON.stringify(uniqueHistory));
             }
             return uniqueHistory;
           });
+        } else {
+          setHistoryList([]);
         }
       } catch (e) {
         console.warn('[CloudHistory] Fetch error:', e);
       }
     };
     loadCloudHistoryRef.current = fetchCloudHistory;
-    fetchCloudHistory();
+    if (currentUser?.id) {
+      fetchCloudHistory(currentUser.id);
+    }
 
     // Setup Multi-tab BroadcastChannel (Same Machine / Browser Tabs)
     if ('BroadcastChannel' in window) {
@@ -656,6 +682,9 @@ export default function Home() {
         // Jika event adalah login baru (SIGNED_IN), tampilkan transisi splash screen masuk ke akun
         if (event === 'SIGNED_IN') {
           setShowSplash(true);
+          if (typeof loadCloudHistoryRef.current === 'function') {
+            loadCloudHistoryRef.current(u.id);
+          }
         }
 
         if (typeof window !== 'undefined') {
@@ -671,9 +700,17 @@ export default function Home() {
       } else if (event === 'SIGNED_OUT') {
         setIsAuthenticated(false);
         setCurrentUser(null);
+        setCartItems([]);
+        setHistoryList([]);
         if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem('cartItems');
+          localStorage.removeItem('budgetLimit');
+          localStorage.removeItem('shoppingHistory');
           localStorage.removeItem(STORAGE_KEYS.AUTH);
           localStorage.removeItem(STORAGE_KEYS.USER);
+          localStorage.removeItem(STORAGE_KEYS.CART);
+          localStorage.removeItem(STORAGE_KEYS.HISTORY);
+          localStorage.removeItem(STORAGE_KEYS.BUDGET);
         }
       }
     });
@@ -707,6 +744,9 @@ export default function Home() {
 
     if (newCart !== undefined) {
       localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(newCart));
+      if (currentUser?.id) {
+        localStorage.setItem(`${STORAGE_KEYS.CART}_${currentUser.id}`, JSON.stringify(newCart));
+      }
     }
     if (newBudget !== undefined) {
       localStorage.setItem(STORAGE_KEYS.BUDGET, String(newBudget));
@@ -767,7 +807,19 @@ export default function Home() {
     setIsAuthenticated(true);
     setActiveTab('cart');
 
-    // Tampilkan transisi dan splash screen saat masuk ke akun yang dituju
+    // 1. Isolasi Keranjang: Akun baru/berpindah akun mulai dari keranjang kosong jika belum ada transaksi untuk akun ini
+    const userCartKey = `${STORAGE_KEYS.CART}_${userProfile.id}`;
+    let initialUserCart = [];
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(userCartKey);
+        if (saved) initialUserCart = JSON.parse(saved);
+      } catch (e) {}
+    }
+    setCartItems(initialUserCart);
+    setHistoryList([]);
+
+    // 2. Tampilkan transisi dan splash screen saat masuk ke akun yang dituju
     setShowSplash(true);
 
     if (typeof window !== 'undefined') {
@@ -778,6 +830,13 @@ export default function Home() {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.AUTH, 'true');
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userProfile));
+      localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(initialUserCart));
+      localStorage.setItem(userCartKey, JSON.stringify(initialUserCart));
+    }
+
+    // 3. Ambil histori belanja yang murni hanya milik akun ini dari database Supabase
+    if (typeof loadCloudHistoryRef.current === 'function') {
+      loadCloudHistoryRef.current(userProfile.id);
     }
   };
 
@@ -786,14 +845,42 @@ export default function Home() {
     try {
       await signOutUser();
     } catch (e) {}
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEYS.AUTH);
-      localStorage.removeItem(STORAGE_KEYS.USER);
-    }
+
+    // 1. Reset seluruh React State ke kondisi awal bersih (Pencegahan Data Bleeding)
+    setCartItems([]);
+    setHistoryList([]);
+    setBudgetLimit(350000);
+    setCurrentStore('Lotte Mart - Puri Indah');
+    setTransactionDate(toIndoDisplayDate(new Date()));
     setCurrentUser(null);
     setIsAuthenticated(false);
     setIsProfileModalOpen(false);
     setShowSplash(false);
+
+    // 2. Pembersihan Total LocalStorage (Termasuk keys yang diminta user)
+    if (typeof localStorage !== 'undefined') {
+      // Hapus kunci spesifik yang diminta user
+      localStorage.removeItem('cartItems');
+      localStorage.removeItem('budgetLimit');
+      localStorage.removeItem('shoppingHistory');
+
+      // Hapus kunci state aplikasi
+      localStorage.removeItem(STORAGE_KEYS.CART);
+      localStorage.removeItem(STORAGE_KEYS.BUDGET);
+      localStorage.removeItem(STORAGE_KEYS.STORE);
+      localStorage.removeItem(STORAGE_KEYS.DATE);
+      localStorage.removeItem(STORAGE_KEYS.HISTORY);
+      localStorage.removeItem(STORAGE_KEYS.USER);
+      localStorage.removeItem(STORAGE_KEYS.AUTH);
+      localStorage.removeItem(STORAGE_KEYS.SPLASH_SHOWN);
+
+      // Hapus kunci session/offline
+      localStorage.removeItem(SINGLE_USER_STORAGE_KEY);
+      localStorage.removeItem('sakugrosir_is_logged_in');
+      localStorage.removeItem('sakugrosir_offline_history');
+      localStorage.removeItem('sakugrosir_offline_budget');
+      localStorage.removeItem('sakugrosir_sample_history_initialized');
+    }
   };
 
   // Cart Operations
@@ -913,7 +1000,7 @@ export default function Home() {
           payload: {}
         });
       } catch (e) {}
-      await clearAllShoppingHistory();
+      await clearAllShoppingHistory(currentUser?.id);
     } else if (deleteTargetItem?.id) {
       const targetId = deleteTargetItem.id;
       setHistoryList(prev => {
@@ -930,7 +1017,7 @@ export default function Home() {
           payload: { tripId: targetId }
         });
       } catch (e) {}
-      await deleteShoppingTrip(targetId);
+      await deleteShoppingTrip(targetId, currentUser?.id);
     }
     setDeleteTargetItem(null);
     setIsDeletingAll(false);
@@ -966,6 +1053,7 @@ export default function Home() {
       const safeShoppingDate = toISODateString(transactionDate);
 
       const saveRes = await saveShoppingTrip({
+        user_id: currentUser?.id,
         shopping_date: safeShoppingDate,
         total_spent: totalCartPrice,
         notes: currentStore
@@ -977,7 +1065,7 @@ export default function Home() {
         harga_satuan: i.originalPrice || i.price,
         harga_akhir_per_satuan: i.price,
         total_harga_item: i.price * i.quantity
-      })));
+      })), currentUser?.id);
 
       // 3. Broadcast sinyal checkout ke perangkat lain via Realtime Channel
       try {

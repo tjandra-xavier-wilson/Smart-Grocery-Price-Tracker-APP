@@ -12,7 +12,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.budget_settings (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID, -- Opsional / dapat berelasi dengan auth.users(id) jika menggunakan autentikasi
+  user_id UUID, -- Terikat dengan auth.users(id) untuk isolasi data antar-akun
   monthly_budget_cap NUMERIC NOT NULL DEFAULT 500000,
   warning_threshold NUMERIC DEFAULT 0.8,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -20,14 +20,40 @@ CREATE TABLE IF NOT EXISTS public.budget_settings (
 
 -- ==============================================================================
 -- 3. TABEL: grocery_history
--- Menyimpan sesi transaksi belanja bulanan (struk belanja)
+-- Menyimpan sesi transaksi belanja bulanan (struk belanja) per pengguna
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.grocery_history (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID, -- Terikat dengan auth.users(id) untuk mencegah kebocoran data (Data Bleeding)
   shopping_date DATE NOT NULL DEFAULT CURRENT_DATE,
   total_spent NUMERIC NOT NULL DEFAULT 0,
   notes TEXT, -- Menyimpan nama supermarket/toko (misal: "Indogrosir Super Kos")
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ==============================================================================
+-- 3B. TABEL: history (Alias / Skema Riwayat Belanja Terisolasi)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.history (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID, -- Terikat dengan auth.users(id)
+  shopping_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  total_spent NUMERIC NOT NULL DEFAULT 0,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ==============================================================================
+-- 3C. TABEL: carts (Penyimpanan State Keranjang Aktif per Akun)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.carts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL, -- Terikat dengan auth.users(id)
+  items JSONB DEFAULT '[]'::jsonb,
+  budget_limit NUMERIC DEFAULT 350000,
+  store_name TEXT,
+  transaction_date TEXT,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- ==============================================================================
@@ -73,47 +99,80 @@ CREATE INDEX IF NOT EXISTS idx_grocery_history_shopping_date
   ON public.grocery_history (shopping_date DESC);
 
 -- ==============================================================================
--- 6. ROW LEVEL SECURITY (RLS) POLICIES
+-- 6. ROW LEVEL SECURITY (RLS) POLICIES (ISOLASI DATA ANTAR-AKUN: auth.uid() = user_id)
 -- ==============================================================================
 ALTER TABLE public.budget_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.grocery_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.grocery_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.carts ENABLE ROW LEVEL SECURITY;
 
--- Kebijakan Akses: budget_settings
+-- A. Kebijakan Akses: grocery_history & history (SELECT, INSERT, UPDATE, DELETE hanya milik user_id = auth.uid())
+DROP POLICY IF EXISTS "Users can only access their own grocery_history" ON public.grocery_history;
+CREATE POLICY "Users can only access their own grocery_history" 
+  ON public.grocery_history FOR ALL 
+  TO authenticated 
+  USING (auth.uid() = user_id) 
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can only access their own history" ON public.history;
+CREATE POLICY "Users can only access their own history" 
+  ON public.history FOR ALL 
+  TO authenticated 
+  USING (auth.uid() = user_id) 
+  WITH CHECK (auth.uid() = user_id);
+
+-- B. Kebijakan Akses: carts (Isolasi State Keranjang Belanja per Akun)
+DROP POLICY IF EXISTS "Users can only access their own carts" ON public.carts;
+CREATE POLICY "Users can only access their own carts" 
+  ON public.carts FOR ALL 
+  TO authenticated 
+  USING (auth.uid() = user_id) 
+  WITH CHECK (auth.uid() = user_id);
+
+-- C. Kebijakan Akses: budget_settings
+DROP POLICY IF EXISTS "Users can only access their own budget_settings" ON public.budget_settings;
+CREATE POLICY "Users can only access their own budget_settings" 
+  ON public.budget_settings FOR ALL 
+  TO authenticated 
+  USING (auth.uid() = user_id) 
+  WITH CHECK (auth.uid() = user_id);
+
+-- D. Kebijakan Akses: grocery_items (terikat dengan grocery_history milik pengguna aktif)
+DROP POLICY IF EXISTS "Users can only access their own grocery_items" ON public.grocery_items;
+CREATE POLICY "Users can only access their own grocery_items" 
+  ON public.grocery_items FOR ALL 
+  TO authenticated 
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.grocery_history
+      WHERE grocery_history.id = grocery_items.history_id
+      AND grocery_history.user_id = auth.uid()
+    )
+  ) 
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.grocery_history
+      WHERE grocery_history.id = grocery_items.history_id
+      AND grocery_history.user_id = auth.uid()
+    )
+  );
+
+-- E. Kebijakan Fallback Publik / Anonim (Pengecekan testing offline lokal)
 DROP POLICY IF EXISTS "Public select budget_settings" ON public.budget_settings;
 CREATE POLICY "Public select budget_settings" 
   ON public.budget_settings FOR SELECT 
   USING (true);
 
-DROP POLICY IF EXISTS "Public modify budget_settings" ON public.budget_settings;
-CREATE POLICY "Public modify budget_settings" 
-  ON public.budget_settings FOR ALL 
-  USING (true) 
-  WITH CHECK (true);
-
--- Kebijakan Akses: grocery_history
 DROP POLICY IF EXISTS "Public select grocery_history" ON public.grocery_history;
 CREATE POLICY "Public select grocery_history" 
   ON public.grocery_history FOR SELECT 
   USING (true);
 
-DROP POLICY IF EXISTS "Public insert grocery_history" ON public.grocery_history;
-CREATE POLICY "Public insert grocery_history" 
-  ON public.grocery_history FOR ALL 
-  USING (true) 
-  WITH CHECK (true);
-
--- Kebijakan Akses: grocery_items
 DROP POLICY IF EXISTS "Public select grocery_items" ON public.grocery_items;
 CREATE POLICY "Public select grocery_items" 
   ON public.grocery_items FOR SELECT 
   USING (true);
-
-DROP POLICY IF EXISTS "Public insert grocery_items" ON public.grocery_items;
-CREATE POLICY "Public insert grocery_items" 
-  ON public.grocery_items FOR ALL 
-  USING (true) 
-  WITH CHECK (true);
 
 -- ==============================================================================
 -- 7. TRIGGER AUTO UPDATE TIMESTAMP (budget_settings.updated_at)

@@ -77,8 +77,17 @@ export async function getLastPrice(namaBarang) {
  * 2. MENYIMPAN TRANSAKSI KERANJANG BELANJA BESERTA SELURUH ITEMNYA (BATCH INSERT)
  * Menyimpan ke grocery_history lalu memasukkan seluruh baris ke grocery_items
  */
-export async function saveShoppingTrip(historyData, itemsList) {
+export async function saveShoppingTrip(historyData, itemsList, userId = null) {
+  let targetUserId = userId || historyData.user_id;
+  if (!targetUserId) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      targetUserId = session?.user?.id;
+    } catch (e) {}
+  }
+
   const payloadHistory = {
+    user_id: targetUserId || null,
     shopping_date: historyData.shopping_date || (function() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(),
     total_spent: Number(historyData.total_spent) || 0,
     notes: historyData.notes || 'Supermarket Grosir'
@@ -232,14 +241,23 @@ export async function updateBudgetSettings(monthlyBudgetCap, warningThreshold = 
 }
 
 /**
- * 5. MENGAMBIL SELURUH RIWAYAT TRANSAKSI DARI SUPABASE
+ * 5. MENGAMBIL SELURUH RIWAYAT TRANSAKSI DARI SUPABASE (TERISOLASI PER USER_ID)
  */
-export async function getShoppingHistoryList() {
+export async function getShoppingHistoryList(userId = null) {
   try {
-    const { data, error } = await supabase
+    let targetUserId = userId;
+    if (!targetUserId) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        targetUserId = session?.user?.id;
+      } catch (e) {}
+    }
+
+    let query = supabase
       .from('grocery_history')
       .select(`
         id,
+        user_id,
         shopping_date,
         total_spent,
         notes,
@@ -261,9 +279,18 @@ export async function getShoppingHistoryList() {
       `)
       .order('created_at', { ascending: false });
 
+    // Filter query HANYA mengambil data milik pengguna yang sedang login saat ini
+    if (targetUserId) {
+      query = query.eq('user_id', targetUserId);
+    } else {
+      return [];
+    }
+
+    const { data, error } = await query;
+
     if (error) {
       console.warn('[Supabase getShoppingHistoryList] Error, using local fallback:', error.message);
-      return getOfflineHistory();
+      return getOfflineHistory(targetUserId);
     }
 
     if (data && data.length > 0) {
@@ -401,15 +428,24 @@ function saveOfflineTrip(historyData, itemsList) {
 /**
  * 6. MENGHAPUS SATU SESI TRANSAKSI BELANJA DARI SUPABASE & LOCALSTORAGE
  */
-export async function deleteShoppingTrip(tripId) {
+export async function deleteShoppingTrip(tripId, userId = null) {
   if (!tripId) return { success: false };
 
   try {
-    // A. Hapus dari Supabase PostgreSQL (grocery_items akan terhapus via CASCADE)
-    const { error } = await supabase
-      .from('grocery_history')
-      .delete()
-      .eq('id', tripId);
+    let targetUserId = userId;
+    if (!targetUserId) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        targetUserId = session?.user?.id;
+      } catch (e) {}
+    }
+
+    // A. Hapus dari Supabase PostgreSQL dengan filter user_id untuk isolasi keamanan
+    let query = supabase.from('grocery_history').delete().eq('id', tripId);
+    if (targetUserId) {
+      query = query.eq('user_id', targetUserId);
+    }
+    const { error } = await query;
 
     if (error) {
       console.warn('[Supabase deleteShoppingTrip] Warning:', error.message);
@@ -424,6 +460,14 @@ export async function deleteShoppingTrip(tripId) {
           const updated = list.filter(item => item.id !== tripId);
           localStorage.setItem(FALLBACK_KEYS.HISTORY, JSON.stringify(updated));
         }
+        if (targetUserId) {
+          const userRaw = localStorage.getItem(`${FALLBACK_KEYS.HISTORY}_${targetUserId}`);
+          if (userRaw) {
+            const list = JSON.parse(userRaw);
+            const updated = list.filter(item => item.id !== tripId);
+            localStorage.setItem(`${FALLBACK_KEYS.HISTORY}_${targetUserId}`, JSON.stringify(updated));
+          }
+        }
       } catch (e) {}
     }
 
@@ -435,14 +479,25 @@ export async function deleteShoppingTrip(tripId) {
 }
 
 /**
- * 7. MENGHAPUS SELURUH RIWAYAT BELANJA
+ * 7. MENGHAPUS SELURUH RIWAYAT BELANJA (TERISOLASI USER_ID)
  */
-export async function clearAllShoppingHistory() {
+export async function clearAllShoppingHistory(userId = null) {
   try {
-    const { error } = await supabase
-      .from('grocery_history')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000');
+    let targetUserId = userId;
+    if (!targetUserId) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        targetUserId = session?.user?.id;
+      } catch (e) {}
+    }
+
+    let query = supabase.from('grocery_history').delete();
+    if (targetUserId) {
+      query = query.eq('user_id', targetUserId);
+    } else {
+      query = query.neq('id', '00000000-0000-0000-0000-000000000000');
+    }
+    const { error } = await query;
 
     if (error) {
       console.warn('[Supabase clearAllShoppingHistory] Warning:', error.message);
@@ -450,6 +505,9 @@ export async function clearAllShoppingHistory() {
 
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(FALLBACK_KEYS.HISTORY);
+      if (targetUserId) {
+        localStorage.removeItem(`${FALLBACK_KEYS.HISTORY}_${targetUserId}`);
+      }
     }
 
     return { success: true };
@@ -915,15 +973,32 @@ export async function signInWithGoogle() {
 }
 
 /**
- * Sign out dari sesi aktif dan bersihkan token dari storage
+ * Sign out dari sesi aktif dan bersihkan seluruh state/token/data pengguna dari storage (Pencegahan Data Bleeding)
  */
 export async function signOutUser() {
   try {
     await supabase.auth.signOut();
   } catch (err) {}
   if (typeof localStorage !== 'undefined') {
+    // Kunci spesifik yang diminta user untuk dibersihkan total
+    localStorage.removeItem('cartItems');
+    localStorage.removeItem('budgetLimit');
+    localStorage.removeItem('shoppingHistory');
+
+    // Kunci modul otentikasi & identitas
     localStorage.removeItem(SINGLE_USER_STORAGE_KEY);
     localStorage.removeItem('sakugrosir_is_logged_in');
+
+    // Kunci data lokal belanjaan
+    localStorage.removeItem('sakugrosir_cart_v1');
+    localStorage.removeItem('sakugrosir_budget_v1');
+    localStorage.removeItem('sakugrosir_history_v1');
+    localStorage.removeItem('sakugrosir_store_name_v1');
+    localStorage.removeItem('sakugrosir_trans_date_v1');
+    localStorage.removeItem('sakugrosir_single_user_v1');
+    localStorage.removeItem('sakugrosir_offline_history');
+    localStorage.removeItem('sakugrosir_offline_budget');
+    localStorage.removeItem('sakugrosir_sample_history_initialized');
   }
   return { success: true };
 }

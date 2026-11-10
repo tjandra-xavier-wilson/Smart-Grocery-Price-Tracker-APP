@@ -395,6 +395,33 @@ export default function ActiveCartScreen({
 
   const secondaryItemsCount = cartItems.filter(i => i.isSecondary).length;
 
+  // Logika Warna Dinamis Status Bar Anggaran (Budget Progress Bar)
+  // Aman (0% - 74%): bg-green-500
+  // Waspada (75% - 90%): bg-orange-500
+  // Kritis (91% - 100%): bg-red-500
+  // Overbudget (> 100%): bg-red-500 animate-pulse, width 100%, pesan merah "Total melebihi limit saldo!"
+  let budgetBarColor = 'bg-green-500';
+  let budgetBadgeText = 'Aman';
+  let budgetBadgeClass = 'bg-green-50 text-green-700 border-green-200';
+
+  if (percentageUsed > 100) {
+    budgetBarColor = 'bg-red-500 animate-pulse';
+    budgetBadgeText = 'Overbudget';
+    budgetBadgeClass = 'bg-red-50 text-red-700 border-red-200';
+  } else if (percentageUsed >= 91) {
+    budgetBarColor = 'bg-red-500';
+    budgetBadgeText = 'Kritis';
+    budgetBadgeClass = 'bg-red-50 text-red-700 border-red-200';
+  } else if (percentageUsed >= 75) {
+    budgetBarColor = 'bg-orange-500';
+    budgetBadgeText = 'Waspada';
+    budgetBadgeClass = 'bg-orange-50 text-orange-700 border-orange-200';
+  } else {
+    budgetBarColor = 'bg-green-500';
+    budgetBadgeText = 'Aman';
+    budgetBadgeClass = 'bg-green-50 text-green-700 border-green-200';
+  }
+
   // Beep Sound on first entering overbudget
   const prevOverbudgetRef = useRef(false);
   useEffect(() => {
@@ -509,18 +536,35 @@ export default function ActiveCartScreen({
           </button>
         </div>
 
-        {/* Dynamic Progress Bar */}
-        <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-          <div 
-            className={`h-full transition-all duration-300 ${
-              isOverbudget 
-                ? 'bg-red-600' 
-                : percentageUsed >= 90 
-                ? 'bg-amber-500' 
-                : 'bg-emerald-700'
-            }`}
-            style={{ width: `${Math.min(100, percentageUsed)}%` }}
-          />
+        {/* Dynamic Progress Bar Anggaran (Budget Progress Bar) */}
+        <div className="space-y-1.5 pt-0.5">
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center space-x-1.5">
+              <span className="text-[11px] font-semibold text-slate-500">Status Anggaran:</span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${budgetBadgeClass}`}>
+                {budgetBadgeText} ({percentageUsed.toFixed(1)}%)
+              </span>
+            </div>
+            <span className="text-xs font-black text-slate-800 tabular-nums">
+              {percentageUsed.toFixed(0)}%
+            </span>
+          </div>
+
+          {/* Baris Progress Bar Horizontal */}
+          <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200 shadow-inner">
+            <div 
+              className={`h-full rounded-full transition-all duration-300 ease-out ${budgetBarColor}`}
+              style={{ width: `${Math.min(100, Math.max(0, percentageUsed))}%` }}
+            />
+          </div>
+
+          {/* Pesan Peringatan Merah saat Overbudget (> 100%) */}
+          {percentageUsed > 100 && (
+            <div className="flex items-center space-x-1.5 text-xs font-bold text-red-600 animate-pulse pt-0.5">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              <span>Total melebihi limit saldo!</span>
+            </div>
+          )}
         </div>
 
         {/* Two-Column Summary Boxes */}
