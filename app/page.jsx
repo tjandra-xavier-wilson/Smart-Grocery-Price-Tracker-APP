@@ -332,6 +332,13 @@ export default function Home() {
       console.warn('LocalStorage load error:', e);
     }
 
+    // b. Auto-update Service Worker & bersihkan cache lama di browser laptop
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        reg.update().catch(() => {});
+      }).catch(() => {});
+    }
+
     // 2. Tangani Google OAuth Callback Redirect jika ada di URL hash (#access_token=...)
     if (typeof window !== 'undefined' && window.location.hash && window.location.hash.includes('access_token')) {
       try {

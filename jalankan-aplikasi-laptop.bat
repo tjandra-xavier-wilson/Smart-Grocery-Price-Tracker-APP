@@ -17,3 +17,4 @@ echo [JANGAN TUTUP JENDELA INI SELAMA ANDA MEMBUKA APLIKASI DI LAPTOP]
 echo.
 node server.js
 pause
+

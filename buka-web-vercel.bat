@@ -4,3 +4,4 @@ color 0B
 echo Membuka Smart Grocery Sentinel di browser laptop Anda...
 start https://smartgrocerypricetrackerapp.vercel.app/
 exit
+
