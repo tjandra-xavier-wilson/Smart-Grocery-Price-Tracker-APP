@@ -5,8 +5,8 @@
    ========================================================================== */
 
 :root {
-  /* Surface & Base Colors */
-  --bg-desktop: #070b12;
+  /* Surface & Base Colors - Clean Minimal (Nordic Teal & Slate) */
+  --bg-desktop: #e2e8f0;
   --bg-app: #0b1120;
   --bg-surface: #111b2f;
   --bg-card: #18233c;
@@ -97,7 +97,7 @@ html, body {
   align-items: center;
   min-height: 100vh;
   min-height: 100dvh;
-  background: radial-gradient(circle at 50% 20%, #17243c 0%, #070b12 85%);
+  background: radial-gradient(circle at 50% 25%, #ebf4f5 0%, #e2e8f0 60%, #d8e7e7 100%);
   padding: 0;
 }
 

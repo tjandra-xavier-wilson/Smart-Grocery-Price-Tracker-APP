@@ -1184,7 +1184,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-[#070D18] flex items-center justify-center p-0 md:p-6 lg:p-8 font-sans selection:bg-emerald-500 selection:text-white">
+    <main className="min-h-screen bg-gradient-to-br from-[#e2e8f0] via-[#e8eff2] to-[#d6e6e6] flex items-center justify-center p-0 md:p-6 lg:p-8 font-sans selection:bg-teal-600 selection:text-white">
       {/* Mobile Shell Mockup Wrapper (iPhone 16 Pro Max 430px Standard) */}
       <div className="w-full max-w-[430px] bg-white min-h-screen md:min-h-[900px] md:max-h-[920px] md:rounded-[44px] shadow-2xl md:ring-12 md:ring-slate-800/90 overflow-hidden flex flex-col relative transition-all duration-300">
         

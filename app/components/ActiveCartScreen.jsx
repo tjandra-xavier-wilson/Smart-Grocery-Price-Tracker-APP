@@ -28,7 +28,9 @@ import {
   Fish,
   Cookie,
   Coffee,
-  Brush
+  Brush,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { playTapSound, playSuccessSound, playWarningBeep } from '../utils/sound';
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
@@ -431,6 +433,47 @@ export default function ActiveCartScreen({
     prevOverbudgetRef.current = isOverbudget;
   }, [isOverbudget]);
 
+  // Scroll Controller untuk Menu Kategori Horizontal
+  const categoryScrollRef = useRef(null);
+  const [canScrollCategoryLeft, setCanScrollCategoryLeft] = useState(false);
+  const [canScrollCategoryRight, setCanScrollCategoryRight] = useState(true);
+  const [categoryScrollProgress, setCategoryScrollProgress] = useState(0);
+
+  const updateCategoryScrollState = () => {
+    const el = categoryScrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    const maxScroll = scrollWidth - clientWidth;
+    setCanScrollCategoryLeft(scrollLeft > 6);
+    setCanScrollCategoryRight(scrollLeft < maxScroll - 6);
+    if (maxScroll > 0) {
+      const pct = Math.min(100, Math.max(0, (scrollLeft / maxScroll) * 100));
+      setCategoryScrollProgress(pct);
+    }
+  };
+
+  useEffect(() => {
+    const el = categoryScrollRef.current;
+    if (el) {
+      updateCategoryScrollState();
+      el.addEventListener('scroll', updateCategoryScrollState, { passive: true });
+      window.addEventListener('resize', updateCategoryScrollState);
+      return () => {
+        el.removeEventListener('scroll', updateCategoryScrollState);
+        window.removeEventListener('resize', updateCategoryScrollState);
+      };
+    }
+  }, []);
+
+  const handleScrollCategory = (direction) => {
+    playTapSound();
+    const el = categoryScrollRef.current;
+    if (!el) return;
+    const scrollDistance = direction === 'left' ? -220 : 220;
+    el.scrollBy({ left: scrollDistance, behavior: 'smooth' });
+    setTimeout(updateCategoryScrollState, 350);
+  };
+
   return (
     <div className="pb-36 bg-slate-50 min-h-full">
       {/* 1. OVERBUDGET DANGER BANNER (Screen 2 / SRS F-05) */}
@@ -640,7 +683,10 @@ export default function ActiveCartScreen({
         </div>
 
         {/* 1. Baris Menu Kategori Horizontal (Scroll Wheel ke Samping: 8 Kategori Berurutan) */}
-        <div className="flex items-center space-x-3 overflow-x-auto no-scrollbar scrollbar-hide px-4 py-1.5 scroll-smooth">
+        <div 
+          ref={categoryScrollRef}
+          className="flex items-center space-x-3 overflow-x-auto no-scrollbar scrollbar-hide px-4 py-1.5 scroll-smooth"
+        >
           {CART_CATEGORIES.map((cat) => {
             const isSelected = activeCategory === cat.id;
             const Icon = cat.icon;
@@ -649,9 +695,11 @@ export default function ActiveCartScreen({
               <button
                 key={cat.id}
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
                   playTapSound();
                   setActiveCategory(cat.id);
+                  e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                  setTimeout(updateCategoryScrollState, 350);
                 }}
                 className="flex flex-col items-center shrink-0 group focus:outline-none cursor-pointer active:scale-95 transition-transform"
               >
@@ -677,6 +725,54 @@ export default function ActiveCartScreen({
               </button>
             );
           })}
+        </div>
+
+        {/* 1.5. Tombol Scroll ke Samping (Kiri & Kanan) di Bawah Kategori & di Atas Rekomendasi Belanja */}
+        <div className="px-4 flex items-center justify-between gap-2 pt-0.5 pb-1">
+          <button
+            type="button"
+            onClick={() => handleScrollCategory('left')}
+            disabled={!canScrollCategoryLeft}
+            className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-[10.5px] font-bold border transition-all active:scale-95 cursor-pointer shadow-2xs ${
+              canScrollCategoryLeft
+                ? 'bg-white border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300'
+                : 'bg-slate-100/60 border-slate-200/50 text-slate-300 cursor-not-allowed opacity-40 shadow-none'
+            }`}
+            title="Geser kategori ke kiri"
+            aria-label="Geser kategori ke kiri"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+            <span>Geser Kiri</span>
+          </button>
+
+          {/* Visual Track Scroll Indicator */}
+          <div className="flex-1 max-w-[130px] flex items-center justify-center">
+            <div className="w-full h-1.5 bg-slate-200/90 rounded-full overflow-hidden p-[1px] flex items-center">
+              <div 
+                className="h-1 bg-gradient-to-r from-emerald-700 via-teal-600 to-emerald-500 rounded-full transition-all duration-150"
+                style={{
+                  width: '38%',
+                  transform: `translateX(${categoryScrollProgress * 1.63}%)`,
+                }}
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => handleScrollCategory('right')}
+            disabled={!canScrollCategoryRight}
+            className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-[10.5px] font-bold border transition-all active:scale-95 cursor-pointer shadow-2xs ${
+              canScrollCategoryRight
+                ? 'bg-white border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300'
+                : 'bg-slate-100/60 border-slate-200/50 text-slate-300 cursor-not-allowed opacity-40 shadow-none'
+            }`}
+            title="Geser kategori ke kanan"
+            aria-label="Geser kategori ke kanan"
+          >
+            <span>Geser Kanan</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {/* 2. KATALOG REKOMENDASI BELANJA DENGAN SCROLL VERTICAL */}
