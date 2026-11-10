@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import SplashScreen from './components/SplashScreen';
 import TopStatusBar from './components/TopStatusBar';
 import HeaderBackgroundTrolley from './components/HeaderBackgroundTrolley';
 import HeaderBar from './components/HeaderBar';
@@ -204,6 +205,7 @@ export default function Home() {
     return null;
   });
   const [syncStatus, setSyncStatus] = useState('Online Sync Live');
+  const [showSplash, setShowSplash] = useState(true);
 
   // Modals state
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -968,166 +970,172 @@ export default function Home() {
       {/* Mobile Shell Mockup Wrapper (iPhone 16 Pro Max 430px Standard) */}
       <div className="w-full max-w-[430px] bg-white min-h-screen md:min-h-[900px] md:max-h-[920px] md:rounded-[44px] shadow-2xl md:ring-12 md:ring-slate-800/90 overflow-hidden flex flex-col relative transition-all duration-300">
         
-        {/* ============================================================== */}
-        {/* HEADER TOP BAR CONTAINER: Sticky Header dengan Background Troli Bergerak Kontinu */}
-        {/* ============================================================== */}
-        <header className="relative overflow-hidden bg-white/95 backdrop-blur-md border-b border-slate-200/80 shrink-0 sticky top-0 z-30 shadow-2xs">
-          {/* Background Animasi Troli & Garis Angin Kecepatan Tinggi (Continuous Loop) */}
-          <HeaderBackgroundTrolley />
-
-          {/* Foreground UI Elements (z-10: Teks Jam, Nama Toko, Avatar Tetap Jelas) */}
-          <div className="relative z-10">
-            {/* Top Status Bar: Jam WIB, Notch, Sinyal 5G */}
-            <TopStatusBar />
-
-            {/* Global Header Bar: Info Toko, Avatar, Tanggal, Limit Budget */}
-            {isAuthenticated && (
-              <HeaderBar
-                currentStore={currentStore}
-                onOpenStoreModal={() => setIsStoreModalOpen(true)}
-                activeTabTitle={getActiveTabTitle()}
-                currentUser={currentUser}
-                onOpenAuthModal={() => setIsProfileModalOpen(true)}
-                syncStatus={syncStatus}
-                transactionDate={transactionDate}
-                onDateChange={handleDateChange}
-                budgetLimit={budgetLimit}
-                onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
-              />
-            )}
-          </div>
-        </header>
-
-        {/* ============================================================== */}
-        {/* VIEW 1: INITIAL LOGIN SCREEN (MOCKUP 1 - SMART GROCERY SENTINEL) */}
-        {/* ============================================================== */}
-        {!isAuthenticated ? (
-          <div className="flex-1 overflow-y-auto no-scrollbar bg-gradient-to-b from-sky-50/50 via-white to-slate-50 flex flex-col">
-            <LoginScreen 
-              onLoginSuccess={handleLoginSuccess} 
-              externalError={authErrorMessage}
-            />
-          </div>
+        {showSplash ? (
+          <SplashScreen onFinish={() => setShowSplash(false)} />
         ) : (
-          /* ============================================================== */
-          /* VIEW 2: AUTHENTICATED APP (MOCKUPS 2, 3, 4, 5 + BOTTOM NAV)    */
-          /* ============================================================== */
           <>
-            {/* Scrollable Viewport Content */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar bg-slate-50 relative">
-              {activeTab === 'cart' && (
-                <ActiveCartScreen
+            {/* ============================================================== */}
+            {/* HEADER TOP BAR CONTAINER: Sticky Header dengan Background Troli Bergerak Kontinu */}
+            {/* ============================================================== */}
+            <header className="relative overflow-hidden bg-white/95 backdrop-blur-md border-b border-slate-200/80 shrink-0 sticky top-0 z-30 shadow-2xs">
+              {/* Background Animasi Troli & Garis Angin Kecepatan Tinggi (Continuous Loop) */}
+              <HeaderBackgroundTrolley />
+
+              {/* Foreground UI Elements (z-10: Teks Jam, Nama Toko, Avatar Tetap Jelas) */}
+              <div className="relative z-10">
+                {/* Top Status Bar: Jam WIB, Notch, Sinyal 5G */}
+                <TopStatusBar />
+
+                {/* Global Header Bar: Info Toko, Avatar, Tanggal, Limit Budget */}
+                {isAuthenticated && (
+                  <HeaderBar
+                    currentStore={currentStore}
+                    onOpenStoreModal={() => setIsStoreModalOpen(true)}
+                    activeTabTitle={getActiveTabTitle()}
+                    currentUser={currentUser}
+                    onOpenAuthModal={() => setIsProfileModalOpen(true)}
+                    syncStatus={syncStatus}
+                    transactionDate={transactionDate}
+                    onDateChange={handleDateChange}
+                    budgetLimit={budgetLimit}
+                    onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
+                  />
+                )}
+              </div>
+            </header>
+
+            {/* ============================================================== */}
+            {/* VIEW 1: INITIAL LOGIN SCREEN (MOCKUP 1 - SMART GROCERY SENTINEL) */}
+            {/* ============================================================== */}
+            {!isAuthenticated ? (
+              <div className="flex-1 overflow-y-auto no-scrollbar bg-gradient-to-b from-sky-50/50 via-white to-slate-50 flex flex-col">
+                <LoginScreen 
+                  onLoginSuccess={handleLoginSuccess} 
+                  externalError={authErrorMessage}
+                />
+              </div>
+            ) : (
+              /* ============================================================== */
+              /* VIEW 2: AUTHENTICATED APP (MOCKUPS 2, 3, 4, 5 + BOTTOM NAV)    */
+              /* ============================================================== */
+              <>
+                {/* Scrollable Viewport Content */}
+                <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar bg-slate-50 relative">
+                  {activeTab === 'cart' && (
+                    <ActiveCartScreen
+                      cartItems={cartItems}
+                      budgetLimit={budgetLimit}
+                      currentStore={currentStore}
+                      transactionDate={transactionDate}
+                      onDateChange={handleDateChange}
+                      onUpdateQuantity={handleUpdateQuantity}
+                      onRemoveItem={handleRemoveItem}
+                      onClearCart={handleClearCart}
+                      onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
+                      onOpenStoreModal={() => setIsStoreModalOpen(true)}
+                      onOpenCheckout={() => {
+                        if (!cartItems || cartItems.length === 0) {
+                          setIsEmptyCartModalOpen(true);
+                          return;
+                        }
+                        setIsCheckoutModalOpen(true);
+                      }}
+                      onOpenBarcodeModal={() => setIsBarcodeModalOpen(true)}
+                      onCutSecondaryItems={handleCutSecondaryItems}
+                      onLoadMockupOverbudget={handleLoadMockupOverbudget}
+                      onLoadMockupNormal={handleLoadMockupNormal}
+                      onAddToCart={handleAddToCart}
+                    />
+                  )}
+
+                  {activeTab === 'input' && (
+                    <CatalogInputScreen
+                      currentStore={currentStore}
+                      currentRemainingBudget={Math.max(0, budgetLimit - totalCartPrice)}
+                      onAddToCart={handleAddToCart}
+                      onOpenBarcodeModal={() => setIsBarcodeModalOpen(true)}
+                      initialValues={inputInitialValues}
+                    />
+                  )}
+
+                  {activeTab === 'history' && (
+                    <HistoryScreen
+                      historyList={historyList}
+                      onOpenReceiptDetail={(session) => setSelectedReceipt(session)}
+                      onRequestDeleteTrip={handleRequestDeleteTrip}
+                      onRequestClearAllHistory={handleRequestClearAll}
+                    />
+                  )}
+                </div>
+
+                {/* Permanent Bottom Navigation Bar (3 Menus: Keranjang Aktif, Katalog & Input, Riwayat Belanja) */}
+                <BottomNav
+                  activeTab={activeTab}
+                  onChangeTab={(tabId) => setActiveTab(tabId)}
+                  cartCount={cartItems.length}
+                />
+
+                {/* User Profile & Logout Modal */}
+                <UserProfileModal
+                  isOpen={isProfileModalOpen}
+                  onClose={() => setIsProfileModalOpen(false)}
+                  currentUser={currentUser}
+                  onLogout={handleLogout}
+                />
+
+                {/* Interactive Functional Modals */}
+                <BudgetLimitModal
+                  isOpen={isBudgetModalOpen}
+                  onClose={() => setIsBudgetModalOpen(false)}
+                  currentLimit={budgetLimit}
+                  onSaveLimit={handleSaveBudgetLimit}
+                />
+
+                <StoreModal
+                  isOpen={isStoreModalOpen}
+                  onClose={() => setIsStoreModalOpen(false)}
+                  currentStore={currentStore}
+                  currentDate={transactionDate}
+                  onSaveStore={handleSaveStore}
+                />
+
+                <BarcodeScannerModal
+                  isOpen={isBarcodeModalOpen}
+                  onClose={() => setIsBarcodeModalOpen(false)}
+                  onScannedItem={handleBarcodeScanned}
+                />
+
+                <ReceiptDetailModal
+                  isOpen={Boolean(selectedReceipt)}
+                  onClose={() => setSelectedReceipt(null)}
+                  session={selectedReceipt}
+                />
+
+                <CheckoutModal
+                  isOpen={isCheckoutModalOpen}
+                  onClose={() => !isCheckoutLoading && setIsCheckoutModalOpen(false)}
+                  totalSpent={totalCartPrice}
+                  storeName={currentStore}
+                  itemCount={cartItems.length}
                   cartItems={cartItems}
-                  budgetLimit={budgetLimit}
-                  currentStore={currentStore}
-                  transactionDate={transactionDate}
-                  onDateChange={handleDateChange}
-                  onUpdateQuantity={handleUpdateQuantity}
-                  onRemoveItem={handleRemoveItem}
-                  onClearCart={handleClearCart}
-                  onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
-                  onOpenStoreModal={() => setIsStoreModalOpen(true)}
-                  onOpenCheckout={() => {
-                    if (!cartItems || cartItems.length === 0) {
-                      setIsEmptyCartModalOpen(true);
-                      return;
-                    }
-                    setIsCheckoutModalOpen(true);
-                  }}
-                  onOpenBarcodeModal={() => setIsBarcodeModalOpen(true)}
-                  onCutSecondaryItems={handleCutSecondaryItems}
-                  onLoadMockupOverbudget={handleLoadMockupOverbudget}
-                  onLoadMockupNormal={handleLoadMockupNormal}
-                  onAddToCart={handleAddToCart}
+                  onConfirmCheckout={handleConfirmCheckout}
+                  isCheckoutLoading={isCheckoutLoading}
                 />
-              )}
 
-              {activeTab === 'input' && (
-                <CatalogInputScreen
-                  currentStore={currentStore}
-                  currentRemainingBudget={Math.max(0, budgetLimit - totalCartPrice)}
-                  onAddToCart={handleAddToCart}
-                  onOpenBarcodeModal={() => setIsBarcodeModalOpen(true)}
-                  initialValues={inputInitialValues}
+                <EmptyCartModal
+                  isOpen={isEmptyCartModalOpen}
+                  onClose={() => setIsEmptyCartModalOpen(false)}
                 />
-              )}
 
-              {activeTab === 'history' && (
-                <HistoryScreen
-                  historyList={historyList}
-                  onOpenReceiptDetail={(session) => setSelectedReceipt(session)}
-                  onRequestDeleteTrip={handleRequestDeleteTrip}
-                  onRequestClearAllHistory={handleRequestClearAll}
+                <DeleteConfirmationModal
+                  isOpen={isDeleteModalOpen}
+                  onClose={() => setIsDeleteModalOpen(false)}
+                  onConfirmDelete={handleConfirmDelete}
+                  targetItem={deleteTargetItem}
+                  isDeletingAll={isDeletingAll}
                 />
-              )}
-            </div>
-
-            {/* Permanent Bottom Navigation Bar (3 Menus: Keranjang Aktif, Katalog & Input, Riwayat Belanja) */}
-            <BottomNav
-              activeTab={activeTab}
-              onChangeTab={(tabId) => setActiveTab(tabId)}
-              cartCount={cartItems.length}
-            />
-
-            {/* User Profile & Logout Modal */}
-            <UserProfileModal
-              isOpen={isProfileModalOpen}
-              onClose={() => setIsProfileModalOpen(false)}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            />
-
-            {/* Interactive Functional Modals */}
-            <BudgetLimitModal
-              isOpen={isBudgetModalOpen}
-              onClose={() => setIsBudgetModalOpen(false)}
-              currentLimit={budgetLimit}
-              onSaveLimit={handleSaveBudgetLimit}
-            />
-
-            <StoreModal
-              isOpen={isStoreModalOpen}
-              onClose={() => setIsStoreModalOpen(false)}
-              currentStore={currentStore}
-              currentDate={transactionDate}
-              onSaveStore={handleSaveStore}
-            />
-
-            <BarcodeScannerModal
-              isOpen={isBarcodeModalOpen}
-              onClose={() => setIsBarcodeModalOpen(false)}
-              onScannedItem={handleBarcodeScanned}
-            />
-
-            <ReceiptDetailModal
-              isOpen={Boolean(selectedReceipt)}
-              onClose={() => setSelectedReceipt(null)}
-              session={selectedReceipt}
-            />
-
-            <CheckoutModal
-              isOpen={isCheckoutModalOpen}
-              onClose={() => !isCheckoutLoading && setIsCheckoutModalOpen(false)}
-              totalSpent={totalCartPrice}
-              storeName={currentStore}
-              itemCount={cartItems.length}
-              cartItems={cartItems}
-              onConfirmCheckout={handleConfirmCheckout}
-              isCheckoutLoading={isCheckoutLoading}
-            />
-
-            <EmptyCartModal
-              isOpen={isEmptyCartModalOpen}
-              onClose={() => setIsEmptyCartModalOpen(false)}
-            />
-
-            <DeleteConfirmationModal
-              isOpen={isDeleteModalOpen}
-              onClose={() => setIsDeleteModalOpen(false)}
-              onConfirmDelete={handleConfirmDelete}
-              targetItem={deleteTargetItem}
-              isDeletingAll={isDeletingAll}
-            />
+              </>
+            )}
           </>
         )}
 
