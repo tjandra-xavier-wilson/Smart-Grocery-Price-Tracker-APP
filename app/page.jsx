@@ -287,6 +287,45 @@ export default function Home() {
   const loadCloudHistoryRef = useRef(null);
   const broadcastChannelRef = useRef(null);
 
+  // Ref penangkal glitch splash screen saat pengguna berpindah tab atau Alt+Tab
+  const isTabSwitchRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        isTabSwitchRef.current = true;
+      } else if (document.visibilityState === 'visible') {
+        // Beri jeda proteksi 1500ms setelah tab aktif kembali agar event auth/focus background tidak memicu splash
+        setTimeout(() => {
+          isTabSwitchRef.current = false;
+        }, 1500);
+      }
+    };
+
+    const handleWindowFocus = () => {
+      isTabSwitchRef.current = true;
+      setTimeout(() => {
+        isTabSwitchRef.current = false;
+      }, 1500);
+    };
+
+    const handleWindowBlur = () => {
+      isTabSwitchRef.current = true;
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('blur', handleWindowBlur);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, []);
+
   // 1. Initialize State & LocalStorage Persistence
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -420,7 +459,9 @@ export default function Home() {
           setAuthErrorMessage('');
 
           // Tampilkan transisi dan splash screen saat masuk ke akun yang dituju
-          setShowSplash(true);
+          if (!isTabSwitchRef.current && !isAuthenticated) {
+            setShowSplash(true);
+          }
 
           if (typeof window !== 'undefined') {
             try {
@@ -679,12 +720,12 @@ export default function Home() {
         setIsAuthenticated(true);
         setAuthErrorMessage('');
 
-        // Jika event adalah login baru (SIGNED_IN), tampilkan transisi splash screen masuk ke akun
-        if (event === 'SIGNED_IN') {
+        // DILARANG memicu splash screen jika user hanya berpindah tab / Alt+Tab atau sudah login!
+        if (event === 'SIGNED_IN' && !isTabSwitchRef.current && !isAuthenticated) {
           setShowSplash(true);
-          if (typeof loadCloudHistoryRef.current === 'function') {
-            loadCloudHistoryRef.current(u.id);
-          }
+        }
+        if (typeof loadCloudHistoryRef.current === 'function') {
+          loadCloudHistoryRef.current(u.id);
         }
 
         if (typeof window !== 'undefined') {
@@ -803,6 +844,18 @@ export default function Home() {
 
   // Auth Operations
   const handleLoginSuccess = (userProfile) => {
+    // DILARANG memicu splash screen jika user sedang pindah tab / Alt+Tab
+    if (isTabSwitchRef.current) {
+      setCurrentUser(userProfile);
+      setIsAuthenticated(true);
+      return;
+    }
+
+    // Jika user sudah login di akun yang sama, jangan re-trigger splash screen
+    if (isAuthenticated && currentUser?.id === userProfile?.id) {
+      return;
+    }
+
     setCurrentUser(userProfile);
     setIsAuthenticated(true);
     setActiveTab('cart');

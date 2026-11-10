@@ -43,6 +43,7 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
   const [errorMsg, setErrorMsg] = useState(externalError || '');
   const [infoMsg, setInfoMsg] = useState('');
   const [deviceAccounts, setDeviceAccounts] = useState([]);
+  const isAuthInitiatedRef = useRef(false);
 
   // Listener onAuthStateChange & Event Reset untuk mengatasi infinite loading
   useEffect(() => {
@@ -53,7 +54,10 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
       setLoading(false);
       setGoogleLoading(false);
 
-      if (session?.user && onLoginSuccess) {
+      // PENTING: Hanya panggil onLoginSuccess jika user secara aktif menginisiasi proses login (misal Google OAuth)
+      // DILARANG memicu login otomatis saat user hanya melakukan Alt+Tab / pindah tab!
+      if (session?.user && onLoginSuccess && event === 'SIGNED_IN' && isAuthInitiatedRef.current) {
+        isAuthInitiatedRef.current = false;
         const u = session.user;
         const profile = {
           id: u.id,
@@ -73,6 +77,8 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
     const handleResetLoading = () => {
       setLoading(false);
       setGoogleLoading(false);
+      // Saat tab kembali fokus (Alt+Tab), pastikan inisiasi auth direset agar tidak memicu auto-login splash
+      isAuthInitiatedRef.current = false;
     };
 
     window.addEventListener('pageshow', handleResetLoading);
@@ -147,6 +153,7 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
     }
 
     setLoading(true);
+    isAuthInitiatedRef.current = true;
 
     try {
       if (authMode === 'login') {
@@ -231,6 +238,7 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
     playTapSound();
     setGoogleLoading(true);
     setLoading(true);
+    isAuthInitiatedRef.current = true;
     setErrorMsg('');
     setInfoMsg('');
 
