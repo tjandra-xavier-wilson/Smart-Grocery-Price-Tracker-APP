@@ -31,7 +31,7 @@ export default function HeaderBar({
   };
 
   return (
-    <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 py-2 shrink-0 sticky top-0 z-30 space-y-1.5 shadow-2xs">
+    <div className="px-4 py-2 space-y-1.5 bg-transparent relative z-10 border-t border-slate-100/60">
       {/* Top Row: User Avatar on Left, Store Name & Ganti, and Tab Title on Right */}
       <div className="flex items-center justify-between">
         {/* Left: Avatar & Supermarket Info */}
@@ -147,7 +147,7 @@ export default function HeaderBar({
           </span>
         </button>
       </div>
-    </header>
+    </div>
   );
 }
 

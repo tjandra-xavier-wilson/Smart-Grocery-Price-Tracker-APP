@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import TopStatusBar from './components/TopStatusBar';
+import HeaderBackgroundTrolley from './components/HeaderBackgroundTrolley';
 import HeaderBar from './components/HeaderBar';
 import BottomNav from './components/BottomNav';
 import LoginScreen from './components/LoginScreen';
@@ -967,8 +968,35 @@ export default function Home() {
       {/* Mobile Shell Mockup Wrapper (iPhone 16 Pro Max 430px Standard) */}
       <div className="w-full max-w-[430px] bg-white min-h-screen md:min-h-[900px] md:max-h-[920px] md:rounded-[44px] shadow-2xl md:ring-12 md:ring-slate-800/90 overflow-hidden flex flex-col relative transition-all duration-300">
         
-        {/* Top Status Bar: WIB Real-time Clock, Moving Cart Wind Animation & Clean Signal (Tanpa Baterai) */}
-        <TopStatusBar />
+        {/* ============================================================== */}
+        {/* HEADER TOP BAR CONTAINER: Sticky Header dengan Background Troli Bergerak Kontinu */}
+        {/* ============================================================== */}
+        <header className="relative overflow-hidden bg-white/95 backdrop-blur-md border-b border-slate-200/80 shrink-0 sticky top-0 z-30 shadow-2xs">
+          {/* Background Animasi Troli & Garis Angin Kecepatan Tinggi (Continuous Loop) */}
+          <HeaderBackgroundTrolley />
+
+          {/* Foreground UI Elements (z-10: Teks Jam, Nama Toko, Avatar Tetap Jelas) */}
+          <div className="relative z-10">
+            {/* Top Status Bar: Jam WIB, Notch, Sinyal 5G */}
+            <TopStatusBar />
+
+            {/* Global Header Bar: Info Toko, Avatar, Tanggal, Limit Budget */}
+            {isAuthenticated && (
+              <HeaderBar
+                currentStore={currentStore}
+                onOpenStoreModal={() => setIsStoreModalOpen(true)}
+                activeTabTitle={getActiveTabTitle()}
+                currentUser={currentUser}
+                onOpenAuthModal={() => setIsProfileModalOpen(true)}
+                syncStatus={syncStatus}
+                transactionDate={transactionDate}
+                onDateChange={handleDateChange}
+                budgetLimit={budgetLimit}
+                onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
+              />
+            )}
+          </div>
+        </header>
 
         {/* ============================================================== */}
         {/* VIEW 1: INITIAL LOGIN SCREEN (MOCKUP 1 - SMART GROCERY SENTINEL) */}
@@ -985,20 +1013,6 @@ export default function Home() {
           /* VIEW 2: AUTHENTICATED APP (MOCKUPS 2, 3, 4, 5 + BOTTOM NAV)    */
           /* ============================================================== */
           <>
-            {/* Global Header Bar with Store info, Avatar & Sync Status */}
-            <HeaderBar
-              currentStore={currentStore}
-              onOpenStoreModal={() => setIsStoreModalOpen(true)}
-              activeTabTitle={getActiveTabTitle()}
-              currentUser={currentUser}
-              onOpenAuthModal={() => setIsProfileModalOpen(true)}
-              syncStatus={syncStatus}
-              transactionDate={transactionDate}
-              onDateChange={handleDateChange}
-              budgetLimit={budgetLimit}
-              onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
-            />
-
             {/* Scrollable Viewport Content */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar bg-slate-50 relative">
               {activeTab === 'cart' && (
