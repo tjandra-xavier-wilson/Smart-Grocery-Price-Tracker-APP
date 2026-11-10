@@ -186,7 +186,7 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
         }
 
       } else {
-        // Mode Daftar: pendaftaran via Supabase Auth dengan penanganan kuota rate-limit bebas macet
+        // Mode Daftar: pendaftaran via Supabase Auth
         const res = await signUpWithEmailPassword(email, pin, fullName);
         
         if (!res.success) {
@@ -195,16 +195,29 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
           return;
         }
 
-        // Aturan Keamanan: Setelah registrasi akun baru berhasil, jangan langsung auto-login ke dashboard!
-        // Arahkan user kembali ke tab 'Masuk' dengan notifikasi: "Registrasi berhasil, silakan login ulang dengan akun Anda."
-        playSuccessSound();
-        setAuthMode('login');
-        setPin(''); // Kosongkan PIN untuk keamanan login ulang
-        setErrorMsg('');
-        setInfoMsg(res.message || 'Registrasi berhasil, silakan login ulang dengan akun Anda.');
+        const u = res.data?.user;
+        const profile = {
+          id: u?.id || 'user-' + Date.now(),
+          name: fullName || u?.user_metadata?.full_name || email.split('@')[0],
+          email: u?.email || email.trim(),
+          avatar_url: u?.user_metadata?.avatar_url || null,
+          provider: 'email_password',
+          role: 'user',
+          authenticated_at: new Date().toISOString()
+        };
 
-        // Update list akun perangkat
+        // Simpan akun ke perangkat dan langsung masuki akun dengan transisi splash screen
+        saveDeviceAccount(profile);
         setDeviceAccounts(getDeviceAccounts());
+        if (rememberMe && typeof localStorage !== 'undefined') {
+          localStorage.setItem(SINGLE_USER_STORAGE_KEY, JSON.stringify(profile));
+          localStorage.setItem('sakugrosir_is_logged_in', 'true');
+        }
+
+        playSuccessSound();
+        if (onLoginSuccess) {
+          onLoginSuccess(profile);
+        }
       }
     } catch (err) {
       setErrorMsg(err.message || 'Terjadi gangguan koneksi pada modul autentikasi.');

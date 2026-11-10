@@ -404,6 +404,15 @@ export default function Home() {
           setActiveTab('cart');
           setAuthErrorMessage('');
 
+          // Tampilkan transisi dan splash screen saat masuk ke akun yang dituju
+          setShowSplash(true);
+
+          if (typeof window !== 'undefined') {
+            try {
+              sessionStorage.setItem(STORAGE_KEYS.SPLASH_SHOWN, 'true');
+            } catch (e) {}
+          }
+
           if (typeof localStorage !== 'undefined') {
             localStorage.setItem(STORAGE_KEYS.AUTH, 'true');
             localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(profile));
@@ -644,6 +653,11 @@ export default function Home() {
         setIsAuthenticated(true);
         setAuthErrorMessage('');
 
+        // Jika event adalah login baru (SIGNED_IN), tampilkan transisi splash screen masuk ke akun
+        if (event === 'SIGNED_IN') {
+          setShowSplash(true);
+        }
+
         if (typeof window !== 'undefined') {
           try {
             sessionStorage.setItem(STORAGE_KEYS.SPLASH_SHOWN, 'true');
@@ -752,6 +766,10 @@ export default function Home() {
     setCurrentUser(userProfile);
     setIsAuthenticated(true);
     setActiveTab('cart');
+
+    // Tampilkan transisi dan splash screen saat masuk ke akun yang dituju
+    setShowSplash(true);
+
     if (typeof window !== 'undefined') {
       try {
         sessionStorage.setItem(STORAGE_KEYS.SPLASH_SHOWN, 'true');
@@ -775,6 +793,7 @@ export default function Home() {
     setCurrentUser(null);
     setIsAuthenticated(false);
     setIsProfileModalOpen(false);
+    setShowSplash(false);
   };
 
   // Cart Operations
