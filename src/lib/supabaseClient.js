@@ -86,24 +86,43 @@ export async function saveShoppingTrip(historyData, itemsList, userId = null) {
     } catch (e) {}
   }
 
-  const payloadHistory = {
+  const baseNotes = historyData.notes || 'Supermarket Grosir';
+  // Sematkan tag identitas pengguna ke dalam notes sebagai redundansi jika kolom user_id belum ada di remote
+  const taggedNotes = targetUserId ? `${baseNotes} ##uid:${targetUserId}##` : baseNotes;
+
+  const payloadWithUid = {
     user_id: targetUserId || null,
     shopping_date: historyData.shopping_date || (function() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(),
     total_spent: Number(historyData.total_spent) || 0,
-    notes: historyData.notes || 'Supermarket Grosir'
+    notes: taggedNotes
   };
 
   try {
-    // A. Insert ke tabel grocery_history
-    const { data: historyRow, error: historyErr } = await supabase
+    // A. Insert ke tabel grocery_history dengan penanganan skema adaptif
+    let historyRow = null;
+    let { data: resData, error: historyErr } = await supabase
       .from('grocery_history')
-      .insert([payloadHistory])
+      .insert([payloadWithUid])
       .select()
       .single();
+
+    // Jika skema remote belum memiliki kolom user_id, coba ulang tanpa kolom user_id (data tetap aman di taggedNotes)
+    if (historyErr && (historyErr.message?.includes('user_id') || historyErr.code === 'PGRST204' || historyErr.code === '42703')) {
+      const payloadFallback = { ...payloadWithUid };
+      delete payloadFallback.user_id;
+      const retry = await supabase
+        .from('grocery_history')
+        .insert([payloadFallback])
+        .select()
+        .single();
+      resData = retry.data;
+      historyErr = retry.error;
+    }
 
     if (historyErr) {
       throw new Error(`Gagal menyimpan grocery_history: ${historyErr.message}`);
     }
+    historyRow = resData;
 
     // B. Format batch items dengan relasi history_id
     if (itemsList && itemsList.length > 0) {
@@ -137,6 +156,9 @@ export async function saveShoppingTrip(historyData, itemsList, userId = null) {
       saveOfflinePrice(item.nama_barang, item.harga_akhir_per_satuan);
     });
 
+    // Simpan juga ke cache lokal per-user
+    saveOfflineTrip(historyData, itemsList, targetUserId);
+
     return {
       success: true,
       source: 'supabase',
@@ -145,7 +167,7 @@ export async function saveShoppingTrip(historyData, itemsList, userId = null) {
     };
   } catch (err) {
     console.warn('[Supabase saveShoppingTrip] Network or schema error, saving to LocalStorage fallback:', err.message);
-    saveOfflineTrip(historyData, itemsList);
+    saveOfflineTrip(historyData, itemsList, targetUserId);
     return {
       success: true,
       source: 'localStorage_fallback',
@@ -286,7 +308,44 @@ export async function getShoppingHistoryList(userId = null) {
       return [];
     }
 
-    const { data, error } = await query;
+    let { data, error } = await query;
+
+    // Fallback adaptif: Jika kolom user_id belum ada di remote schema Supabase, query tanpa kolom user_id lalu filter by notes tag
+    if (error && (error.message?.includes('user_id') || error.code === '42703' || error.code === 'PGRST204')) {
+      console.warn('[Supabase getShoppingHistoryList] Kolom user_id belum aktif di remote DB, menggunakan fallback query adaptif.');
+      const fallbackQuery = await supabase
+        .from('grocery_history')
+        .select(`
+          id,
+          shopping_date,
+          total_spent,
+          notes,
+          created_at,
+          grocery_items (
+            id,
+            nama_barang,
+            kategori,
+            satuan,
+            kuantitas,
+            harga_satuan,
+            diskon_persen_1,
+            diskon_persen_2,
+            potongan_langsung,
+            harga_akhir_per_satuan,
+            total_harga_item,
+            harga_bulan_lalu
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (!fallbackQuery.error && fallbackQuery.data) {
+        data = fallbackQuery.data.filter(row => {
+          if (!row.notes) return false;
+          return row.notes.includes(`##uid:${targetUserId}##`);
+        });
+        error = null;
+      }
+    }
 
     if (error) {
       console.warn('[Supabase getShoppingHistoryList] Error, using local fallback:', error.message);
@@ -328,10 +387,16 @@ export async function getShoppingHistoryList(userId = null) {
 
         const totalItems = items.reduce((acc, curr) => acc + curr.quantity, 0);
 
+        // Bersihkan tag ##uid:...## dari nama toko/notes untuk tampilan UI
+        const cleanStoreName = (row.notes || 'Supermarket Grosir')
+          .replace(/\s*##uid:[^#]+##\s*/g, '')
+          .trim();
+
         return {
           id: row.id,
-          storeName: row.notes || 'Supermarket Grosir',
-          store_name: row.notes || 'Supermarket Grosir',
+          storeName: cleanStoreName,
+          store_name: cleanStoreName,
+          notes: cleanStoreName,
           date: dateDisplay,
           shopping_date: row.shopping_date,
           time: timeStr,
@@ -394,9 +459,13 @@ function getOfflineBudget() {
   return { monthly_budget_cap: val, warning_threshold: 0.8 };
 }
 
-function getOfflineHistory() {
+function getOfflineHistory(userId = null) {
   if (typeof localStorage === 'undefined') return [];
   try {
+    if (userId) {
+      const userRaw = localStorage.getItem(`${FALLBACK_KEYS.HISTORY}_${userId}`);
+      if (userRaw) return JSON.parse(userRaw);
+    }
     const raw = localStorage.getItem(FALLBACK_KEYS.HISTORY);
     return raw ? JSON.parse(raw) : [];
   } catch (e) {
@@ -404,20 +473,32 @@ function getOfflineHistory() {
   }
 }
 
-function saveOfflineTrip(historyData, itemsList) {
+function saveOfflineTrip(historyData, itemsList, userId = null) {
   if (typeof localStorage === 'undefined') return;
   try {
-    const history = getOfflineHistory();
+    const targetUserId = userId || historyData.user_id;
+    const history = getOfflineHistory(targetUserId);
+    const cleanNotes = (historyData.notes || 'Supermarket Grosir')
+      .replace(/\s*##uid:[^#]+##\s*/g, '')
+      .trim();
     const trip = {
       id: 'trip_offline_' + Date.now(),
-      store_name: historyData.notes || 'Supermarket Grosir',
+      storeName: cleanNotes,
+      store_name: cleanNotes,
+      notes: cleanNotes,
       date: historyData.shopping_date || (function() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(),
+      shopping_date: historyData.shopping_date || (function() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(),
+      totalSpent: historyData.total_spent || 0,
       total_spent: historyData.total_spent || 0,
+      itemCount: itemsList.length,
       items_count: itemsList.length,
       items: itemsList
     };
     history.unshift(trip);
     localStorage.setItem(FALLBACK_KEYS.HISTORY, JSON.stringify(history));
+    if (targetUserId) {
+      localStorage.setItem(`${FALLBACK_KEYS.HISTORY}_${targetUserId}`, JSON.stringify(history));
+    }
   } catch (e) {}
 }
 
@@ -445,7 +526,12 @@ export async function deleteShoppingTrip(tripId, userId = null) {
     if (targetUserId) {
       query = query.eq('user_id', targetUserId);
     }
-    const { error } = await query;
+    let { error } = await query;
+
+    if (error && (error.message?.includes('user_id') || error.code === '42703' || error.code === 'PGRST204')) {
+      const retry = await supabase.from('grocery_history').delete().eq('id', tripId);
+      error = retry.error;
+    }
 
     if (error) {
       console.warn('[Supabase deleteShoppingTrip] Warning:', error.message);
@@ -497,7 +583,14 @@ export async function clearAllShoppingHistory(userId = null) {
     } else {
       query = query.neq('id', '00000000-0000-0000-0000-000000000000');
     }
-    const { error } = await query;
+    let { error } = await query;
+
+    if (error && (error.message?.includes('user_id') || error.code === '42703' || error.code === 'PGRST204')) {
+      if (targetUserId) {
+        const retry = await supabase.from('grocery_history').delete().like('notes', `%##uid:${targetUserId}##%`);
+        error = retry.error;
+      }
+    }
 
     if (error) {
       console.warn('[Supabase clearAllShoppingHistory] Warning:', error.message);
