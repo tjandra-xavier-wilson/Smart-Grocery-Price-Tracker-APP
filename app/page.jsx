@@ -166,17 +166,11 @@ const MOCKUP_OVERBUDGET_CART = [
 ];
 
 export default function Home() {
+  // Mounting guard untuk menjamin 0 hydration mismatch antara Server & Client
+  const [isMounted, setIsMounted] = useState(false);
+
   // Authentication State: Session persistence across reload / Ctrl+R
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const isAuth = localStorage.getItem(STORAGE_KEYS.AUTH);
-      const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
-      if (isAuth === 'true' && savedUser) {
-        return true;
-      }
-    }
-    return false;
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authErrorMessage, setAuthErrorMessage] = useState('');
 
   // Navigation State: 'cart' | 'input' | 'history'
@@ -184,66 +178,16 @@ export default function Home() {
 
   // Core App State
   const [currentStore, setCurrentStore] = useState('Lotte Mart - Puri Indah');
-  const [transactionDate, setTransactionDate] = useState(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem(STORAGE_KEYS.DATE);
-        if (saved) return saved;
-      } catch (e) {}
-    }
-    return toIndoDisplayDate(new Date());
-  });
+  const [transactionDate, setTransactionDate] = useState('24 Mei 2025');
   const [budgetLimit, setBudgetLimit] = useState(350000);
   // State keranjang belanja terisolasi per akun (akun baru tanpa transaksi mulai dari state kosong [])
-  const [cartItems, setCartItems] = useState(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const savedAuth = localStorage.getItem(STORAGE_KEYS.AUTH);
-        const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
-        if (savedAuth === 'true' && savedUser) {
-          const parsed = JSON.parse(savedUser);
-          const userCartKey = `${STORAGE_KEYS.CART}_${parsed.id}`;
-          const savedCart = localStorage.getItem(userCartKey) || localStorage.getItem(STORAGE_KEYS.CART);
-          if (savedCart) return JSON.parse(savedCart);
-        }
-      } catch (e) {}
-    }
-    return [];
-  });
+  const [cartItems, setCartItems] = useState([]);
   const [historyList, setHistoryList] = useState([]);
-  const [currentUser, setCurrentUser] = useState(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
-        if (savedUser) return JSON.parse(savedUser);
-      } catch (e) {}
-    }
-    return null;
-  });
+  const [currentUser, setCurrentUser] = useState(null);
   const [syncStatus, setSyncStatus] = useState('Online Sync Live');
 
-  // Splash Screen State:
-  // Cegah kemunculan kembali animasi splash screen saat pengguna menekan Ctrl+R / refresh
-  // baik ketika sedang berada di halaman login maupun saat sudah masuk ke menu utama.
-  const [showSplash, setShowSplash] = useState(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        // 1. Cek penanda sesi tab (jika sudah pernah menampilkan splash di sesi ini, misal di halaman login)
-        const sessionSplash = sessionStorage.getItem(STORAGE_KEYS.SPLASH_SHOWN);
-        if (sessionSplash === 'true') {
-          return false;
-        }
-
-        // 2. Cek apakah pengguna sudah login dan berada di menu utama
-        const isAuth = localStorage.getItem(STORAGE_KEYS.AUTH);
-        const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
-        if (isAuth === 'true' && savedUser) {
-          return false;
-        }
-      } catch (e) {}
-    }
-    return true;
-  });
+  // Splash Screen State
+  const [showSplash, setShowSplash] = useState(false);
 
   // Simpan penanda ke sessionStorage saat splash screen nonaktif
   useEffect(() => {
@@ -326,13 +270,40 @@ export default function Home() {
     };
   }, []);
 
-  // 1. Initialize State & LocalStorage Persistence
+  // 1. Initialize State & LocalStorage Persistence safely after client mount
   useEffect(() => {
+    setIsMounted(true);
     if (typeof window === 'undefined') return;
 
     try {
-      const savedCart = localStorage.getItem(STORAGE_KEYS.CART);
-      if (savedCart) setCartItems(JSON.parse(savedCart));
+      // a. Cek status autentikasi dari LocalStorage
+      const isAuth = localStorage.getItem(STORAGE_KEYS.AUTH);
+      const savedUserStr = localStorage.getItem(STORAGE_KEYS.USER);
+      const sessionSplash = sessionStorage.getItem(STORAGE_KEYS.SPLASH_SHOWN);
+
+      if (isAuth === 'true' && savedUserStr) {
+        const parsedUser = JSON.parse(savedUserStr);
+        setCurrentUser(parsedUser);
+        setIsAuthenticated(true);
+        setShowSplash(false);
+
+        // Isolasi keranjang belanja untuk akun aktif
+        const userCartKey = `${STORAGE_KEYS.CART}_${parsedUser.id}`;
+        const savedCart = localStorage.getItem(userCartKey) || localStorage.getItem(STORAGE_KEYS.CART);
+        if (savedCart) setCartItems(JSON.parse(savedCart));
+
+        if (typeof loadCloudHistoryRef.current === 'function') {
+          loadCloudHistoryRef.current(parsedUser.id);
+        }
+      } else {
+        setIsAuthenticated(false);
+        // Tampilkan splash screen pembuka hanya pada kunjungan pertama sesi ini
+        if (sessionSplash !== 'true') {
+          setShowSplash(true);
+        } else {
+          setShowSplash(false);
+        }
+      }
 
       const savedBudget = localStorage.getItem(STORAGE_KEYS.BUDGET);
       if (savedBudget) setBudgetLimit(Number(savedBudget));
@@ -341,7 +312,11 @@ export default function Home() {
       if (savedStore) setCurrentStore(savedStore);
 
       const savedDate = localStorage.getItem(STORAGE_KEYS.DATE);
-      if (savedDate) setTransactionDate(savedDate);
+      if (savedDate) {
+        setTransactionDate(savedDate);
+      } else {
+        setTransactionDate(toIndoDisplayDate(new Date()));
+      }
 
       const savedHistory = localStorage.getItem(STORAGE_KEYS.HISTORY);
       if (savedHistory) {
@@ -1182,6 +1157,21 @@ export default function Home() {
       default: return 'Keranjang Aktif';
     }
   };
+
+  if (!isMounted) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-[#e2e8f0] via-[#e8eff2] to-[#d6e6e6] flex items-center justify-center p-0 md:p-6 lg:p-8 font-sans selection:bg-teal-600 selection:text-white">
+        <div className="w-full max-w-[430px] bg-white min-h-screen md:min-h-[900px] md:max-h-[920px] md:rounded-[44px] shadow-2xl md:ring-12 md:ring-slate-800/90 overflow-hidden flex flex-col items-center justify-center relative">
+          <div className="flex flex-col items-center space-y-3">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-800 flex items-center justify-center text-white shadow-md animate-pulse">
+              <span className="text-2xl font-bold">🛒</span>
+            </div>
+            <span className="text-xs font-bold text-slate-500">Memuat Smart Grocery Sentinel...</span>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-[#e2e8f0] via-[#e8eff2] to-[#d6e6e6] flex items-center justify-center p-0 md:p-6 lg:p-8 font-sans selection:bg-teal-600 selection:text-white">

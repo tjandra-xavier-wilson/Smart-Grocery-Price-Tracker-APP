@@ -1048,7 +1048,19 @@ export async function signInWithGoogle() {
       }
 
       if (typeof window !== 'undefined') {
-        window.location.href = data.url;
+        let isInIframe = false;
+        try {
+          isInIframe = window.self !== window.top;
+        } catch (e) {
+          isInIframe = true;
+        }
+
+        if (isInIframe) {
+          // Jika aplikasi dibuka di dalam Canvas / iframe / Webview, buka Google OAuth di tab baru untuk mencegah error 'This page couldn't load' (X-Frame-Options Google)
+          window.open(data.url, '_blank');
+        } else {
+          window.location.href = data.url;
+        }
       }
       return { success: true, data };
     }
