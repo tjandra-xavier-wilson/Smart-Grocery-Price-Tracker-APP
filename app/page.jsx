@@ -43,7 +43,8 @@ const STORAGE_KEYS = {
   DATE: 'sakugrosir_trans_date_v1',
   HISTORY: 'sakugrosir_history_v1',
   USER: 'sakugrosir_single_user_v1',
-  AUTH: 'sakugrosir_is_logged_in'
+  AUTH: 'sakugrosir_is_logged_in',
+  SPLASH_SHOWN: 'sentinel_splash_shown'
 };
 
 // Initial Mockup 2 Dataset (Normal: Rp 284.000 / Rp 350.000)
@@ -205,7 +206,47 @@ export default function Home() {
     return null;
   });
   const [syncStatus, setSyncStatus] = useState('Online Sync Live');
-  const [showSplash, setShowSplash] = useState(true);
+
+  // Splash Screen State:
+  // Cegah kemunculan kembali animasi splash screen saat pengguna menekan Ctrl+R / refresh
+  // baik ketika sedang berada di halaman login maupun saat sudah masuk ke menu utama.
+  const [showSplash, setShowSplash] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        // 1. Cek penanda sesi tab (jika sudah pernah menampilkan splash di sesi ini, misal di halaman login)
+        const sessionSplash = sessionStorage.getItem(STORAGE_KEYS.SPLASH_SHOWN);
+        if (sessionSplash === 'true') {
+          return false;
+        }
+
+        // 2. Cek apakah pengguna sudah login dan berada di menu utama
+        const isAuth = localStorage.getItem(STORAGE_KEYS.AUTH);
+        const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
+        if (isAuth === 'true' && savedUser) {
+          return false;
+        }
+      } catch (e) {}
+    }
+    return true;
+  });
+
+  // Simpan penanda ke sessionStorage saat splash screen nonaktif
+  useEffect(() => {
+    if (!showSplash && typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem(STORAGE_KEYS.SPLASH_SHOWN, 'true');
+      } catch (e) {}
+    }
+  }, [showSplash]);
+
+  const handleSplashFinish = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem(STORAGE_KEYS.SPLASH_SHOWN, 'true');
+      } catch (e) {}
+    }
+    setShowSplash(false);
+  };
 
   // Modals state
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -389,6 +430,12 @@ export default function Home() {
         saveDeviceAccount(profile);
         setCurrentUser(profile);
         setIsAuthenticated(true);
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.setItem(STORAGE_KEYS.SPLASH_SHOWN, 'true');
+          } catch (e) {}
+        }
+
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem(STORAGE_KEYS.AUTH, 'true');
           localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(profile));
@@ -597,6 +644,12 @@ export default function Home() {
         setIsAuthenticated(true);
         setAuthErrorMessage('');
 
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.setItem(STORAGE_KEYS.SPLASH_SHOWN, 'true');
+          } catch (e) {}
+        }
+
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem(STORAGE_KEYS.AUTH, 'true');
           localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(profile));
@@ -699,6 +752,11 @@ export default function Home() {
     setCurrentUser(userProfile);
     setIsAuthenticated(true);
     setActiveTab('cart');
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem(STORAGE_KEYS.SPLASH_SHOWN, 'true');
+      } catch (e) {}
+    }
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.AUTH, 'true');
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userProfile));
@@ -971,7 +1029,7 @@ export default function Home() {
       <div className="w-full max-w-[430px] bg-white min-h-screen md:min-h-[900px] md:max-h-[920px] md:rounded-[44px] shadow-2xl md:ring-12 md:ring-slate-800/90 overflow-hidden flex flex-col relative transition-all duration-300">
         
         {showSplash ? (
-          <SplashScreen onFinish={() => setShowSplash(false)} />
+          <SplashScreen onFinish={handleSplashFinish} />
         ) : (
           <>
             {/* ============================================================== */}
