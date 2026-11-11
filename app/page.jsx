@@ -26,6 +26,7 @@ import {
   signOutUser, 
   saveShoppingTrip, 
   getShoppingHistoryList,
+  getOfflineHistory,
   deleteShoppingTrip,
   clearAllShoppingHistory,
   updateBudgetSettings,
@@ -231,6 +232,11 @@ export default function Home() {
   const supabaseSyncChannelRef = useRef(null);
   const loadCloudHistoryRef = useRef(null);
   const broadcastChannelRef = useRef(null);
+  const currentUserRef = useRef(currentUser);
+
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
 
   // Ref penangkal glitch splash screen saat pengguna berpindah tab atau Alt+Tab
   const isTabSwitchRef = useRef(false);
@@ -507,14 +513,19 @@ export default function Home() {
     // Multi-Device Cloud History Synchronization Terisolasi per User ID (Pencegahan Data Bleeding)
     const fetchCloudHistory = async (overrideUserId = null) => {
       try {
-        const activeUid = overrideUserId || currentUser?.id;
-        if (!activeUid) {
-          setHistoryList([]);
-          return;
+        let activeUid = overrideUserId || currentUserRef.current?.id;
+        if (!activeUid && typeof window !== 'undefined') {
+          try {
+            const saved = localStorage.getItem(STORAGE_KEYS.USER);
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              activeUid = parsed?.id;
+            }
+          } catch (e) {}
         }
 
         const cloudHistory = await getShoppingHistoryList(activeUid);
-        if (cloudHistory && Array.isArray(cloudHistory)) {
+        if (cloudHistory && Array.isArray(cloudHistory) && cloudHistory.length > 0) {
           setHistoryList(() => {
             // Deduplikasi array berdasarkan ID unik - Cloud sebagai Single Source of Truth
             const uniqueHistory = Array.from(
@@ -522,15 +533,27 @@ export default function Home() {
             ).filter(Boolean);
             if (typeof localStorage !== 'undefined') {
               localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(uniqueHistory));
-              localStorage.setItem(`${STORAGE_KEYS.HISTORY}_${activeUid}`, JSON.stringify(uniqueHistory));
+              if (activeUid) {
+                localStorage.setItem(`${STORAGE_KEYS.HISTORY}_${activeUid}`, JSON.stringify(uniqueHistory));
+              }
             }
             return uniqueHistory;
           });
         } else {
-          setHistoryList([]);
+          // Jika data cloud kosong atau offline, ambil riwayat tersimpan di LocalStorage
+          const offlineData = getOfflineHistory(activeUid);
+          if (Array.isArray(offlineData) && offlineData.length > 0) {
+            setHistoryList(offlineData);
+          } else {
+            setHistoryList([]);
+          }
         }
       } catch (e) {
         console.warn('[CloudHistory] Fetch error:', e);
+        const fallbackOffline = getOfflineHistory(overrideUserId || currentUserRef.current?.id);
+        if (Array.isArray(fallbackOffline) && fallbackOffline.length > 0) {
+          setHistoryList(fallbackOffline);
+        }
       }
     };
     loadCloudHistoryRef.current = fetchCloudHistory;
@@ -766,9 +789,9 @@ export default function Home() {
   // Auto-Sync Riwayat Belanja saat pengguna membuka tab Riwayat
   useEffect(() => {
     if (activeTab === 'history' && typeof loadCloudHistoryRef.current === 'function') {
-      loadCloudHistoryRef.current();
+      loadCloudHistoryRef.current(currentUser?.id);
     }
-  }, [activeTab]);
+  }, [activeTab, currentUser]);
 
   // Broadcast & Save changes to LocalStorage & Realtime Cloud (Multi-Device Sync)
   const persistState = (newCart, newBudget, newStore, newDate) => {
@@ -1125,37 +1148,55 @@ export default function Home() {
         });
       } catch (e) {}
 
-      // 4. Update data Single Source of Truth:
-      // Jika offline fallback terjadi (saveRes.source === 'local'), simpan sesi lokal.
-      // Jika berhasil ke Supabase Cloud, panggil loadCloudHistoryRef() untuk memuat satu data resmi dari server.
-      if (saveRes?.source === 'local') {
-        const fallbackSession = {
-          id: saveRes.historyId || ('sesi-' + Date.now()),
-          storeName: currentStore,
-          store_name: currentStore,
-          totalSpent: totalCartPrice,
-          total_spent: totalCartPrice,
-          savings: 0,
-          date: toIndoDisplayDate(safeShoppingDate),
-          shopping_date: safeShoppingDate,
-          time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
-          itemCount: cartItems.reduce((acc, i) => acc + i.quantity, 0),
-          statusTier: 'safe',
-          statusBadge: 'Tersimpan Offline',
-          items: cartItems
-        };
-        setHistoryList(prev => {
-          const list = [fallbackSession, ...(prev || []).filter(h => h.id !== fallbackSession.id)];
-          const unique = Array.from(new Map(list.map(item => [item.id, item])).values());
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(unique));
+      // 4. Update data Single Source of Truth & Optimistic UI Update
+      const activeUserId = currentUser?.id || currentUserRef.current?.id;
+      const isLocalStorageFallback = saveRes?.source === 'localStorage_fallback' || saveRes?.source === 'local';
+
+      const completedSession = {
+        id: saveRes?.historyId || ('sesi-' + Date.now()),
+        storeName: currentStore,
+        store_name: currentStore,
+        notes: currentStore,
+        totalSpent: totalCartPrice,
+        total_spent: totalCartPrice,
+        savings: 0,
+        date: toIndoDisplayDate(safeShoppingDate),
+        shopping_date: safeShoppingDate,
+        time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
+        itemCount: cartItems.reduce((acc, i) => acc + i.quantity, 0),
+        items_count: cartItems.reduce((acc, i) => acc + i.quantity, 0),
+        statusTier: 'safe',
+        statusBadge: isLocalStorageFallback ? 'Tersimpan Offline' : 'Tersimpan di Cloud',
+        iconType: 'cart',
+        items: cartItems.map(i => ({
+          ...i,
+          name: i.name,
+          nama_barang: i.name,
+          price: i.price,
+          harga_akhir_per_satuan: i.price,
+          quantity: i.quantity,
+          kuantitas: i.quantity,
+          unit: i.unit || 'pcs',
+          satuan: i.unit || 'pcs'
+        }))
+      };
+
+      // Segera update state historyList & LocalStorage agar UI langsung menampilkan riwayat seketika
+      setHistoryList(prev => {
+        const list = [completedSession, ...(prev || []).filter(h => h.id !== completedSession.id)];
+        const unique = Array.from(new Map(list.map(item => [item.id, item])).values());
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(unique));
+          if (activeUserId) {
+            localStorage.setItem(`${STORAGE_KEYS.HISTORY}_${activeUserId}`, JSON.stringify(unique));
           }
-          return unique;
-        });
-      } else {
-        if (typeof loadCloudHistoryRef.current === 'function') {
-          await loadCloudHistoryRef.current();
         }
+        return unique;
+      });
+
+      // Lakukan sync latar belakang dari server Supabase
+      if (typeof loadCloudHistoryRef.current === 'function') {
+        loadCloudHistoryRef.current(activeUserId).catch(() => {});
       }
 
       setCartItems([]);

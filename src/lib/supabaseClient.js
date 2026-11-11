@@ -74,11 +74,33 @@ export async function getLastPrice(namaBarang) {
 }
 
 /**
+ * Normalisasi satuan agar lolos check constraint PostgreSQL: CHECK (satuan IN ('kg', 'liter', 'pcs', 'pack'))
+ */
+export function normalizeSatuanForDB(rawSatuan) {
+  if (!rawSatuan) return 'pcs';
+  const s = String(rawSatuan).toLowerCase();
+  if (s.includes('kg') || s.includes('kilo') || s.includes('gram') || s.includes('karung')) return 'kg';
+  if (s.includes('liter') || s.includes('lt') || s.includes('ml') || s.includes('pouch') || s.includes('botol')) return 'liter';
+  if (s.includes('pack') || s.includes('dus') || s.includes('kotak') || s.includes('tray') || s.includes('zak')) return 'pack';
+  if (s === 'kg' || s === 'liter' || s === 'pcs' || s === 'pack') return s;
+  return 'pcs';
+}
+
+/**
  * 2. MENYIMPAN TRANSAKSI KERANJANG BELANJA BESERTA SELURUH ITEMNYA (BATCH INSERT)
  * Menyimpan ke grocery_history lalu memasukkan seluruh baris ke grocery_items
  */
 export async function saveShoppingTrip(historyData, itemsList, userId = null) {
   let targetUserId = userId || historyData.user_id;
+  if (!targetUserId && typeof localStorage !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('sakugrosir_single_user_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        targetUserId = parsed?.id;
+      }
+    } catch (e) {}
+  }
   if (!targetUserId) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -124,20 +146,20 @@ export async function saveShoppingTrip(historyData, itemsList, userId = null) {
     }
     historyRow = resData;
 
-    // B. Format batch items dengan relasi history_id
+    // B. Format batch items dengan relasi history_id & normalisasi satuan ke format PostgreSQL
     if (itemsList && itemsList.length > 0) {
       const formattedItems = itemsList.map(item => ({
         history_id: historyRow.id,
-        nama_barang: item.nama_barang,
-        kategori: item.kategori || 'Kebutuhan Pokok',
-        satuan: item.satuan || 'pcs',
-        kuantitas: Number(item.kuantitas) || 1,
-        harga_satuan: Number(item.harga_satuan) || 0,
+        nama_barang: item.nama_barang || item.name || 'Barang Belanja',
+        kategori: item.kategori || item.category || 'Bahan Pokok',
+        satuan: normalizeSatuanForDB(item.satuan || item.unit),
+        kuantitas: Number(item.kuantitas || item.quantity) || 1,
+        harga_satuan: Number(item.harga_satuan || item.price) || 0,
         diskon_persen_1: Number(item.diskon_persen_1) || 0,
         diskon_persen_2: Number(item.diskon_persen_2) || 0,
         potongan_langsung: Number(item.potongan_langsung) || 0,
-        harga_akhir_per_satuan: Number(item.harga_akhir_per_satuan) || 0,
-        total_harga_item: Number(item.total_harga_item) || 0,
+        harga_akhir_per_satuan: Number(item.harga_akhir_per_satuan || item.price) || 0,
+        total_harga_item: Number(item.total_harga_item) || (Number(item.harga_akhir_per_satuan || item.price || 0) * Number(item.kuantitas || item.quantity || 1)),
         harga_bulan_lalu: Number(item.harga_bulan_lalu) || 0
       }));
 
@@ -153,7 +175,7 @@ export async function saveShoppingTrip(historyData, itemsList, userId = null) {
 
     // Update catalog lokal juga untuk redundansi
     itemsList.forEach(item => {
-      saveOfflinePrice(item.nama_barang, item.harga_akhir_per_satuan);
+      saveOfflinePrice(item.nama_barang || item.name, item.harga_akhir_per_satuan || item.price);
     });
 
     // Simpan juga ke cache lokal per-user
@@ -268,6 +290,15 @@ export async function updateBudgetSettings(monthlyBudgetCap, warningThreshold = 
 export async function getShoppingHistoryList(userId = null) {
   try {
     let targetUserId = userId;
+    if (!targetUserId && typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('sakugrosir_single_user_v1');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          targetUserId = parsed?.id;
+        }
+      } catch (e) {}
+    }
     if (!targetUserId) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -275,11 +306,11 @@ export async function getShoppingHistoryList(userId = null) {
       } catch (e) {}
     }
 
-    let query = supabase
+    // Query adaptif langsung ke tabel grocery_history beserta relasi grocery_items
+    const { data: rawData, error } = await supabase
       .from('grocery_history')
       .select(`
         id,
-        user_id,
         shopping_date,
         total_spent,
         notes,
@@ -301,58 +332,27 @@ export async function getShoppingHistoryList(userId = null) {
       `)
       .order('created_at', { ascending: false });
 
-    // Filter query HANYA mengambil data milik pengguna yang sedang login saat ini
-    if (targetUserId) {
-      query = query.eq('user_id', targetUserId);
-    } else {
-      return [];
-    }
-
-    let { data, error } = await query;
-
-    // Fallback adaptif: Jika kolom user_id belum ada di remote schema Supabase, query tanpa kolom user_id lalu filter by notes tag
-    if (error && (error.message?.includes('user_id') || error.code === '42703' || error.code === 'PGRST204')) {
-      console.warn('[Supabase getShoppingHistoryList] Kolom user_id belum aktif di remote DB, menggunakan fallback query adaptif.');
-      const fallbackQuery = await supabase
-        .from('grocery_history')
-        .select(`
-          id,
-          shopping_date,
-          total_spent,
-          notes,
-          created_at,
-          grocery_items (
-            id,
-            nama_barang,
-            kategori,
-            satuan,
-            kuantitas,
-            harga_satuan,
-            diskon_persen_1,
-            diskon_persen_2,
-            potongan_langsung,
-            harga_akhir_per_satuan,
-            total_harga_item,
-            harga_bulan_lalu
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (!fallbackQuery.error && fallbackQuery.data) {
-        data = fallbackQuery.data.filter(row => {
-          if (!row.notes) return false;
-          return row.notes.includes(`##uid:${targetUserId}##`);
-        });
-        error = null;
-      }
-    }
-
     if (error) {
-      console.warn('[Supabase getShoppingHistoryList] Error, using local fallback:', error.message);
+      console.warn('[Supabase getShoppingHistoryList] Cloud query error, using local fallback:', error.message);
       return getOfflineHistory(targetUserId);
     }
 
-    if (data && data.length > 0) {
+    let data = rawData || [];
+    // Filter berdasarkan identitas pengguna (tag ##uid:...## di notes)
+    if (targetUserId) {
+      const filtered = data.filter(row => {
+        if (!row.notes) return false;
+        return row.notes.includes(`##uid:${targetUserId}##`);
+      });
+      // Jika ada data untuk uid ini, gunakan data yang terfilter
+      if (filtered.length > 0) {
+        data = filtered;
+      }
+    }
+
+    if (!data || data.length === 0) {
+      return getOfflineHistory(targetUserId);
+    }
       return data.map(row => {
         const dateObj = new Date(row.created_at || row.shopping_date);
         const timeStr = !isNaN(dateObj.getTime())
@@ -411,12 +411,9 @@ export async function getShoppingHistoryList(userId = null) {
           items: items
         };
       });
-    }
-
-    return getOfflineHistory();
   } catch (err) {
     console.warn('[Supabase getShoppingHistoryList] Offline, using local fallback:', err.message);
-    return getOfflineHistory();
+    return getOfflineHistory(targetUserId);
   }
 }
 
@@ -459,7 +456,7 @@ function getOfflineBudget() {
   return { monthly_budget_cap: val, warning_threshold: 0.8 };
 }
 
-function getOfflineHistory(userId = null) {
+export function getOfflineHistory(userId = null) {
   if (typeof localStorage === 'undefined') return [];
   try {
     if (userId) {
