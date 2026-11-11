@@ -30,7 +30,8 @@ import {
   clearAllShoppingHistory,
   updateBudgetSettings,
   saveDeviceAccount,
-  isEmailRegistered
+  isEmailRegistered,
+  SINGLE_USER_STORAGE_KEY
 } from '../src/lib/supabaseClient';
 import { toIndoDisplayDate, toISODateString } from './utils/date';
 import { playTapSound, playSuccessSound } from './utils/sound';
@@ -282,18 +283,31 @@ export default function Home() {
       const sessionSplash = sessionStorage.getItem(STORAGE_KEYS.SPLASH_SHOWN);
 
       if (isAuth === 'true' && savedUserStr) {
-        const parsedUser = JSON.parse(savedUserStr);
-        setCurrentUser(parsedUser);
-        setIsAuthenticated(true);
-        setShowSplash(false);
+        try {
+          const parsedUser = JSON.parse(savedUserStr);
+          if (parsedUser && parsedUser.id) {
+            setCurrentUser(parsedUser);
+            setIsAuthenticated(true);
+            setShowSplash(false);
 
-        // Isolasi keranjang belanja untuk akun aktif
-        const userCartKey = `${STORAGE_KEYS.CART}_${parsedUser.id}`;
-        const savedCart = localStorage.getItem(userCartKey) || localStorage.getItem(STORAGE_KEYS.CART);
-        if (savedCart) setCartItems(JSON.parse(savedCart));
+            // Isolasi keranjang belanja untuk akun aktif
+            const userCartKey = `${STORAGE_KEYS.CART}_${parsedUser.id}`;
+            const savedCart = localStorage.getItem(userCartKey) || localStorage.getItem(STORAGE_KEYS.CART);
+            if (savedCart) {
+              try {
+                const parsedCart = JSON.parse(savedCart);
+                if (Array.isArray(parsedCart)) setCartItems(parsedCart);
+              } catch (e) {}
+            }
 
-        if (typeof loadCloudHistoryRef.current === 'function') {
-          loadCloudHistoryRef.current(parsedUser.id);
+            if (typeof loadCloudHistoryRef.current === 'function') {
+              loadCloudHistoryRef.current(parsedUser.id);
+            }
+          } else {
+            setIsAuthenticated(false);
+          }
+        } catch (e) {
+          setIsAuthenticated(false);
         }
       } else {
         setIsAuthenticated(false);
