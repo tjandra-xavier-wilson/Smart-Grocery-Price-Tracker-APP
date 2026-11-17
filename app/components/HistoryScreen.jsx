@@ -345,7 +345,7 @@ export default function HistoryScreen({
                   </span>
 
                   <div className="flex items-center space-x-1.5">
-                    {/* Tombol Lihat Detail Struk */}
+                    {/* Tombol Lihat Struk */}
                     <button
                       type="button"
                       onClick={(e) => {
@@ -353,10 +353,11 @@ export default function HistoryScreen({
                         playTapSound();
                         if (onOpenReceiptDetail) onOpenReceiptDetail(session);
                       }}
-                      className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                      title="Lihat Detail Struk"
+                      className="flex items-center space-x-1.5 px-2.5 py-1 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200/80 transition-colors cursor-pointer"
+                      title="Lihat Struk"
                     >
-                      <Receipt className="w-4 h-4" />
+                      <Receipt className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>Lihat Struk</span>
                     </button>
 
                     {/* Tombol Hapus Riwayat Sesi Ini (Merah) */}

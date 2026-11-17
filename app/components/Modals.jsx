@@ -297,66 +297,391 @@ export function BarcodeScannerModal({ isOpen, onClose, onScannedItem }) {
 /**
  * 4. Modal Detail Struk Belanja
  */
-export function ReceiptDetailModal({ isOpen, onClose, session }) {
-  if (!isOpen || !session) return null;
+/**
+ * Helper normalisasi data struk agar seragam baik dari Checkout maupun Riwayat Belanja
+ */
+export function normalizeReceiptData(data, currentUser) {
+  if (!data) return null;
 
-  const handleCopyText = () => {
+  // Format ID Struk (misal: TRX-448916-2351)
+  let id = data.id || '';
+  if (!String(id).startsWith('TRX-')) {
+    const rawDigits = String(id).replace(/\D/g, '');
+    const part1 = (rawDigits.slice(-6) || '448916').padStart(6, '0');
+    const part2 = (rawDigits.slice(0, 4) || '2351').padStart(4, '0');
+    id = `TRX-${part1}-${part2}`;
+  }
+
+  const storeName = 'LOTTE MART GROCERY - PURI INDAH';
+  const customerName = 
+    data.customerName || 
+    currentUser?.user_metadata?.full_name || 
+    currentUser?.user_metadata?.name || 
+    currentUser?.name || 
+    currentUser?.email?.split('@')[0] || 
+    'Tjandra Wilson';
+  const cashier = data.cashier || 'Self-Checkout (Smart Grocery)';
+  const date = data.date || data.shopping_date || '17 November 2026';
+  const time = data.time || '00.10 WIB';
+
+  // Normalisasi daftar item
+  const rawItems = data.items || data.grocery_items || [];
+  const items = rawItems.map(it => {
+    const name = it.name || it.nama_barang || 'Item Belanja';
+    const quantity = Number(it.quantity || it.kuantitas || 1);
+    const unit = it.unit || it.satuan || 'pcs';
+    const price = Number(it.price || it.harga_akhir_per_satuan || it.harga_satuan || 0);
+    const lineTotal = Number(it.total_harga_item) || (price * quantity);
+    return { name, quantity, unit, price, lineTotal };
+  });
+
+  // Kalkulasi Subtotal, Promo, Pajak PPN 11%, dan Grand Total
+  const subtotal = data.subtotal !== undefined
+    ? Number(data.subtotal)
+    : (items.length > 0
+        ? items.reduce((sum, it) => sum + it.lineTotal, 0)
+        : Number(data.totalSpent || data.total_spent || 0));
+
+  const promo = Number(data.promo || data.savings || 0);
+  const pajak = data.pajak !== undefined
+    ? Number(data.pajak)
+    : Math.round(subtotal * 0.11);
+
+  const grandTotal = data.grandTotal !== undefined
+    ? Number(data.grandTotal)
+    : (subtotal - promo + pajak);
+
+  return {
+    id,
+    storeName,
+    date,
+    time,
+    customerName,
+    cashier,
+    items,
+    subtotal,
+    promo,
+    pajak,
+    grandTotal,
+    paymentMethod: 'QRIS / Saldo Dompet',
+    status: 'LUNAS / BERHASIL'
+  };
+}
+
+/**
+ * Komponen Utama Modal Struk Belanja Klasik Kertas Thermal POS
+ */
+export function ThermalPaperReceiptModal({
+  isOpen,
+  onClose,
+  data,
+  currentUser,
+  onFinishAndShopAgain
+}) {
+  const [copied, setCopied] = useState(false);
+
+  if (!isOpen || !data) return null;
+
+  const normalized = normalizeReceiptData(data, currentUser);
+  if (!normalized) return null;
+
+  const handlePrint = () => {
     playTapSound();
-    const text = `🛒 STRUK BELANJA - ${session.storeName}\nTanggal: ${session.date} ${session.time || ''}\nTotal: Rp ${session.totalSpent.toLocaleString('id-ID')}\nStatus: ${session.statusBadge}\n\nSmart Grocery Sentinel`;
-    navigator.clipboard?.writeText(text);
-    alert('Struk teks disalin ke clipboard!');
+    if (typeof window !== 'undefined') {
+      window.print();
+    }
+  };
+
+  const handleCopyReceipt = () => {
+    playTapSound();
+    const itemsText = (normalized.items || []).map(item => {
+      const qtyStr = item.unit ? `${item.quantity} ${item.unit}` : `${item.quantity}`;
+      return `${item.name}\n${qtyStr} x Rp ${item.price.toLocaleString('id-ID')} = Rp ${item.lineTotal.toLocaleString('id-ID')}`;
+    }).join('\n');
+
+    const receiptText = `LOTTE MART GROCERY - PURI INDAH
+--------------------------------
+No. Struk: ${normalized.id}
+Tanggal: ${normalized.date}, ${normalized.time}
+Pelanggan: ${normalized.customerName}
+--------------------------------
+ITEM / KUANTITAS
+${itemsText}
+--------------------------------
+Subtotal: Rp ${normalized.subtotal.toLocaleString('id-ID')}
+Pajak (11%): Rp ${normalized.pajak.toLocaleString('id-ID')}
+--------------------------------
+GRAND TOTAL: Rp ${normalized.grandTotal.toLocaleString('id-ID')}
+Status: ${normalized.status}`;
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(receiptText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/60 backdrop-blur-xs p-0 sm:p-4 animate-fade-in">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-3 sm:p-4 animate-fade-in select-none overflow-y-auto"
+      onClick={onClose}
+    >
+      {/* Print Specific CSS */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          #printable-thermal-receipt, #printable-thermal-receipt * {
+            visibility: visible !important;
+          }
+          #printable-thermal-receipt {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: 380px !important;
+            margin: 0 auto !important;
+            box-shadow: none !important;
+            border: 1px dashed #444 !important;
+            background: #ffffff !important;
+            padding: 16px !important;
+          }
+          .receipt-no-print {
+            display: none !important;
+          }
+        }
+      ` }} />
+
       <div 
-        className="w-full max-w-[420px] bg-white rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl border border-slate-100 animate-slide-up"
+        className="w-full max-w-[390px] my-auto flex flex-col items-center animate-slide-up relative"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-          <div>
-            <h3 className="font-extrabold text-sm text-slate-900">{session.storeName}</h3>
-            <span className="text-[11px] text-slate-400">{session.date} • {session.time}</span>
+        {/* Tombol Tutup X di pojok kanan atas modal */}
+        <button
+          onClick={() => { playTapSound(); onClose(); }}
+          className="absolute -top-3 -right-2 sm:-top-3.5 sm:-right-3.5 w-8 h-8 rounded-full bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-100 shadow-md flex items-center justify-center transition-all cursor-pointer z-20 border border-slate-200"
+          title="Tutup Struk"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        {/* --- KERTAS STRUK THERMAL ASLI (Thermal Paper Style) --- */}
+        <div 
+          id="printable-thermal-receipt"
+          className="w-full bg-[#fdfdfc] text-slate-900 rounded-2xl shadow-2xl border border-slate-300/80 p-5 font-mono text-xs relative overflow-hidden select-text"
+          style={{
+            backgroundImage: 'radial-gradient(#e5e7eb 0.75px, transparent 0.75px)',
+            backgroundSize: '12px 12px'
+          }}
+        >
+          {/* Top Accent Strip (Emerald Green Theme) */}
+          <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800" />
+
+          {/* 1. HEADER STRUK */}
+          <div className="text-center pt-2 pb-1">
+            <div className="inline-flex items-center justify-center space-x-1.5 mb-1">
+              <Store className="w-4 h-4 text-emerald-800 shrink-0" />
+              <span className="font-black text-sm tracking-wider uppercase text-slate-900">
+                LOTTE MART GROCERY - PURI INDAH
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-500 font-bold tracking-tight">
+              SMART GROCERY SYSTEM • SELF-CHECKOUT
+            </p>
+            <p className="text-[9.5px] text-slate-400">
+              Mall Puri Indah, Kembangan, Jakarta Barat
+            </p>
           </div>
-          <button 
-            onClick={() => { playTapSound(); onClose(); }}
-            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center"
-          >
-            <X className="w-4 h-4" />
-          </button>
+
+          {/* Pemisah Putus-Putus */}
+          <div className="border-b border-dashed border-gray-400 my-2" />
+
+          {/* 2. SUB-HEADER & IDENTITAS */}
+          <div className="space-y-1 text-[11px] text-slate-700">
+            <div className="flex justify-between">
+              <span className="text-slate-500">No. Struk:</span>
+              <span className="font-black text-slate-900">{normalized.id}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Tanggal:</span>
+              <span>{normalized.date}, {normalized.time}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Pelanggan:</span>
+              <span className="font-bold text-slate-900 truncate max-w-[190px]">
+                {normalized.customerName}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Kasir:</span>
+              <span className="font-bold text-slate-800">{normalized.cashier}</span>
+            </div>
+          </div>
+
+          {/* Pemisah Putus-Putus */}
+          <div className="border-b border-dashed border-gray-400 my-2" />
+
+          {/* 3. DAFTAR BARANG (ITEMS LIST) */}
+          <div className="space-y-2 py-0.5">
+            <div className="flex justify-between text-[10px] font-black uppercase text-slate-500 tracking-wider">
+              <span>ITEM / KUANTITAS</span>
+              <span>SUBTOTAL</span>
+            </div>
+
+            <div className="space-y-1.5 max-h-48 overflow-y-auto no-scrollbar pr-0.5">
+              {(normalized.items || []).map((item, idx) => (
+                <div key={idx} className="text-[11px] leading-tight">
+                  <div className="font-bold text-slate-900 break-words">
+                    {item.name}
+                  </div>
+                  <div className="flex justify-between text-[10.5px] text-slate-600 pl-1">
+                    <span>
+                      {item.quantity} {item.unit} x Rp {item.price.toLocaleString('id-ID')}
+                    </span>
+                    <span className="font-bold text-slate-900">
+                      Rp {item.lineTotal.toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Pemisah Putus-Putus */}
+          <div className="border-b border-dashed border-gray-400 my-2" />
+
+          {/* 4. TOTALS, DISKON, PAJAK & GRAND TOTAL */}
+          <div className="space-y-1 text-[11px]">
+            <div className="flex justify-between text-slate-600">
+              <span>Subtotal Belanja:</span>
+              <span className="font-bold text-slate-800">
+                Rp {normalized.subtotal.toLocaleString('id-ID')}
+              </span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>Promo yang Digunakan:</span>
+              <span className={`font-bold ${normalized.promo > 0 ? 'text-emerald-700' : 'text-slate-500'}`}>
+                {normalized.promo > 0 ? `-Rp ${normalized.promo.toLocaleString('id-ID')}` : 'Rp 0'}
+              </span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>Biaya Pajak (PPN 11%):</span>
+              <span className="font-bold text-slate-800">
+                Rp {normalized.pajak.toLocaleString('id-ID')}
+              </span>
+            </div>
+
+            <div className="border-b-2 border-dashed border-slate-700 my-1.5" />
+
+            <div className="flex justify-between text-xs font-black text-slate-900 py-0.5">
+              <span>GRAND TOTAL:</span>
+              <span className="text-sm font-black text-emerald-700">
+                Rp {normalized.grandTotal.toLocaleString('id-ID')}
+              </span>
+            </div>
+            <div className="flex justify-between text-[10px] text-slate-500">
+              <span>Metode Pembayaran:</span>
+              <span className="font-bold text-slate-700">{normalized.paymentMethod}</span>
+            </div>
+            <div className="flex justify-between text-[10px] text-slate-500">
+              <span>Status Transaksi:</span>
+              <span className="font-black text-emerald-700">{normalized.status}</span>
+            </div>
+          </div>
+
+          {/* Pemisah Putus-Putus */}
+          <div className="border-b border-dashed border-gray-400 my-2" />
+
+          {/* 5. FOOTER UCAPAN & BARCODE */}
+          <div className="text-center space-y-1.5 text-[10px] text-slate-600">
+            <p className="font-black text-slate-900">
+              *** TERIMA KASIH TELAH BERBELANJA ***
+            </p>
+            <p className="text-[9.5px] leading-tight text-slate-500">
+              Barang yang sudah dibeli tidak dapat ditukar/dikembalikan.
+            </p>
+            <p className="text-[9px] text-slate-400">
+              Simpan struk digital ini sebagai bukti sah transaksi.
+            </p>
+
+            {/* Mockup Barcode Thermal POS */}
+            <div className="pt-2 flex flex-col items-center justify-center">
+              <div className="h-8 flex items-center space-x-[2px] opacity-90 px-4 bg-white border border-slate-200 rounded py-1">
+                {[4,2,3,1,4,1,2,3,2,1,4,2,1,3,2,4,1,3,2,1,4,2,3,1,2,4,2,1,3,4].map((w, i) => (
+                  <div key={i} className="bg-slate-900 h-full" style={{ width: `${w}px` }} />
+                ))}
+              </div>
+              <span className="text-[9px] font-bold text-slate-500 tracking-widest mt-1">
+                *{normalized.id}*
+              </span>
+            </div>
+          </div>
         </div>
 
-        <div className="py-4 space-y-3">
-          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 flex items-center justify-between">
-            <span className="text-xs text-slate-500 font-bold">Total Struk:</span>
-            <span className="text-lg font-black text-emerald-800">
-              Rp {session.totalSpent.toLocaleString('id-ID')}
-            </span>
+        {/* --- TOMBOL AKSI DI BAWAH STRUK (RECEIPT ACTIONS) --- */}
+        <div className="w-full mt-3 space-y-2 receipt-no-print">
+          {/* Tombol Cetak / Simpan & Salin Teks (Grid 2 Kolom) */}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="py-2.5 px-3 bg-white hover:bg-slate-100 active:scale-98 text-slate-800 font-extrabold text-xs rounded-xl border border-slate-300 shadow-sm flex items-center justify-center space-x-1.5 transition-all cursor-pointer"
+              title="Cetak struk ke printer atau simpan sebagai PDF"
+            >
+              <Printer className="w-4 h-4 text-slate-700" />
+              <span>Cetak / Simpan</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyReceipt}
+              className="py-2.5 px-3 bg-white hover:bg-slate-100 active:scale-98 text-slate-800 font-extrabold text-xs rounded-xl border border-slate-300 shadow-sm flex items-center justify-center space-x-1.5 transition-all cursor-pointer"
+              title="Salin teks struk untuk dikirim via WhatsApp"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-600" />
+                  <span className="text-emerald-700 font-bold">Tersalin!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4 text-slate-700" />
+                  <span>Salin Teks Struk</span>
+                </>
+              )}
+            </button>
           </div>
 
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-            Rincian Item Belanja:
-          </div>
-
-          <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
-            {(session.items || []).map((i, idx) => (
-              <div key={idx} className="flex justify-between items-center text-xs p-2 bg-slate-50 rounded-lg">
-                <span className="font-bold text-slate-800">{i.name || i.nama_barang || "Item"} x {i.quantity || i.kuantitas || 1}</span>
-                <span className="font-bold text-slate-900">Rp {(((i.price || i.harga_akhir_per_satuan || 0) * (i.quantity || i.kuantitas || 1))).toLocaleString('id-ID')}</span>
-              </div>
-            ))}
-          </div>
-
-          <button
-            onClick={handleCopyText}
-            className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl flex items-center justify-center space-x-2 transition-colors"
-          >
-            <Copy className="w-3.5 h-3.5" />
-            <span>Salin Struk Teks (Untuk WhatsApp)</span>
-          </button>
+          {/* Tombol Opsional: Tutup & Selesai / Belanja Lagi (Hanya jika onFinishAndShopAgain disediakan) */}
+          {onFinishAndShopAgain && (
+            <button
+              type="button"
+              onClick={onFinishAndShopAgain}
+              className="w-full py-3 px-4 bg-emerald-800 hover:bg-emerald-900 active:scale-98 text-white font-black text-xs rounded-xl shadow-lg flex items-center justify-center space-x-2 transition-all cursor-pointer tracking-wide"
+            >
+              <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+              <span>Tutup &amp; Selesai (Belanja Lagi)</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * 4. Modal Detail Struk Belanja (Thermal Paper Style dari Riwayat Belanja)
+ */
+export function ReceiptDetailModal({ isOpen, onClose, session, currentUser }) {
+  return (
+    <ThermalPaperReceiptModal
+      isOpen={isOpen}
+      onClose={onClose}
+      data={session}
+      currentUser={currentUser}
+    />
   );
 }
 
@@ -963,302 +1288,23 @@ export function CheckoutModal({
 }
 
 /**
- * 5.5 Modal Struk Belanja Digital (Authentic Thermal POS Paper Style)
+ * 5.5 Modal Struk Belanja Digital (Thermal Paper Style dari Checkout)
  */
 export function DigitalReceiptModal({
   isOpen,
   onClose,
   receiptData,
-  onFinishAndShopAgain
+  onFinishAndShopAgain,
+  currentUser
 }) {
-  const [copied, setCopied] = useState(false);
-
-  if (!isOpen || !receiptData) return null;
-
-  const handlePrint = () => {
-    playTapSound();
-    if (typeof window !== 'undefined') {
-      window.print();
-    }
-  };
-
-  const handleCopyText = () => {
-    playTapSound();
-    const itemsText = (receiptData.items || []).map(item => {
-      const qty = item.quantity || 1;
-      const price = item.price || 0;
-      return `${item.name}\n  ${qty} ${item.unit || 'pcs'} x Rp ${price.toLocaleString('id-ID')} = Rp ${(price * qty).toLocaleString('id-ID')}`;
-    }).join('\n');
-
-    const receiptText = `====================================
-${(receiptData.storeName || 'LOTTE MART GROCERY - PURI INDAH').toUpperCase()}
-SMART GROCERY SYSTEM • SELF-CHECKOUT
-====================================
-No. Struk : ${receiptData.id}
-Tanggal   : ${receiptData.date}, ${receiptData.time}
-Kasir     : ${receiptData.cashier || 'Self-Checkout'}
-Pelanggan : ${receiptData.customerName || 'Pelanggan Setia'}
-------------------------------------
-DAFTAR BELANJA:
-${itemsText}
-------------------------------------
-Subtotal  : Rp ${(receiptData.subtotal || 0).toLocaleString('id-ID')}
-Promo     : ${receiptData.promo > 0 ? `-Rp ${receiptData.promo.toLocaleString('id-ID')}` : 'Rp 0'}
-Pajak PPN : Rp ${(receiptData.pajak || 0).toLocaleString('id-ID')}
-====================================
-GRAND TOTAL : Rp ${(receiptData.grandTotal || 0).toLocaleString('id-ID')}
-Pembayaran  : QRIS / Saldo Dompet
-Status      : LUNAS / BERHASIL
-====================================
-Terima Kasih telah berbelanja!
-Barang yang sudah dibeli tidak
-dapat ditukar/dikembalikan.
-Simpan struk ini sebagai bukti sah.
-====================================`;
-
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(receiptText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-3 sm:p-4 animate-fade-in select-none overflow-y-auto">
-      {/* Print Specific CSS */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        @media print {
-          body * {
-            visibility: hidden !important;
-          }
-          #printable-digital-receipt, #printable-digital-receipt * {
-            visibility: visible !important;
-          }
-          #printable-digital-receipt {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            max-width: 380px !important;
-            margin: 0 auto !important;
-            box-shadow: none !important;
-            border: 1px dashed #444 !important;
-            background: #ffffff !important;
-            padding: 16px !important;
-          }
-          .receipt-no-print {
-            display: none !important;
-          }
-        }
-      ` }} />
-
-      <div 
-        className="w-full max-w-[390px] my-auto flex flex-col items-center animate-slide-up"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* --- KERTAS STRUK THERMAL ASLI --- */}
-        <div 
-          id="printable-digital-receipt"
-          className="w-full bg-[#fdfdfc] text-slate-900 rounded-2xl shadow-2xl border border-slate-300/80 p-5 font-mono text-xs relative overflow-hidden"
-          style={{
-            backgroundImage: 'radial-gradient(#e5e7eb 0.75px, transparent 0.75px)',
-            backgroundSize: '12px 12px'
-          }}
-        >
-          {/* Top Accent Strip (Emerald Green Theme) */}
-          <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800" />
-
-          {/* 1. HEADER STRUK */}
-          <div className="text-center pt-2 pb-1">
-            <div className="inline-flex items-center justify-center space-x-1.5 mb-1">
-              <Store className="w-4 h-4 text-emerald-800" />
-              <span className="font-black text-sm tracking-wider uppercase text-slate-900">
-                {receiptData.storeName || 'LOTTE MART GROCERY - PURI INDAH'}
-              </span>
-            </div>
-            <p className="text-[10px] text-slate-500 font-bold tracking-tight">
-              SMART GROCERY SYSTEM • SELF-CHECKOUT
-            </p>
-            <p className="text-[9.5px] text-slate-400">
-              Mall Puri Indah, Kembangan, Jakarta Barat
-            </p>
-          </div>
-
-          {/* Pemisah Putus-Putus */}
-          <div className="border-b-2 border-dashed border-slate-400 my-2" />
-
-          {/* 2. SUB-HEADER & IDENTITAS */}
-          <div className="space-y-1 text-[11px] text-slate-700">
-            <div className="flex justify-between">
-              <span className="text-slate-500">No. Struk:</span>
-              <span className="font-black text-slate-900">{receiptData.id}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Tanggal:</span>
-              <span>{receiptData.date}, {receiptData.time}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Pelanggan:</span>
-              <span className="font-bold text-slate-900 truncate max-w-[190px]">
-                {receiptData.customerName || 'Pelanggan Setia'}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Kasir:</span>
-              <span className="font-bold text-slate-800">{receiptData.cashier || 'Self-Checkout (Smart Grocery)'}</span>
-            </div>
-          </div>
-
-          {/* Pemisah Putus-Putus */}
-          <div className="border-b-2 border-dashed border-slate-400 my-2.5" />
-
-          {/* 3. DAFTAR BARANG (ITEMS LIST) */}
-          <div className="space-y-2 py-0.5">
-            <div className="flex justify-between text-[10px] font-black uppercase text-slate-500 tracking-wider">
-              <span>ITEM / KUANTITAS</span>
-              <span>SUBTOTAL</span>
-            </div>
-
-            <div className="space-y-1.5 max-h-48 overflow-y-auto no-scrollbar pr-0.5">
-              {(receiptData.items || []).map((item, idx) => {
-                const qty = item.quantity || 1;
-                const price = item.price || 0;
-                const lineTotal = price * qty;
-                return (
-                  <div key={idx} className="text-[11px] leading-tight">
-                    <div className="font-bold text-slate-900 break-words">
-                      {item.name}
-                    </div>
-                    <div className="flex justify-between text-[10.5px] text-slate-600 pl-1">
-                      <span>{qty} {item.unit || 'pcs'} x Rp {price.toLocaleString('id-ID')}</span>
-                      <span className="font-bold text-slate-900">
-                        Rp {lineTotal.toLocaleString('id-ID')}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Pemisah Putus-Putus */}
-          <div className="border-b-2 border-dashed border-slate-400 my-2.5" />
-
-          {/* 4. TOTALS, DISKON, PAJAK & GRAND TOTAL */}
-          <div className="space-y-1 text-[11px]">
-            <div className="flex justify-between text-slate-600">
-              <span>Subtotal Belanja:</span>
-              <span className="font-bold text-slate-800">
-                Rp {(receiptData.subtotal || 0).toLocaleString('id-ID')}
-              </span>
-            </div>
-            <div className="flex justify-between text-slate-600">
-              <span>Promo yang Digunakan:</span>
-              <span className={`font-bold ${receiptData.promo > 0 ? 'text-emerald-700' : 'text-slate-500'}`}>
-                {receiptData.promo > 0 ? `-Rp ${receiptData.promo.toLocaleString('id-ID')}` : 'Rp 0'}
-              </span>
-            </div>
-            <div className="flex justify-between text-slate-600">
-              <span>Biaya Pajak (PPN 11%):</span>
-              <span className="font-bold text-slate-800">
-                Rp {(receiptData.pajak || 0).toLocaleString('id-ID')}
-              </span>
-            </div>
-
-            <div className="border-b-2 border-dashed border-slate-700 my-1.5" />
-
-            <div className="flex justify-between text-xs font-black text-slate-900 py-0.5">
-              <span>GRAND TOTAL:</span>
-              <span className="text-sm font-black text-emerald-800">
-                Rp {(receiptData.grandTotal || 0).toLocaleString('id-ID')}
-              </span>
-            </div>
-            <div className="flex justify-between text-[10px] text-slate-500">
-              <span>Metode Pembayaran:</span>
-              <span className="font-bold text-slate-700">QRIS / Saldo Dompet</span>
-            </div>
-            <div className="flex justify-between text-[10px] text-slate-500">
-              <span>Status Transaksi:</span>
-              <span className="font-black text-emerald-700">LUNAS / BERHASIL</span>
-            </div>
-          </div>
-
-          {/* Pemisah Putus-Putus */}
-          <div className="border-b-2 border-dashed border-slate-400 my-3" />
-
-          {/* 5. FOOTER UCAPAN & BARCODE */}
-          <div className="text-center space-y-1.5 text-[10px] text-slate-600">
-            <p className="font-black text-slate-900">
-              *** TERIMA KASIH TELAH BERBELANJA ***
-            </p>
-            <p className="text-[9.5px] leading-tight text-slate-500">
-              Barang yang sudah dibeli tidak dapat ditukar/dikembalikan.
-            </p>
-            <p className="text-[9px] text-slate-400">
-              Simpan struk digital ini sebagai bukti sah transaksi.
-            </p>
-
-            {/* Mockup Barcode Thermal POS */}
-            <div className="pt-2 flex flex-col items-center justify-center">
-              <div className="h-8 flex items-center space-x-[2px] opacity-85 px-4 bg-white border border-slate-200 rounded py-1">
-                {[4,2,3,1,4,1,2,3,2,1,4,2,1,3,2,4,1,3,2,1,4,2,3,1,2,4,2,1,3,4].map((w, i) => (
-                  <div key={i} className="bg-slate-900 h-full" style={{ width: `${w}px` }} />
-                ))}
-              </div>
-              <span className="text-[9px] font-bold text-slate-500 tracking-widest mt-1">
-                *{receiptData.id}*
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* --- TOMBOL AKSI DI BAWAH STRUK (RECEIPT ACTIONS) --- */}
-        <div className="w-full mt-3 space-y-2 receipt-no-print">
-          {/* Tombol Cetak / Simpan & Salin Teks */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="py-2.5 px-3 bg-white hover:bg-slate-100 active:scale-98 text-slate-800 font-extrabold text-xs rounded-xl border border-slate-300 shadow-sm flex items-center justify-center space-x-1.5 transition-all cursor-pointer"
-              title="Cetak struk ke printer atau simpan sebagai PDF"
-            >
-              <Printer className="w-4 h-4 text-slate-700" />
-              <span>Cetak / Simpan</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleCopyText}
-              className="py-2.5 px-3 bg-white hover:bg-slate-100 active:scale-98 text-slate-800 font-extrabold text-xs rounded-xl border border-slate-300 shadow-sm flex items-center justify-center space-x-1.5 transition-all cursor-pointer"
-              title="Salin teks struk untuk dikirim via WhatsApp"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4 text-emerald-600" />
-                  <span className="text-emerald-700 font-bold">Tersalin!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4 text-slate-700" />
-                  <span>Salin Teks Struk</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Tombol Utama: Tutup & Selesai / Belanja Lagi (Emerald Green) */}
-          <button
-            type="button"
-            onClick={onFinishAndShopAgain}
-            className="w-full py-3 px-4 bg-emerald-800 hover:bg-emerald-900 active:scale-98 text-white font-black text-xs rounded-xl shadow-lg flex items-center justify-center space-x-2 transition-all cursor-pointer tracking-wide"
-          >
-            <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
-            <span>Tutup &amp; Selesai (Belanja Lagi)</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-    </div>
+    <ThermalPaperReceiptModal
+      isOpen={isOpen}
+      onClose={onClose}
+      data={receiptData}
+      currentUser={currentUser}
+      onFinishAndShopAgain={onFinishAndShopAgain}
+    />
   );
 }
 

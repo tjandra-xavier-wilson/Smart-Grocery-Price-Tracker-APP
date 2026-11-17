@@ -1610,6 +1610,7 @@ export default function Home() {
                   isOpen={Boolean(selectedReceipt)}
                   onClose={() => setSelectedReceipt(null)}
                   session={selectedReceipt}
+                  currentUser={currentUser}
                 />
 
                 <OrderSummaryModal
@@ -1641,6 +1642,7 @@ export default function Home() {
                   onClose={handleFinishAndShopAgain}
                   receiptData={digitalReceiptData}
                   onFinishAndShopAgain={handleFinishAndShopAgain}
+                  currentUser={currentUser}
                 />
 
                 <EmptyCartModal
