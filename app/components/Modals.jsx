@@ -1256,8 +1256,6 @@ Simpan struk ini sebagai bukti sah.
             <span>Tutup &amp; Selesai (Belanja Lagi)</span>
             <ArrowRight className="w-4 h-4" />
           </button>
-            <ArrowRight className="w-4 h-4" />
-          </button>
         </div>
       </div>
     </div>
