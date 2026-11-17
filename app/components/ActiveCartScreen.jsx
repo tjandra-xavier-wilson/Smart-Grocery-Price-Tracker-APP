@@ -56,16 +56,16 @@ export default function ActiveCartScreen({
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
 
-  // 1. Menu Kategori Horizontal (Scrollable Carousel sesuai urutan spesifikasi)
+  // 1. Menu Kategori Horizontal (100% Representasi Emoji)
   const CART_CATEGORIES = [
-    { id: 'all', name: 'Semua', icon: Sparkles },
-    { id: 'sembako', name: 'Bahan Pokok', icon: ShoppingBag },
-    { id: 'sayur', name: 'Sayuran Segar', icon: Carrot },
-    { id: 'buah', name: 'Buah-buahan', icon: Apple },
-    { id: 'daging', name: 'Daging dan Lauk', icon: Fish },
-    { id: 'camilan', name: 'Camilan', icon: Cookie },
-    { id: 'minuman', name: 'Minuman', icon: Coffee },
-    { id: 'kebersihan', name: 'Peralatan Kebersihan', icon: Brush }
+    { id: 'all', name: 'Semua', emoji: '✨' },
+    { id: 'sembako', name: 'Bahan Pokok', emoji: '🌾' },
+    { id: 'sayur', name: 'Sayuran Segar', emoji: '🥬' },
+    { id: 'buah', name: 'Buah-buahan', emoji: '🍎' },
+    { id: 'daging', name: 'Daging dan Lauk', emoji: '🥩' },
+    { id: 'camilan', name: 'Camilan', emoji: '🍪' },
+    { id: 'minuman', name: 'Minuman', emoji: '🧃' },
+    { id: 'kebersihan', name: 'Peralatan Kebersihan', emoji: '🧼' }
   ];
 
   // 2. Data Katalog Rekomendasi Belanja Berdasarkan Kategori Lengkap (100% Emoji, Bebas Tag <img>)
@@ -657,7 +657,6 @@ export default function ActiveCartScreen({
         >
           {CART_CATEGORIES.map((cat) => {
             const isSelected = activeCategory === cat.id;
-            const Icon = cat.icon;
 
             return (
               <button
@@ -678,9 +677,7 @@ export default function ActiveCartScreen({
                       : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
                 >
-                  <Icon className={`w-6 h-6 transition-transform group-hover:scale-110 ${
-                    isSelected ? 'stroke-[2.5]' : 'stroke-2 text-slate-700'
-                  }`} />
+                  <span className="text-2xl select-none transition-transform group-hover:scale-110">{cat.emoji}</span>
                 </div>
 
                 <span className={`text-[10px] mt-1.5 text-center leading-tight transition-colors whitespace-nowrap px-0.5 ${

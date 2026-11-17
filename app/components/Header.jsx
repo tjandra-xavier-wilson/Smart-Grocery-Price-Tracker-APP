@@ -99,11 +99,7 @@ export default function Header({
                 className="relative w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-xs active-press overflow-hidden border border-indigo-400"
                 title={currentUser ? `Akun: ${currentUser.email} (Single-User)` : 'Masuk Akun'}
               >
-                {currentUser?.avatar_url ? (
-                  <img src={currentUser.avatar_url} alt={currentUser.name} className="w-full h-full object-cover" />
-                ) : (
-                  <span>{currentUser?.name?.[0] || 'W'}</span>
-                )}
+                <span className="text-base select-none">👤</span>
                 {/* Tiny Google indicator dot */}
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-white rounded-full flex items-center justify-center shadow-xs">
                   <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />

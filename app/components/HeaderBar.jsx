@@ -45,15 +45,7 @@ export default function HeaderBar({
             className="w-10 h-10 rounded-full bg-red-600 text-white flex items-center justify-center font-bold text-xs shadow-xs hover:ring-2 hover:ring-red-400 transition-all cursor-pointer overflow-hidden relative shrink-0"
             title="Kelola Akun Pemilik"
           >
-            {currentUser?.avatar_url ? (
-              <img 
-                src={currentUser.avatar_url} 
-                alt="Avatar" 
-                className="w-full h-full object-cover" 
-              />
-            ) : (
-              <User className="w-5 h-5 text-white" />
-            )}
+            <span className="text-xl select-none">👤</span>
           </button>
 
           {/* Store Name & Ganti Button */}

@@ -1287,11 +1287,7 @@ export function UserProfileModal({ isOpen, onClose, currentUser, onLogout }) {
         </div>
 
         <div className="w-16 h-16 rounded-full bg-emerald-800 text-white mx-auto flex items-center justify-center font-bold text-xl shadow-md overflow-hidden mb-3">
-          {currentUser?.avatar_url ? (
-            <img src={currentUser.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-          ) : (
-            <span>WT</span>
-          )}
+          <span className="text-3xl select-none">👤</span>
         </div>
 
         <h4 className="text-base font-extrabold text-slate-900">{currentUser?.name || 'Wilson Tjandra'}</h4>

@@ -331,11 +331,7 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
                   >
                     <div className="flex items-center space-x-2.5 min-w-0 pr-2">
                       <div className="w-7 h-7 rounded-full bg-emerald-800 text-white flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden shadow-2xs">
-                        {acc.avatar_url ? (
-                          <img src={acc.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                        ) : (
-                          <span>{(acc.name || acc.email).charAt(0).toUpperCase()}</span>
-                        )}
+                        <span className="text-sm select-none">👤</span>
                       </div>
                       <div className="min-w-0">
                         <div className="text-xs font-bold text-slate-900 truncate leading-snug flex items-center space-x-1">

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import SplashScreen from './components/SplashScreen';
-import HeaderBackgroundTrolley from './components/HeaderBackgroundTrolley';
 import HeaderBar from './components/HeaderBar';
 import BottomNav from './components/BottomNav';
 import LoginScreen from './components/LoginScreen';
@@ -325,7 +324,9 @@ export default function Home() {
             if (savedCart) {
               try {
                 const parsedCart = JSON.parse(savedCart);
-                if (Array.isArray(parsedCart)) setCartItems(parsedCart);
+                if (Array.isArray(parsedCart)) {
+                  setCartItems(parsedCart.map(({ image, ...rest }) => rest));
+                }
               } catch (e) {}
             }
 
@@ -908,7 +909,10 @@ export default function Home() {
     if (typeof localStorage !== 'undefined') {
       try {
         const saved = localStorage.getItem(userCartKey);
-        if (saved) initialUserCart = JSON.parse(saved);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) initialUserCart = parsed.map(({ image, ...rest }) => rest);
+        }
       } catch (e) {}
     }
     setCartItems(initialUserCart);
@@ -1308,13 +1312,10 @@ export default function Home() {
         ) : (
           <>
             {/* ============================================================== */}
-            {/* HEADER TOP BAR CONTAINER: Sticky Header dengan Background Troli Bergerak Kontinu */}
+            {/* HEADER TOP BAR CONTAINER: Clean Production Header */}
             {/* ============================================================== */}
-            <header className="relative overflow-hidden bg-white/95 backdrop-blur-md border-b border-slate-200/80 shrink-0 sticky top-0 z-30 shadow-2xs">
-              {/* Background Animasi Troli & Garis Angin Kecepatan Tinggi (Continuous Loop) */}
-              <HeaderBackgroundTrolley />
-
-              {/* Foreground UI Elements (z-10: Nama Toko, Avatar, Tanggal Tetap Jelas) */}
+            <header className="relative bg-white/95 backdrop-blur-md border-b border-slate-200/80 shrink-0 sticky top-0 z-30 shadow-2xs">
+              {/* Foreground UI Elements */}
               <div className="relative z-10">
                 {/* Global Header Bar: Info Toko, Avatar, Tanggal, Limit Budget */}
                 {isAuthenticated && (

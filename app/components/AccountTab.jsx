@@ -56,11 +56,7 @@ export default function AccountTab({ currentUser, onOpenAuthModal, onLogout }) {
       {/* Profile Header with Google Authentication Badge */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-card flex items-center space-x-3.5 relative overflow-hidden">
         <div className="relative w-14 h-14 rounded-full bg-indigo-600 text-white flex items-center justify-center font-extrabold text-xl shadow-brand shrink-0 overflow-hidden border border-indigo-400">
-          {currentUser?.avatar_url ? (
-            <img src={currentUser.avatar_url} alt={displayName} className="w-full h-full object-cover" />
-          ) : (
-            <span>{displayName.charAt(0)}</span>
-          )}
+          <span className="text-3xl select-none">👤</span>
         </div>
 
         <div className="flex-1 min-w-0">
