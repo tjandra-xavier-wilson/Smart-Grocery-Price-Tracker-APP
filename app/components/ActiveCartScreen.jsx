@@ -534,18 +534,38 @@ export default function ActiveCartScreen({
     return currentCategoryItems.slice(startIndex, startIndex + itemsPerPage);
   }, [currentCategoryItems, currentPage, itemsPerPage]);
 
-  // Helper nomor halaman angka "1, 2, 3..."
+  // Helper nomor halaman angka "1, 2, 3..." dengan smart ellipsis (halaman 1, current-1, current, current+1, terakhir)
   const getPageNumbers = () => {
     if (totalPages <= 5) {
       return Array.from({ length: totalPages }, (_, i) => i + 1);
     }
-    if (currentPage <= 3) {
-      return [1, 2, 3, 4, '...', totalPages];
+
+    const pages = [];
+    const leftBound = Math.max(2, currentPage - 1);
+    const rightBound = Math.min(totalPages - 1, currentPage + 1);
+
+    // 1. Halaman pertama selalu tampil
+    pages.push(1);
+
+    // 2. Ellipsis kiri jika ada jeda antara halaman 1 dan leftBound
+    if (leftBound > 2) {
+      pages.push('...');
     }
-    if (currentPage >= totalPages - 2) {
-      return [1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+
+    // 3. Halaman di sekitar current (sebelum, current, sesudah)
+    for (let i = leftBound; i <= rightBound; i++) {
+      pages.push(i);
     }
-    return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+
+    // 4. Ellipsis kanan jika ada jeda antara rightBound dan totalPages
+    if (rightBound < totalPages - 1) {
+      pages.push('...');
+    }
+
+    // 5. Halaman terakhir selalu tampil
+    pages.push(totalPages);
+
+    return pages;
   };
 
   const handleAddRecommended = (prod) => {
@@ -1027,7 +1047,7 @@ export default function ActiveCartScreen({
           </div>
 
           {/* 3. Komponen Navigasi Halaman (Pagination UI) */}
-          <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-1 select-none">
+          <div className="pt-2.5 p-2 px-2 sm:px-4 border-t border-slate-100 flex flex-wrap justify-center items-center gap-2 select-none">
             {/* Tombol Sebelumnya */}
             <button
               type="button"
@@ -1039,18 +1059,18 @@ export default function ActiveCartScreen({
               className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 shrink-0"
               title="Halaman Sebelumnya"
             >
-              <ChevronLeft className="w-3.5 h-3.5" />
+              <ChevronLeft className="w-3.5 h-3.5 shrink-0" />
               <span className="hidden sm:inline">Sebelumnya</span>
             </button>
 
-            {/* Nomor Halaman Angka (1, 2, 3...) */}
-            <div className="flex items-center space-x-1">
+            {/* Nomor Halaman Angka (1, ..., 4, 5, 6, ..., 9) dengan container horizontal scroll aman */}
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar shrink-0 max-w-full py-0.5">
               {getPageNumbers().map((pageNum, idx) => {
                 if (pageNum === '...') {
                   return (
                     <span 
                       key={`dots-${idx}`} 
-                      className="w-7 h-7 flex items-center justify-center text-xs text-slate-400 font-bold select-none"
+                      className="w-7 h-7 flex items-center justify-center text-xs text-slate-400 font-bold select-none shrink-0"
                     >
                       ...
                     </span>
@@ -1065,7 +1085,7 @@ export default function ActiveCartScreen({
                       playTapSound();
                       setCurrentPage(pageNum);
                     }}
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all cursor-pointer active:scale-95 ${
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all cursor-pointer active:scale-95 shrink-0 ${
                       isActive
                         ? 'bg-emerald-700 text-white shadow-xs font-extrabold'
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200 font-semibold'
@@ -1090,7 +1110,7 @@ export default function ActiveCartScreen({
               title="Halaman Selanjutnya"
             >
               <span className="hidden sm:inline">Selanjutnya</span>
-              <ChevronRight className="w-3.5 h-3.5" />
+              <ChevronRight className="w-3.5 h-3.5 shrink-0" />
             </button>
           </div>
         </div>
