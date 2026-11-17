@@ -36,26 +36,18 @@ export default function ProductCard({
       className="bg-white rounded-2xl border border-slate-200/80 p-2.5 shadow-card hover:shadow-md transition-all duration-200 flex flex-col justify-between group relative overflow-hidden active-press"
     >
       <div>
-        {/* Product Emoji Container (100% Emoji, No <img> Tag) */}
-        <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-100 mb-2 flex items-center justify-center">
+        {/* Product Emoji Container (Soft Pink Rounded Box matching Image 2) */}
+        <div className="w-20 h-20 mx-auto rounded-2xl bg-rose-50/70 border border-rose-100/60 mb-2.5 flex items-center justify-center text-4xl shadow-2xs relative">
           <ProductEmojiBox 
             name={product.name} 
             category={product.category} 
-            className="w-full h-full text-5xl bg-slate-50" 
+            className="w-full h-full text-4xl bg-transparent border-none shadow-none" 
           />
 
           {/* Discount Badge Overlay */}
           {product.discountPercent > 0 && (
-            <div className="absolute top-2 left-2 bg-red-600 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-full shadow-xs">
+            <div className="absolute top-1 left-1 bg-red-600 text-white font-extrabold text-[9px] px-1.5 py-0.2 rounded-full shadow-xs">
               {product.discountPercent}% OFF
-            </div>
-          )}
-
-          {/* Sold count / Star rating badge */}
-          {product.rating && (
-            <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-xs text-slate-800 text-[10px] font-bold px-1.5 py-0.5 rounded-md shadow-xs flex items-center space-x-0.5">
-              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-              <span>{product.rating}</span>
             </div>
           )}
         </div>

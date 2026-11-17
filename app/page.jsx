@@ -376,7 +376,17 @@ export default function Home() {
       console.warn('LocalStorage load error:', e);
     }
 
-    // b. Auto-update Service Worker & bersihkan cache lama di browser laptop
+    // b. Auto-update Service Worker & bersihkan cache lama di browser laptop/HP
+    if (typeof window !== 'undefined' && 'caches' in window) {
+      caches.keys().then((names) => {
+        names.forEach((name) => {
+          if (name !== 'sakugrosir-pwa-v6') {
+            caches.delete(name);
+          }
+        });
+      }).catch(() => {});
+    }
+
     if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').then((reg) => {
         reg.update().catch(() => {});

@@ -90,13 +90,13 @@ export function getProductEmoji(itemName = '', category = '') {
 
 /**
  * Standard Uniform Product Emoji Container Component
- * Strictly styled to Tailwind: `w-16 h-16 bg-gray-100 rounded-md flex items-center justify-center text-3xl shadow-sm`
+ * Styled with soft-pink rounded container matching Image 2 mockup
  */
 export function ProductEmojiBox({ name, category, className = '' }) {
   const emoji = getProductEmoji(name, category);
   return (
     <div 
-      className={`w-16 h-16 bg-gray-100 rounded-md flex items-center justify-center text-3xl shadow-sm shrink-0 select-none ${className}`}
+      className={`w-16 h-16 bg-rose-50/70 border border-rose-100/60 rounded-2xl flex items-center justify-center text-3xl shadow-2xs shrink-0 select-none ${className}`}
       aria-label={name || 'Produk'}
     >
       <span>{emoji}</span>

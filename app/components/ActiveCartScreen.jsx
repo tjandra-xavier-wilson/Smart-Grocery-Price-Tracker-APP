@@ -103,6 +103,15 @@ export default function ActiveCartScreen({
           description: 'Garam dapur beryodium murni standar SNI'
         },
         {
+          id: 'rec-sembako-indomie',
+          name: 'Indomie Goreng (5 pcs)',
+          category: 'Bahan Pokok',
+          unit: '5 pcs',
+          price: 15500,
+          lastMonthPrice: 15500,
+          description: 'Mie instan goreng favorit keluarga Indonesia'
+        },
+        {
           id: 'rec-sembako-4',
           name: 'Minyak Goreng Sawit Murni',
           category: 'Bahan Pokok',
@@ -292,6 +301,15 @@ export default function ActiveCartScreen({
       iconEmoji: '🧼',
       items: [
         {
+          id: 'rec-kebersihan-lifebuoy',
+          name: 'Sabun Mandi Lifebuoy',
+          category: 'Peralatan Kebersihan',
+          unit: '4 pcs',
+          price: 16000,
+          lastMonthPrice: 16000,
+          description: 'Perlindungan kuman & higienis untuk keluarga'
+        },
+        {
           id: 'rec-kebersihan-1',
           name: 'Sabun Mandi Detoff 400ml',
           category: 'Peralatan Kebersihan',
@@ -339,55 +357,50 @@ export default function ActiveCartScreen({
     }
   };
 
-  // Render Product Card (100% Emoji Container w-16 h-16 & Price Fluctuation Badge)
-  const renderProductCard = (prod) => (
-    <div 
-      key={prod.id}
-      className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-red-50/30 hover:border-red-200 flex items-center justify-between gap-3 transition-all group"
-    >
-      {/* Bagian Kiri: Container Emoji Kotak Bersudut Tumpul (w-16 h-16 bg-gray-100 rounded-md) */}
-      <ProductEmojiBox name={prod.name} category={prod.category} />
-
-      {/* Bagian Tengah: Judul produk, Deskripsi singkat, Kategori & Fluktuasi Harga */}
-      <div className="flex-1 min-w-0">
-        <h5 className="text-xs font-bold text-slate-900 truncate leading-snug">
-          {prod.name}
-        </h5>
-        <p className="text-[10.5px] text-slate-500 line-clamp-1 mt-0.5">
-          {prod.description}
-        </p>
-        <div className="flex items-center space-x-1.5 mt-1">
-          <span className="text-[9px] font-semibold text-slate-500 bg-white border border-slate-200 px-1.5 py-0.2 rounded">
-            {prod.unit}
-          </span>
-          <span className="text-[9px] font-bold text-red-600 bg-red-50 px-1.5 py-0.2 rounded border border-red-100">
-            {prod.category}
-          </span>
-        </div>
-        {/* Indikator Fluktuasi Harga Skenario Uji 4 */}
-        <div className="mt-1">
-          <PriceFluctuationBadge price={prod.price} lastMonthPrice={prod.lastMonthPrice} showOldPrice={true} />
-        </div>
-      </div>
-
-      {/* Bagian Kanan: Nominal harga & Tombol Tambah Lotte Red */}
-      <div className="text-right shrink-0 flex items-center space-x-2">
+  // Render Product Card (Grid 2-Column Card matching User's Mockup in Image 2)
+  const renderProductCard = (prod) => {
+    const emoji = getProductEmoji(prod.name, prod.category);
+    return (
+      <div 
+        key={prod.id}
+        className="bg-white rounded-2xl border border-rose-100/90 p-3 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
+      >
         <div>
-          <span className="text-xs font-black text-slate-900 block">
-            Rp {prod.price.toLocaleString('id-ID')}
-          </span>
+          {/* Top Emoji Container: Soft Pink Rounded Box exactly like Image 2 */}
+          <div className="w-20 h-20 mx-auto rounded-2xl bg-rose-50/70 border border-rose-100/60 flex items-center justify-center text-4xl mb-2.5 shadow-2xs group-hover:scale-105 transition-transform select-none">
+            <span>{emoji}</span>
+          </div>
+
+          {/* Product Title */}
+          <h5 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug line-clamp-2 min-h-[36px]">
+            {prod.name}
+          </h5>
+
+          {/* Price Fluctuation Badge (SRS F-04 Skenario Uji 4) */}
+          <div className="mt-1">
+            <PriceFluctuationBadge price={prod.price} lastMonthPrice={prod.lastMonthPrice} showOldPrice={true} />
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => handleAddRecommended(prod)}
-          className="w-8 h-8 rounded-xl bg-red-600 hover:bg-red-700 active:scale-95 text-white flex items-center justify-center shadow-xs transition-all cursor-pointer"
-          title="Tambah ke Keranjang Belanja"
-        >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
-        </button>
+
+        <div className="mt-2.5">
+          {/* Price in Bold Lotte Red */}
+          <div className="text-sm sm:text-base font-extrabold text-[#ED1C24] mb-2 leading-none">
+            Rp {prod.price.toLocaleString('id-ID')}
+          </div>
+
+          {/* Full-width + Tambah Button */}
+          <button
+            type="button"
+            onClick={() => handleAddRecommended(prod)}
+            className="w-full py-2 bg-[#ED1C24] hover:bg-red-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center space-x-1 cursor-pointer"
+            title={`Tambah ${prod.name} ke Keranjang`}
+          >
+            <span>+ Tambah</span>
+          </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Calculations
   const totalCartPrice = cartItems.reduce((acc, item) => {
@@ -770,14 +783,14 @@ export default function ActiveCartScreen({
                     <span className="text-[9.5px] font-bold text-slate-400">({catGroup.items.length})</span>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2.5">
                     {catGroup.items.map((prod) => renderProductCard(prod))}
                   </div>
                 </div>
               ))
             ) : (
-              // Mode Kategori Spesifik: Tampilkan daftar produk kategori terkait
-              <div className="space-y-2">
+              // Mode Kategori Spesifik: Tampilkan daftar produk kategori terkait dalam 2 kolom grid
+              <div className="grid grid-cols-2 gap-2.5">
                 {(RECOMMENDED_PRODUCTS_BY_CATEGORY[activeCategory]?.items || []).map((prod) => renderProductCard(prod))}
               </div>
             )}
