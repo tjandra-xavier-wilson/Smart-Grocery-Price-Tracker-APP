@@ -16,6 +16,7 @@ import {
   ReceiptDetailModal, 
   OrderSummaryModal,
   CheckoutModal,
+  DigitalReceiptModal,
   UserProfileModal,
   DeleteConfirmationModal,
   EmptyCartModal
@@ -216,6 +217,8 @@ export default function Home() {
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
   const [isOrderSummaryOpen, setIsOrderSummaryOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [isDigitalReceiptOpen, setIsDigitalReceiptOpen] = useState(false);
+  const [digitalReceiptData, setDigitalReceiptData] = useState(null);
   const [isEmptyCartModalOpen, setIsEmptyCartModalOpen] = useState(false);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
@@ -1125,6 +1128,35 @@ export default function Home() {
       // Mencegah pergeseran timezone UTC yang mengubah tanggal (misal 1 November menjadi 31 Oktober)
       const safeShoppingDate = toISODateString(transactionDate);
 
+      // Hitung rincian subtotal, promo potongan, dan simulasi pajak PPN 11%
+      const subtotalVal = cartItems.reduce((acc, i) => acc + ((i.originalPrice || i.price) * (i.quantity || 1)), 0);
+      const promoVal = Math.max(0, cartItems.reduce((acc, i) => acc + (((i.originalPrice || i.price) - i.price) * (i.quantity || 1)), 0));
+      const pajakVal = Math.round(totalCartPrice * 0.11);
+      const grandTotalVal = totalCartPrice + pajakVal;
+
+      // Ambil snapshot lengkap data belanja untuk dicetak pada Struk Belanja Digital
+      const receiptSnapshot = {
+        id: 'TRX-' + Date.now().toString().slice(-6) + '-' + Math.floor(1000 + Math.random() * 9000),
+        storeName: currentStore,
+        date: toIndoDisplayDate(safeShoppingDate),
+        time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
+        customerName: currentUser?.user_metadata?.full_name || currentUser?.name || currentUser?.email?.split('@')[0] || 'Pelanggan Setia',
+        cashier: 'Self-Checkout (Smart Grocery)',
+        items: cartItems.map(i => ({
+          name: i.name,
+          price: i.price,
+          originalPrice: i.originalPrice || i.price,
+          quantity: i.quantity || 1,
+          unit: i.unit || 'pcs',
+          category: i.category || 'Bahan Pokok'
+        })),
+        subtotal: subtotalVal,
+        promo: promoVal,
+        pajak: pajakVal,
+        grandTotal: grandTotalVal,
+        rawTotalSpent: totalCartPrice
+      };
+
       const saveRes = await saveShoppingTrip({
         user_id: currentUser?.id,
         shopping_date: safeShoppingDate,
@@ -1160,14 +1192,14 @@ export default function Home() {
         notes: currentStore,
         totalSpent: totalCartPrice,
         total_spent: totalCartPrice,
-        savings: 0,
+        savings: promoVal,
         date: toIndoDisplayDate(safeShoppingDate),
         shopping_date: safeShoppingDate,
         time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
         itemCount: cartItems.reduce((acc, i) => acc + i.quantity, 0),
         items_count: cartItems.reduce((acc, i) => acc + i.quantity, 0),
         statusTier: 'safe',
-        statusBadge: isLocalStorageFallback ? 'Tersimpan Offline' : 'Tersimpan di Cloud',
+        statusBadge: isLocalStorageFallback ? 'Tersimpan Offline' : 'Transaksi Sukses',
         iconType: 'cart',
         items: cartItems.map(i => ({
           ...i,
@@ -1200,16 +1232,27 @@ export default function Home() {
         loadCloudHistoryRef.current(activeUserId).catch(() => {});
       }
 
-      setCartItems([]);
-      persistState([]);
-      setActiveTab('history');
+      // 5. Buka Struk Belanja Digital tepat setelah transaksi & animasi selesai
+      setDigitalReceiptData(receiptSnapshot);
+      setIsCheckoutModalOpen(false);
+      setIsDigitalReceiptOpen(true);
     } catch (err) {
       console.warn('[Checkout Cloud Save Error]:', err);
     } finally {
-      // 5. Kembalikan state loading ke false dan tutup modal checkout
+      // Kembalikan state loading ke false
       setIsCheckoutLoading(false);
       setIsCheckoutModalOpen(false);
     }
+  };
+
+  // Handler untuk menutup Struk Belanja Digital, mengosongkan keranjang, dan belanja lagi
+  const handleFinishAndShopAgain = () => {
+    playTapSound();
+    setCartItems([]);
+    persistState([]);
+    setIsDigitalReceiptOpen(false);
+    setDigitalReceiptData(null);
+    setActiveTab('cart');
   };
 
   const getActiveTabTitle = () => {
@@ -1402,6 +1445,13 @@ export default function Home() {
                   cartItems={cartItems}
                   onConfirmCheckout={handleConfirmCheckout}
                   isCheckoutLoading={isCheckoutLoading}
+                />
+
+                <DigitalReceiptModal
+                  isOpen={isDigitalReceiptOpen}
+                  onClose={handleFinishAndShopAgain}
+                  receiptData={digitalReceiptData}
+                  onFinishAndShopAgain={handleFinishAndShopAgain}
                 />
 
                 <EmptyCartModal

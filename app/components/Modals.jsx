@@ -18,7 +18,10 @@ import {
   CheckCircle2,
   ShoppingBag,
   ShoppingCart,
-  ArrowRight
+  ArrowRight,
+  Printer,
+  Download,
+  Share2
 } from 'lucide-react';
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
 import { playTapSound, playSuccessSound, playWarningBeep } from '../utils/sound';
@@ -683,13 +686,13 @@ export function CheckoutModal({
       setStage('success');
     }, 2300);
 
-    // 2. Fase Cleanup: Setelah centang sukses tampil selama ~1.15s (total ~3.45s)
+    // 2. Fase Cleanup: Setelah centang sukses tampil selama ~0.7s (total ~3.0s)
     const timerCleanup = setTimeout(async () => {
       if (onConfirmCheckout) {
         await onConfirmCheckout();
       }
       onClose();
-    }, 3450);
+    }, 3000);
 
     return () => {
       clearTimeout(timerSuccess);
@@ -948,6 +951,306 @@ export function CheckoutModal({
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 5.5 Modal Struk Belanja Digital (Authentic Thermal POS Paper Style)
+ */
+export function DigitalReceiptModal({
+  isOpen,
+  onClose,
+  receiptData,
+  onFinishAndShopAgain
+}) {
+  const [copied, setCopied] = useState(false);
+
+  if (!isOpen || !receiptData) return null;
+
+  const handlePrint = () => {
+    playTapSound();
+    if (typeof window !== 'undefined') {
+      window.print();
+    }
+  };
+
+  const handleCopyText = () => {
+    playTapSound();
+    const itemsText = (receiptData.items || []).map(item => {
+      const qty = item.quantity || 1;
+      const price = item.price || 0;
+      return `${item.name}\n  ${qty} ${item.unit || 'pcs'} x Rp ${price.toLocaleString('id-ID')} = Rp ${(price * qty).toLocaleString('id-ID')}`;
+    }).join('\n');
+
+    const receiptText = `====================================
+${(receiptData.storeName || 'LOTTE MART').toUpperCase()}
+SMART GROCERY SYSTEM • SELF-CHECKOUT
+====================================
+No. Struk : ${receiptData.id}
+Tanggal   : ${receiptData.date}, ${receiptData.time}
+Kasir     : ${receiptData.cashier || 'Self-Checkout'}
+Pelanggan : ${receiptData.customerName || 'Pelanggan Setia'}
+------------------------------------
+DAFTAR BELANJA:
+${itemsText}
+------------------------------------
+Subtotal  : Rp ${(receiptData.subtotal || 0).toLocaleString('id-ID')}
+Promo     : ${receiptData.promo > 0 ? `-Rp ${receiptData.promo.toLocaleString('id-ID')}` : 'Rp 0'}
+Pajak PPN : Rp ${(receiptData.pajak || 0).toLocaleString('id-ID')}
+====================================
+GRAND TOTAL : Rp ${(receiptData.grandTotal || 0).toLocaleString('id-ID')}
+Pembayaran  : QRIS / Saldo Dompet
+Status      : LUNAS / BERHASIL
+====================================
+Terima Kasih telah berbelanja!
+Barang yang sudah dibeli tidak
+dapat ditukar/dikembalikan.
+Simpan struk ini sebagai bukti sah.
+====================================`;
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(receiptText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-3 sm:p-4 animate-fade-in select-none overflow-y-auto">
+      {/* Print Specific CSS */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          #printable-digital-receipt, #printable-digital-receipt * {
+            visibility: visible !important;
+          }
+          #printable-digital-receipt {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: 380px !important;
+            margin: 0 auto !important;
+            box-shadow: none !important;
+            border: 1px dashed #444 !important;
+            background: #ffffff !important;
+            padding: 16px !important;
+          }
+          .receipt-no-print {
+            display: none !important;
+          }
+        }
+      ` }} />
+
+      <div 
+        className="w-full max-w-[390px] my-auto flex flex-col items-center animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* --- KERTAS STRUK THERMAL ASLI --- */}
+        <div 
+          id="printable-digital-receipt"
+          className="w-full bg-[#fdfdfc] text-slate-900 rounded-2xl shadow-2xl border border-slate-300/80 p-5 font-mono text-xs relative overflow-hidden"
+          style={{
+            backgroundImage: 'radial-gradient(#e5e7eb 0.75px, transparent 0.75px)',
+            backgroundSize: '12px 12px'
+          }}
+        >
+          {/* Top Accent Strip */}
+          <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700" />
+
+          {/* 1. HEADER STRUK */}
+          <div className="text-center pt-2 pb-1">
+            <div className="inline-flex items-center justify-center space-x-1.5 mb-1">
+              <Store className="w-4 h-4 text-emerald-800" />
+              <span className="font-black text-sm tracking-wider uppercase text-slate-900">
+                {receiptData.storeName || 'LOTTE MART'}
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-500 font-bold tracking-tight">
+              SMART GROCERY SYSTEM • SELF-CHECKOUT
+            </p>
+            <p className="text-[9.5px] text-slate-400">
+              Mall Puri Indah, Kembangan, Jakarta Barat
+            </p>
+          </div>
+
+          {/* Pemisah Putus-Putus */}
+          <div className="border-b-2 border-dashed border-slate-400 my-2" />
+
+          {/* 2. SUB-HEADER & IDENTITAS */}
+          <div className="space-y-1 text-[11px] text-slate-700">
+            <div className="flex justify-between">
+              <span className="text-slate-500">No. Struk:</span>
+              <span className="font-black text-slate-900">{receiptData.id}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Tanggal:</span>
+              <span>{receiptData.date}, {receiptData.time}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Pelanggan:</span>
+              <span className="font-bold text-slate-900 truncate max-w-[190px]">
+                {receiptData.customerName || 'Pelanggan Setia'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Kasir:</span>
+              <span className="font-bold text-slate-800">{receiptData.cashier || 'Self-Checkout (Smart Grocery)'}</span>
+            </div>
+          </div>
+
+          {/* Pemisah Putus-Putus */}
+          <div className="border-b-2 border-dashed border-slate-400 my-2.5" />
+
+          {/* 3. DAFTAR BARANG (ITEMS LIST) */}
+          <div className="space-y-2 py-0.5">
+            <div className="flex justify-between text-[10px] font-black uppercase text-slate-500 tracking-wider">
+              <span>ITEM / KUANTITAS</span>
+              <span>SUBTOTAL</span>
+            </div>
+
+            <div className="space-y-1.5 max-h-48 overflow-y-auto no-scrollbar pr-0.5">
+              {(receiptData.items || []).map((item, idx) => {
+                const qty = item.quantity || 1;
+                const price = item.price || 0;
+                const lineTotal = price * qty;
+                return (
+                  <div key={idx} className="text-[11px] leading-tight">
+                    <div className="font-bold text-slate-900 break-words">
+                      {item.name}
+                    </div>
+                    <div className="flex justify-between text-[10.5px] text-slate-600 pl-1">
+                      <span>{qty} {item.unit || 'pcs'} x Rp {price.toLocaleString('id-ID')}</span>
+                      <span className="font-bold text-slate-900">
+                        Rp {lineTotal.toLocaleString('id-ID')}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Pemisah Putus-Putus */}
+          <div className="border-b-2 border-dashed border-slate-400 my-2.5" />
+
+          {/* 4. TOTALS, DISKON, PAJAK & GRAND TOTAL */}
+          <div className="space-y-1 text-[11px]">
+            <div className="flex justify-between text-slate-600">
+              <span>Subtotal Belanja:</span>
+              <span className="font-bold text-slate-800">
+                Rp {(receiptData.subtotal || 0).toLocaleString('id-ID')}
+              </span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>Promo yang Digunakan:</span>
+              <span className={`font-bold ${receiptData.promo > 0 ? 'text-emerald-700' : 'text-slate-500'}`}>
+                {receiptData.promo > 0 ? `-Rp ${receiptData.promo.toLocaleString('id-ID')}` : 'Rp 0'}
+              </span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>Biaya Pajak (PPN 11%):</span>
+              <span className="font-bold text-slate-800">
+                Rp {(receiptData.pajak || 0).toLocaleString('id-ID')}
+              </span>
+            </div>
+
+            <div className="border-b-2 border-dashed border-slate-700 my-1.5" />
+
+            <div className="flex justify-between text-xs font-black text-slate-900 py-0.5">
+              <span>GRAND TOTAL:</span>
+              <span className="text-sm font-black text-emerald-800">
+                Rp {(receiptData.grandTotal || 0).toLocaleString('id-ID')}
+              </span>
+            </div>
+            <div className="flex justify-between text-[10px] text-slate-500">
+              <span>Metode Pembayaran:</span>
+              <span className="font-bold text-slate-700">QRIS / Saldo Dompet</span>
+            </div>
+            <div className="flex justify-between text-[10px] text-slate-500">
+              <span>Status Transaksi:</span>
+              <span className="font-black text-emerald-700">LUNAS / BERHASIL</span>
+            </div>
+          </div>
+
+          {/* Pemisah Putus-Putus */}
+          <div className="border-b-2 border-dashed border-slate-400 my-3" />
+
+          {/* 5. FOOTER UCAPAN & BARCODE */}
+          <div className="text-center space-y-1.5 text-[10px] text-slate-600">
+            <p className="font-black text-slate-900">
+              *** TERIMA KASIH TELAH BERBELANJA ***
+            </p>
+            <p className="text-[9.5px] leading-tight text-slate-500">
+              Barang yang sudah dibeli tidak dapat ditukar/dikembalikan.
+            </p>
+            <p className="text-[9px] text-slate-400">
+              Simpan struk digital ini sebagai bukti sah transaksi.
+            </p>
+
+            {/* Mockup Barcode Thermal POS */}
+            <div className="pt-2 flex flex-col items-center justify-center">
+              <div className="h-8 flex items-center space-x-[2px] opacity-85 px-4 bg-white border border-slate-200 rounded py-1">
+                {[4,2,3,1,4,1,2,3,2,1,4,2,1,3,2,4,1,3,2,1,4,2,3,1,2,4,2,1,3,4].map((w, i) => (
+                  <div key={i} className="bg-slate-900 h-full" style={{ width: `${w}px` }} />
+                ))}
+              </div>
+              <span className="text-[9px] font-bold text-slate-500 tracking-widest mt-1">
+                *{receiptData.id}*
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* --- TOMBOL AKSI DI BAWAH STRUK (RECEIPT ACTIONS) --- */}
+        <div className="w-full mt-3 space-y-2 receipt-no-print">
+          {/* Tombol Cetak / Simpan & Salin Teks */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="py-2.5 px-3 bg-white hover:bg-slate-100 active:scale-98 text-slate-800 font-extrabold text-xs rounded-xl border border-slate-300 shadow-sm flex items-center justify-center space-x-1.5 transition-all cursor-pointer"
+              title="Cetak struk ke printer atau simpan sebagai PDF"
+            >
+              <Printer className="w-4 h-4 text-slate-700" />
+              <span>Cetak / Simpan</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyText}
+              className="py-2.5 px-3 bg-white hover:bg-slate-100 active:scale-98 text-slate-800 font-extrabold text-xs rounded-xl border border-slate-300 shadow-sm flex items-center justify-center space-x-1.5 transition-all cursor-pointer"
+              title="Salin teks struk untuk dikirim via WhatsApp"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-600" />
+                  <span className="text-emerald-700 font-bold">Tersalin!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4 text-slate-700" />
+                  <span>Salin Teks Struk</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Tombol Utama: Tutup & Selesai / Belanja Lagi */}
+          <button
+            type="button"
+            onClick={onFinishAndShopAgain}
+            className="w-full py-3 px-4 bg-emerald-800 hover:bg-emerald-900 active:scale-98 text-white font-black text-xs rounded-xl shadow-lg flex items-center justify-center space-x-2 transition-all cursor-pointer tracking-wide"
+          >
+            <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+            <span>Tutup &amp; Selesai (Belanja Lagi)</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
