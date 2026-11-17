@@ -34,7 +34,8 @@ import {
 } from 'lucide-react';
 import { playTapSound, playSuccessSound, playWarningBeep } from '../utils/sound';
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
-import { getProductEmoji, getProductImage, ProductImageThumbnail, ProductEmojiBox, PriceFluctuationBadge } from '../utils/emoji';
+import { getProductEmoji, ProductEmojiBox, PriceFluctuationBadge } from '../utils/emoji';
+import { getItemStorePrice } from '../utils/storePrices';
 
 export default function ActiveCartScreen({
   cartItems = [],
@@ -68,7 +69,7 @@ export default function ActiveCartScreen({
     { id: 'kebersihan', name: 'Peralatan Kebersihan', emoji: '🧼' }
   ];
 
-  // 2. Data Katalog Rekomendasi Belanja Berdasarkan Kategori Lengkap (Gambar Asli + Floating Emoji)
+  // 2. Data Katalog Rekomendasi Belanja Berdasarkan Kategori Lengkap (100% Emoji + Dynamic 4-Store Pricing)
   // Skenario Uji 4 (SRS F-04): Beras 5kg, Telur Ayam Ras 1kg, Garam 500g
   const RECOMMENDED_PRODUCTS_BY_CATEGORY = {
     sembako: {
@@ -83,7 +84,12 @@ export default function ActiveCartScreen({
           price: 74000,
           lastMonthPrice: 68000,
           description: 'Beras putih pulen berkualitas tanpa pemutih',
-          image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 74000, history: 68000 },
+            'Super Indo - Pesanggrahan': { current: 71900, history: 74900 },
+            'Hypermart - Puri Mall': { current: 73000, history: 73000 },
+            'Indogrosir Daan Mogot': { current: 67000, history: 62000 }
+          }
         },
         {
           id: 'rec-sembako-2',
@@ -93,7 +99,12 @@ export default function ActiveCartScreen({
           price: 28000,
           lastMonthPrice: 32000,
           description: 'Telur ayam ras segar kaya protein hewani',
-          image: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 28000, history: 32000 },
+            'Super Indo - Pesanggrahan': { current: 27900, history: 31900 },
+            'Hypermart - Puri Mall': { current: 29000, history: 29000 },
+            'Indogrosir Daan Mogot': { current: 25500, history: 24000 }
+          }
         },
         {
           id: 'rec-sembako-3',
@@ -103,7 +114,12 @@ export default function ActiveCartScreen({
           price: 5000,
           lastMonthPrice: 5000,
           description: 'Garam dapur beryodium murni standar SNI',
-          image: 'https://images.unsplash.com/photo-1518110925495-5fe2fda0442c?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 5000, history: 5000 },
+            'Super Indo - Pesanggrahan': { current: 4900, history: 6500 },
+            'Hypermart - Puri Mall': { current: 5000, history: 5000 },
+            'Indogrosir Daan Mogot': { current: 4200, history: 3900 }
+          }
         },
         {
           id: 'rec-sembako-indomie',
@@ -113,7 +129,12 @@ export default function ActiveCartScreen({
           price: 15500,
           lastMonthPrice: 15500,
           description: 'Mie instan goreng favorit keluarga Indonesia',
-          image: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 15500, history: 15500 },
+            'Super Indo - Pesanggrahan': { current: 14900, history: 16900 },
+            'Hypermart - Puri Mall': { current: 15500, history: 15500 },
+            'Indogrosir Daan Mogot': { current: 13500, history: 12500 }
+          }
         },
         {
           id: 'rec-sembako-4',
@@ -123,7 +144,12 @@ export default function ActiveCartScreen({
           price: 38500,
           lastMonthPrice: 35000,
           description: 'Jernih tahan panas dengan vitamin E',
-          image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 38500, history: 35000 },
+            'Super Indo - Pesanggrahan': { current: 36900, history: 39900 },
+            'Hypermart - Puri Mall': { current: 37500, history: 37500 },
+            'Indogrosir Daan Mogot': { current: 33500, history: 31000 }
+          }
         },
         {
           id: 'rec-sembako-5',
@@ -133,7 +159,12 @@ export default function ActiveCartScreen({
           price: 17500,
           lastMonthPrice: 17500,
           description: 'Gula tebu butiran bersih standar SNI',
-          image: 'https://images.unsplash.com/photo-1622484212850-eb596d769edc?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 17500, history: 17500 },
+            'Super Indo - Pesanggrahan': { current: 16900, history: 18900 },
+            'Hypermart - Puri Mall': { current: 17500, history: 17500 },
+            'Indogrosir Daan Mogot': { current: 15000, history: 14000 }
+          }
         }
       ]
     },
@@ -149,7 +180,12 @@ export default function ActiveCartScreen({
           price: 9500,
           lastMonthPrice: 8500,
           description: 'Manis renyah kaya beta-karoten',
-          image: 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 9500, history: 8500 },
+            'Super Indo - Pesanggrahan': { current: 8900, history: 10900 },
+            'Hypermart - Puri Mall': { current: 9000, history: 9000 },
+            'Indogrosir Daan Mogot': { current: 7800, history: 7200 }
+          }
         },
         {
           id: 'rec-sayur-2',
@@ -159,7 +195,12 @@ export default function ActiveCartScreen({
           price: 6000,
           lastMonthPrice: 6000,
           description: 'Segar bebas pestisida kaya zat besi',
-          image: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 6000, history: 6000 },
+            'Super Indo - Pesanggrahan': { current: 5900, history: 6900 },
+            'Hypermart - Puri Mall': { current: 6000, history: 6000 },
+            'Indogrosir Daan Mogot': { current: 5000, history: 4500 }
+          }
         },
         {
           id: 'rec-sayur-3',
@@ -169,7 +210,12 @@ export default function ActiveCartScreen({
           price: 16000,
           lastMonthPrice: 17500,
           description: 'Brokoli segar kaya antioksidan sehat',
-          image: 'https://images.unsplash.com/photo-1459411621453-7b03977f4bfc?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 16000, history: 17500 },
+            'Super Indo - Pesanggrahan': { current: 15900, history: 18900 },
+            'Hypermart - Puri Mall': { current: 16500, history: 16500 },
+            'Indogrosir Daan Mogot': { current: 14000, history: 13000 }
+          }
         }
       ]
     },
@@ -185,7 +231,12 @@ export default function ActiveCartScreen({
           price: 34000,
           lastMonthPrice: 38000,
           description: 'Renyah manis kaya serat & vitamin alami',
-          image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 34000, history: 38000 },
+            'Super Indo - Pesanggrahan': { current: 32900, history: 36900 },
+            'Hypermart - Puri Mall': { current: 35000, history: 35000 },
+            'Indogrosir Daan Mogot': { current: 29500, history: 28000 }
+          }
         },
         {
           id: 'rec-buah-2',
@@ -195,7 +246,12 @@ export default function ActiveCartScreen({
           price: 22000,
           lastMonthPrice: 20000,
           description: 'Manis legit sumber energi harian',
-          image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 22000, history: 20000 },
+            'Super Indo - Pesanggrahan': { current: 21900, history: 24900 },
+            'Hypermart - Puri Mall': { current: 22000, history: 22000 },
+            'Indogrosir Daan Mogot': { current: 19000, history: 17500 }
+          }
         },
         {
           id: 'rec-buah-3',
@@ -205,7 +261,12 @@ export default function ActiveCartScreen({
           price: 26000,
           lastMonthPrice: 26000,
           description: 'Bulir berair manis menyegarkan',
-          image: 'https://images.unsplash.com/photo-1547514701-42782101795e?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 26000, history: 26000 },
+            'Super Indo - Pesanggrahan': { current: 24900, history: 28900 },
+            'Hypermart - Puri Mall': { current: 26000, history: 26000 },
+            'Indogrosir Daan Mogot': { current: 22500, history: 21000 }
+          }
         }
       ]
     },
@@ -221,7 +282,12 @@ export default function ActiveCartScreen({
           price: 46000,
           lastMonthPrice: 50000,
           description: 'Dada ayam tanpa tulang tinggi protein',
-          image: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 46000, history: 50000 },
+            'Super Indo - Pesanggrahan': { current: 44900, history: 49900 },
+            'Hypermart - Puri Mall': { current: 46000, history: 46000 },
+            'Indogrosir Daan Mogot': { current: 41000, history: 38500 }
+          }
         },
         {
           id: 'rec-daging-2',
@@ -231,7 +297,12 @@ export default function ActiveCartScreen({
           price: 68000,
           lastMonthPrice: 65000,
           description: 'Sapi lokal empuk rendah lemak',
-          image: 'https://images.unsplash.com/photo-1588168333986-5078d3ae3976?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 68000, history: 65000 },
+            'Super Indo - Pesanggrahan': { current: 66900, history: 71900 },
+            'Hypermart - Puri Mall': { current: 68000, history: 68000 },
+            'Indogrosir Daan Mogot': { current: 61000, history: 58000 }
+          }
         },
         {
           id: 'rec-daging-3',
@@ -241,7 +312,12 @@ export default function ActiveCartScreen({
           price: 55000,
           lastMonthPrice: 55000,
           description: 'Kaya Omega-3 untuk kesehatan jantung',
-          image: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 55000, history: 55000 },
+            'Super Indo - Pesanggrahan': { current: 53900, history: 58900 },
+            'Hypermart - Puri Mall': { current: 55000, history: 55000 },
+            'Indogrosir Daan Mogot': { current: 49000, history: 46000 }
+          }
         }
       ]
     },
@@ -257,7 +333,12 @@ export default function ActiveCartScreen({
           price: 11500,
           lastMonthPrice: 11500,
           description: 'Biskuit kelapa renyah kaya vitamin',
-          image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 11500, history: 11500 },
+            'Super Indo - Pesanggrahan': { current: 10900, history: 12900 },
+            'Hypermart - Puri Mall': { current: 11500, history: 11500 },
+            'Indogrosir Daan Mogot': { current: 9800, history: 9200 }
+          }
         },
         {
           id: 'rec-camilan-2',
@@ -267,7 +348,12 @@ export default function ActiveCartScreen({
           price: 12000,
           lastMonthPrice: 11000,
           description: 'Keripik kentang bergelombang gurih',
-          image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 12000, history: 11000 },
+            'Super Indo - Pesanggrahan': { current: 11900, history: 13900 },
+            'Hypermart - Puri Mall': { current: 12000, history: 12000 },
+            'Indogrosir Daan Mogot': { current: 10500, history: 9800 }
+          }
         },
         {
           id: 'rec-camilan-3',
@@ -277,7 +363,12 @@ export default function ActiveCartScreen({
           price: 9800,
           lastMonthPrice: 10500,
           description: 'Biskuit cokelat sandwich krim lezat',
-          image: 'https://images.unsplash.com/photo-1582293041079-7814c2f12063?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 9800, history: 10500 },
+            'Super Indo - Pesanggrahan': { current: 8900, history: 10900 },
+            'Hypermart - Puri Mall': { current: 9800, history: 9800 },
+            'Indogrosir Daan Mogot': { current: 8500, history: 8000 }
+          }
         }
       ]
     },
@@ -293,7 +384,12 @@ export default function ActiveCartScreen({
           price: 19500,
           lastMonthPrice: 21000,
           description: 'Susu sapi murni kaya kalsium alami',
-          image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 19500, history: 21000 },
+            'Super Indo - Pesanggrahan': { current: 18900, history: 21900 },
+            'Hypermart - Puri Mall': { current: 19500, history: 19500 },
+            'Indogrosir Daan Mogot': { current: 17200, history: 16000 }
+          }
         },
         {
           id: 'rec-minuman-2',
@@ -303,7 +399,12 @@ export default function ActiveCartScreen({
           price: 14500,
           lastMonthPrice: 14500,
           description: 'Kopi tubruk gula mantap harum',
-          image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 14500, history: 14500 },
+            'Super Indo - Pesanggrahan': { current: 13900, history: 15900 },
+            'Hypermart - Puri Mall': { current: 14500, history: 14500 },
+            'Indogrosir Daan Mogot': { current: 12800, history: 12000 }
+          }
         },
         {
           id: 'rec-minuman-3',
@@ -313,7 +414,12 @@ export default function ActiveCartScreen({
           price: 9500,
           lastMonthPrice: 9500,
           description: 'Seduhan daun teh melati asli alami',
-          image: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 9500, history: 9500 },
+            'Super Indo - Pesanggrahan': { current: 8900, history: 10900 },
+            'Hypermart - Puri Mall': { current: 9500, history: 9500 },
+            'Indogrosir Daan Mogot': { current: 8200, history: 7800 }
+          }
         }
       ]
     },
@@ -329,7 +435,12 @@ export default function ActiveCartScreen({
           price: 16000,
           lastMonthPrice: 16000,
           description: 'Perlindungan kuman & higienis untuk keluarga',
-          image: 'https://images.unsplash.com/photo-1608248597359-54359483c6f8?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 16000, history: 16000 },
+            'Super Indo - Pesanggrahan': { current: 15900, history: 17900 },
+            'Hypermart - Puri Mall': { current: 16000, history: 16000 },
+            'Indogrosir Daan Mogot': { current: 14000, history: 13200 }
+          }
         },
         {
           id: 'rec-kebersihan-1',
@@ -339,7 +450,12 @@ export default function ActiveCartScreen({
           price: 26500,
           lastMonthPrice: 29000,
           description: 'Sabun cair antiseptik perlindungan kuman',
-          image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 26500, history: 29000 },
+            'Super Indo - Pesanggrahan': { current: 25900, history: 29900 },
+            'Hypermart - Puri Mall': { current: 26500, history: 26500 },
+            'Indogrosir Daan Mogot': { current: 23500, history: 22000 }
+          }
         },
         {
           id: 'rec-kebersihan-2',
@@ -349,7 +465,12 @@ export default function ActiveCartScreen({
           price: 21500,
           lastMonthPrice: 20000,
           description: 'Hilangkan noda membandel 1x kucek',
-          image: 'https://images.unsplash.com/photo-1610557892470-55d9e80c0bce?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 21500, history: 20000 },
+            'Super Indo - Pesanggrahan': { current: 20900, history: 23900 },
+            'Hypermart - Puri Mall': { current: 21500, history: 21500 },
+            'Indogrosir Daan Mogot': { current: 18900, history: 17500 }
+          }
         },
         {
           id: 'rec-kebersihan-3',
@@ -359,7 +480,12 @@ export default function ActiveCartScreen({
           price: 15500,
           lastMonthPrice: 15500,
           description: 'Bersihkan lemak membandel seketika',
-          image: 'https://images.unsplash.com/photo-1585670270638-74dd014045c7?w=300&auto=format&fit=crop&q=80'
+          prices: {
+            'Lotte Mart - Puri Indah': { current: 15500, history: 15500 },
+            'Super Indo - Pesanggrahan': { current: 14900, history: 16900 },
+            'Hypermart - Puri Mall': { current: 15500, history: 15500 },
+            'Indogrosir Daan Mogot': { current: 13500, history: 12500 }
+          }
         }
       ]
     }
@@ -368,78 +494,87 @@ export default function ActiveCartScreen({
   const handleAddRecommended = (prod) => {
     playTapSound();
     if (onAddToCart) {
+      const storePrice = getItemStorePrice(prod, currentStore);
       onAddToCart({
         id: 'rec-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
         name: prod.name,
-        price: prod.price,
-        originalPrice: prod.lastMonthPrice !== undefined ? prod.lastMonthPrice : prod.price,
+        price: storePrice.current,
+        originalPrice: storePrice.history,
+        lastMonthPrice: storePrice.history,
+        prices: prod.prices,
         category: prod.category || 'Bahan Pokok',
         unit: prod.unit || 'pcs',
         quantity: 1,
-        isSecondary: false,
-        image: prod.image || getProductImage(prod.name, prod.category),
-        lastMonthPrice: prod.lastMonthPrice !== undefined ? prod.lastMonthPrice : prod.price
+        isSecondary: false
       });
     }
   };
 
-  // Render Product Card (Horizontal List Layout with Real Image & Top-Left Emoji Badge)
-  const renderProductCard = (prod) => (
-    <div 
-      key={prod.id}
-      className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-emerald-50/40 hover:border-emerald-200 flex items-center justify-between gap-3 transition-all group"
-    >
-      {/* Bagian Kiri: Gambar Produk Asli dengan Emoji Kecil di Sudut Kiri Atas */}
-      <ProductImageThumbnail 
-        image={prod.image} 
-        name={prod.name} 
-        category={prod.category} 
-      />
+  // Render Product Card (Horizontal List Layout with Full Emoji Box & Dynamic Store Pricing)
+  const renderProductCard = (prod) => {
+    const storePrice = getItemStorePrice(prod, currentStore);
+    return (
+      <div 
+        key={prod.id}
+        className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-emerald-50/40 hover:border-emerald-200 flex items-center justify-between gap-3 transition-all group"
+      >
+        {/* Bagian Kiri: Full Emoji Container Box (Tanpa tag <img>) */}
+        <ProductEmojiBox 
+          name={prod.name} 
+          category={prod.category} 
+          className="w-16 h-16 text-3xl"
+        />
 
-      {/* Bagian Tengah: Judul produk, Deskripsi singkat, Kategori & Fluktuasi Harga */}
-      <div className="flex-1 min-w-0">
-        <h5 className="text-xs font-bold text-slate-900 truncate leading-snug">
-          {prod.name}
-        </h5>
-        <p className="text-[10.5px] text-slate-500 line-clamp-1 mt-0.5">
-          {prod.description}
-        </p>
-        <div className="flex items-center space-x-1.5 mt-1">
-          <span className="text-[9px] font-semibold text-slate-500 bg-white border border-slate-200 px-1.5 py-0.2 rounded">
-            {prod.unit}
-          </span>
-          <span className="text-[9px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200/60">
-            {prod.category}
-          </span>
+        {/* Bagian Tengah: Judul produk, Deskripsi singkat, Kategori & Fluktuasi Harga Dinamis */}
+        <div className="flex-1 min-w-0">
+          <h5 className="text-xs font-bold text-slate-900 truncate leading-snug">
+            {prod.name}
+          </h5>
+          <p className="text-[10.5px] text-slate-500 line-clamp-1 mt-0.5">
+            {prod.description}
+          </p>
+          <div className="flex items-center space-x-1.5 mt-1">
+            <span className="text-[9px] font-semibold text-slate-500 bg-white border border-slate-200 px-1.5 py-0.2 rounded">
+              {prod.unit}
+            </span>
+            <span className="text-[9px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200/60">
+              {prod.category}
+            </span>
+          </div>
+          {/* Indikator Fluktuasi Harga Skenario Uji 4 */}
+          <div className="mt-1">
+            <PriceFluctuationBadge 
+              currentPrice={storePrice.current} 
+              historyPrice={storePrice.history} 
+              showOldPrice={true} 
+            />
+          </div>
         </div>
-        {/* Indikator Fluktuasi Harga Skenario Uji 4 */}
-        <div className="mt-1">
-          <PriceFluctuationBadge price={prod.price} lastMonthPrice={prod.lastMonthPrice} showOldPrice={true} />
+
+        {/* Bagian Kanan: Nominal harga & Tombol Tambah Hijau */}
+        <div className="text-right shrink-0 flex items-center space-x-2">
+          <div>
+            <span className="text-xs font-black text-slate-900 block">
+              Rp {storePrice.current.toLocaleString('id-ID')}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleAddRecommended(prod)}
+            className="w-8 h-8 rounded-xl bg-emerald-800 hover:bg-emerald-900 active:scale-95 text-white flex items-center justify-center shadow-xs transition-all cursor-pointer"
+            title={`Tambah ${prod.name} ke Keranjang`}
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+          </button>
         </div>
       </div>
+    );
+  };
 
-      {/* Bagian Kanan: Nominal harga & Tombol Tambah Hijau */}
-      <div className="text-right shrink-0 flex items-center space-x-2">
-        <div>
-          <span className="text-xs font-black text-slate-900 block">
-            Rp {prod.price.toLocaleString('id-ID')}
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={() => handleAddRecommended(prod)}
-          className="w-8 h-8 rounded-xl bg-emerald-800 hover:bg-emerald-900 active:scale-95 text-white flex items-center justify-center shadow-xs transition-all cursor-pointer"
-          title={`Tambah ${prod.name} ke Keranjang`}
-        >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
-        </button>
-      </div>
-    </div>
-  );
-
-  // Calculations
+  // Calculations: Dihitung secara dinamis berdasarkan supermarket yang aktif
   const totalCartPrice = cartItems.reduce((acc, item) => {
-    const itemPrice = item.price || 0;
+    const storePrice = getItemStorePrice(item, currentStore);
+    const itemPrice = storePrice.current || item.price || 0;
     return acc + (itemPrice * (item.quantity || 1));
   }, 0);
 
@@ -875,8 +1010,11 @@ export default function ActiveCartScreen({
         ) : (
           <div className="space-y-2.5">
             {cartItems.map((item) => {
-              const itemTotal = (item.price || 0) * (item.quantity || 1);
-              const hasDiscount = item.originalPrice && item.originalPrice > item.price;
+              const storePrice = getItemStorePrice(item, currentStore);
+              const currentItemPrice = storePrice.current || item.price || 0;
+              const currentHistoryPrice = storePrice.history ?? item.lastMonthPrice ?? currentItemPrice;
+              const itemTotal = currentItemPrice * (item.quantity || 1);
+              const hasDiscount = item.originalPrice && item.originalPrice > currentItemPrice;
               const isItemSecondary = item.isSecondary;
 
               return (
@@ -889,11 +1027,11 @@ export default function ActiveCartScreen({
                   }`}
                 >
                   <div className="flex space-x-3">
-                    {/* Item Thumbnail: Gambar Asli dengan Badge Emoji di Sudut Kiri Atas */}
-                    <ProductImageThumbnail 
-                      image={item.image}
+                    {/* Item Thumbnail: Full Emoji Container (100% Emoji, Tanpa Tag <img>) */}
+                    <ProductEmojiBox 
                       name={item.name} 
                       category={item.category || item.unit} 
+                      className="w-16 h-16 text-3xl"
                     />
 
                     {/* Item Info */}
@@ -942,11 +1080,11 @@ export default function ActiveCartScreen({
                         </p>
                       )}
 
-                      {/* Price Fluctuation Trend (Universal Skenario Uji 4) */}
+                      {/* Price Fluctuation Trend (Universal Skenario Uji 4 Dinamis) */}
                       <div className="mt-1">
                         <PriceFluctuationBadge 
-                          price={item.price} 
-                          lastMonthPrice={item.lastMonthPrice} 
+                          currentPrice={currentItemPrice} 
+                          historyPrice={currentHistoryPrice} 
                           showOldPrice={true} 
                         />
                       </div>
@@ -963,7 +1101,7 @@ export default function ActiveCartScreen({
                             Rp {itemTotal.toLocaleString('id-ID')}
                             {item.quantity > 1 && (
                               <span className="text-[10px] text-slate-400 font-normal ml-1">
-                                (Rp {item.price.toLocaleString('id-ID')}/{item.unit ? item.unit.split('/')[0].trim() : 'unit'})
+                                (Rp {currentItemPrice.toLocaleString('id-ID')}/{item.unit ? item.unit.split('/')[0].trim() : 'unit'})
                               </span>
                             )}
                           </div>

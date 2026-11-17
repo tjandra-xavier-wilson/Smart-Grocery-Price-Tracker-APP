@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { playTapSound, playSuccessSound } from '../utils/sound';
 import { GROCERY_PRODUCTS } from '../data/groceryData';
-import { getProductEmoji, getProductImage, ProductEmojiBox, PriceFluctuationBadge } from '../utils/emoji';
+import { getProductEmoji, ProductEmojiBox, PriceFluctuationBadge } from '../utils/emoji';
 
 export default function CatalogInputScreen({
   currentStore = 'Lotte Mart Grocery - Puri Indah',
@@ -229,8 +229,7 @@ export default function CatalogInputScreen({
       quantity: quantity,
       isSecondary: category === 'Lainnya' || category === 'Minuman & Camilan',
       discountLabel: (d1 > 0 || d2 > 0) ? `${d1}%${d2 > 0 ? ` + ${d2}%` : ''}` : null,
-      lastMonthPrice: effectiveLastMonth,
-      image: getProductImage(itemName.trim(), category)
+      lastMonthPrice: effectiveLastMonth
     };
 
     playSuccessSound();

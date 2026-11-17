@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { User, Store, Calendar, Wallet, Pencil } from 'lucide-react';
 import { playTapSound } from '../utils/sound';
 import { toISODateString } from '../utils/date';
 
 export default function HeaderBar({ 
-  currentStore = 'Lotte Mart Grocery - Puri Indah',
+  currentStore = 'Lotte Mart - Puri Indah',
   onOpenStoreModal,
   activeTabTitle = 'Keranjang Aktif',
   currentUser,
@@ -18,6 +18,26 @@ export default function HeaderBar({
   onOpenBudgetModal
 }) {
   const dateInputRef = useRef(null);
+  const [avatarError, setAvatarError] = useState(false);
+
+  // Ambil URL Foto Profil Asli dari Sesi Google / Supabase Auth
+  const googleAvatarUrl = 
+    currentUser?.user_metadata?.avatar_url || 
+    currentUser?.user_metadata?.picture || 
+    currentUser?.avatar_url || 
+    currentUser?.picture || 
+    currentUser?.photoURL || 
+    null;
+
+  // Nama Tampilan & Inisial Huruf untuk Fallback
+  const displayName = 
+    currentUser?.user_metadata?.full_name || 
+    currentUser?.user_metadata?.name || 
+    currentUser?.name || 
+    currentUser?.email?.split('@')[0] || 
+    'Pengguna';
+
+  const initialLetter = (displayName || 'U').trim().charAt(0).toUpperCase() || 'U';
 
   const handleOpenDatePicker = () => {
     playTapSound();
@@ -36,16 +56,28 @@ export default function HeaderBar({
       <div className="flex items-center justify-between">
         {/* Left: Avatar & Supermarket Info */}
         <div className="flex items-center space-x-2.5 min-w-0">
-          {/* Avatar button with Emerald Green */}
+          {/* Avatar button with Google Profile Photo or Initial Letter Fallback */}
           <button
             onClick={() => {
               playTapSound();
               if (onOpenAuthModal) onOpenAuthModal();
             }}
             className="w-10 h-10 rounded-full bg-emerald-800 text-white flex items-center justify-center font-bold text-xs shadow-xs hover:ring-2 hover:ring-emerald-400 transition-all cursor-pointer overflow-hidden relative shrink-0"
-            title="Kelola Akun Pemilik"
+            title={`Kelola Akun (${displayName})`}
           >
-            <span className="text-xl select-none">👤</span>
+            {googleAvatarUrl && !avatarError ? (
+              <img
+                src={googleAvatarUrl}
+                alt={displayName}
+                className="w-8 h-8 rounded-full object-cover"
+                referrerPolicy="no-referrer"
+                onError={() => setAvatarError(true)}
+              />
+            ) : (
+              <span className="text-sm font-black uppercase select-none tracking-tight">
+                {initialLetter}
+              </span>
+            )}
           </button>
 
           {/* Store Name & Ganti Button */}

@@ -338,16 +338,14 @@ export async function getShoppingHistoryList(userId = null) {
     }
 
     let data = rawData || [];
-    // Filter berdasarkan identitas pengguna (tag ##uid:...## di notes)
+    // Filter ketat berdasarkan identitas pengguna (tag ##uid:...## di notes atau kolom user_id)
+    // Mencegah data bleeding antar akun Google
     if (targetUserId) {
-      const filtered = data.filter(row => {
-        if (!row.notes) return false;
-        return row.notes.includes(`##uid:${targetUserId}##`);
+      data = data.filter(row => {
+        if (row.user_id && row.user_id === targetUserId) return true;
+        if (row.notes && row.notes.includes(`##uid:${targetUserId}##`)) return true;
+        return false;
       });
-      // Jika ada data untuk uid ini, gunakan data yang terfilter
-      if (filtered.length > 0) {
-        data = filtered;
-      }
     }
 
     if (!data || data.length === 0) {
@@ -461,7 +459,7 @@ export function getOfflineHistory(userId = null) {
   try {
     if (userId) {
       const userRaw = localStorage.getItem(`${FALLBACK_KEYS.HISTORY}_${userId}`);
-      if (userRaw) return JSON.parse(userRaw);
+      return userRaw ? JSON.parse(userRaw) : [];
     }
     const raw = localStorage.getItem(FALLBACK_KEYS.HISTORY);
     return raw ? JSON.parse(raw) : [];
@@ -492,9 +490,10 @@ function saveOfflineTrip(historyData, itemsList, userId = null) {
       items: itemsList
     };
     history.unshift(trip);
-    localStorage.setItem(FALLBACK_KEYS.HISTORY, JSON.stringify(history));
     if (targetUserId) {
       localStorage.setItem(`${FALLBACK_KEYS.HISTORY}_${targetUserId}`, JSON.stringify(history));
+    } else {
+      localStorage.setItem(FALLBACK_KEYS.HISTORY, JSON.stringify(history));
     }
   } catch (e) {}
 }
@@ -507,7 +506,7 @@ function saveOfflineTrip(historyData, itemsList, userId = null) {
  * 6. MENGHAPUS SATU SESI TRANSAKSI BELANJA DARI SUPABASE & LOCALSTORAGE
  */
 export async function deleteShoppingTrip(tripId, userId = null) {
-  if (!tripId) return { success: false };
+  if (!tripId) return { success: false, error: 'No tripId provided' };
 
   try {
     let targetUserId = userId;
@@ -518,31 +517,31 @@ export async function deleteShoppingTrip(tripId, userId = null) {
       } catch (e) {}
     }
 
-    // A. Hapus dari Supabase PostgreSQL dengan filter user_id untuk isolasi keamanan
-    let query = supabase.from('grocery_history').delete().eq('id', tripId);
-    if (targetUserId) {
-      query = query.eq('user_id', targetUserId);
-    }
-    let { error } = await query;
+    // A. Hapus child items di grocery_items terlebih dahulu agar tidak terblokir Foreign Key
+    try {
+      await supabase.from('grocery_items').delete().eq('history_id', tripId);
+    } catch (e) {}
 
+    // B. Hapus dari Supabase PostgreSQL dengan ID unik
+    let deleteQuery = supabase.from('grocery_history').delete().eq('id', tripId);
+    if (targetUserId) {
+      deleteQuery = deleteQuery.eq('user_id', targetUserId);
+    }
+    let { error } = await deleteQuery;
+
+    // Jika skema remote belum memiliki kolom user_id (error 42703/PGRST204), coba delete langsung berdasarkan id
     if (error && (error.message?.includes('user_id') || error.code === '42703' || error.code === 'PGRST204')) {
       const retry = await supabase.from('grocery_history').delete().eq('id', tripId);
       error = retry.error;
     }
 
     if (error) {
-      console.warn('[Supabase deleteShoppingTrip] Warning:', error.message);
+      console.warn('[Supabase deleteShoppingTrip] Supabase error:', error.message);
     }
 
-    // B. Hapus dari LocalStorage fallback
+    // C. Hapus dari LocalStorage fallback (baik user-isolated maupun global)
     if (typeof localStorage !== 'undefined') {
       try {
-        const raw = localStorage.getItem(FALLBACK_KEYS.HISTORY);
-        if (raw) {
-          const list = JSON.parse(raw);
-          const updated = list.filter(item => item.id !== tripId);
-          localStorage.setItem(FALLBACK_KEYS.HISTORY, JSON.stringify(updated));
-        }
         if (targetUserId) {
           const userRaw = localStorage.getItem(`${FALLBACK_KEYS.HISTORY}_${targetUserId}`);
           if (userRaw) {
@@ -551,13 +550,22 @@ export async function deleteShoppingTrip(tripId, userId = null) {
             localStorage.setItem(`${FALLBACK_KEYS.HISTORY}_${targetUserId}`, JSON.stringify(updated));
           }
         }
+        const raw = localStorage.getItem(FALLBACK_KEYS.HISTORY);
+        if (raw) {
+          const list = JSON.parse(raw);
+          const updated = list.filter(item => item.id !== tripId);
+          localStorage.setItem(FALLBACK_KEYS.HISTORY, JSON.stringify(updated));
+        }
       } catch (e) {}
     }
 
+    if (error) {
+      return { success: false, error: error.message };
+    }
     return { success: true };
   } catch (err) {
-    console.warn('[Supabase deleteShoppingTrip] Exception caught:', err.message);
-    return { success: true };
+    console.error('[Supabase deleteShoppingTrip] Exception caught:', err.message);
+    return { success: false, error: err.message };
   }
 }
 
@@ -574,36 +582,34 @@ export async function clearAllShoppingHistory(userId = null) {
       } catch (e) {}
     }
 
-    let query = supabase.from('grocery_history').delete();
+    let error = null;
     if (targetUserId) {
-      query = query.eq('user_id', targetUserId);
-    } else {
-      query = query.neq('id', '00000000-0000-0000-0000-000000000000');
-    }
-    let { error } = await query;
+      let res = await supabase.from('grocery_history').delete().eq('user_id', targetUserId);
+      error = res.error;
 
-    if (error && (error.message?.includes('user_id') || error.code === '42703' || error.code === 'PGRST204')) {
-      if (targetUserId) {
+      // Jika kolom user_id tidak ada, hapus baris yang memuat ##uid:targetUserId## di notes
+      if (error && (error.message?.includes('user_id') || error.code === '42703' || error.code === 'PGRST204')) {
         const retry = await supabase.from('grocery_history').delete().like('notes', `%##uid:${targetUserId}##%`);
         error = retry.error;
       }
+    } else {
+      const res = await supabase.from('grocery_history').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      error = res.error;
     }
 
-    if (error) {
-      console.warn('[Supabase clearAllShoppingHistory] Warning:', error.message);
-    }
-
+    // Hapus dari LocalStorage fallback
     if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(FALLBACK_KEYS.HISTORY);
-      if (targetUserId) {
-        localStorage.removeItem(`${FALLBACK_KEYS.HISTORY}_${targetUserId}`);
-      }
+      try {
+        if (targetUserId) {
+          localStorage.removeItem(`${FALLBACK_KEYS.HISTORY}_${targetUserId}`);
+        }
+        localStorage.removeItem(FALLBACK_KEYS.HISTORY);
+      } catch (e) {}
     }
 
-    return { success: true };
+    return { success: !error, error: error?.message };
   } catch (err) {
-    console.warn('[Supabase clearAllShoppingHistory] Exception caught:', err.message);
-    return { success: true };
+    return { success: false, error: err.message };
   }
 }
 

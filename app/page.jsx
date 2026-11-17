@@ -37,6 +37,7 @@ import {
 import { toIndoDisplayDate, toISODateString } from './utils/date';
 import { playTapSound, playSuccessSound } from './utils/sound';
 import { getProductImage } from './utils/emoji';
+import { getItemStorePrice } from './utils/storePrices';
 
 // Storage Keys for LocalStorage Persistence
 const STORAGE_KEYS = {
@@ -50,7 +51,7 @@ const STORAGE_KEYS = {
   SPLASH_SHOWN: 'sentinel_splash_shown'
 };
 
-// Initial Mockup 2 Dataset (Normal: Rp 284.000 / Rp 350.000 - Real Photos + Top-Left Emoji)
+// Initial Mockup 2 Dataset (Normal: 100% Emoji + Dynamic 4-Store Pricing)
 const MOCKUP_NORMAL_CART = [
   {
     id: 'prod-1',
@@ -62,7 +63,12 @@ const MOCKUP_NORMAL_CART = [
     category: 'Bahan Pokok',
     isSecondary: false,
     lastMonthPrice: 68000, // +Rp 6.000 vs bln lalu (Skenario Uji 4)
-    image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&auto=format&fit=crop&q=80'
+    prices: {
+      'Lotte Mart - Puri Indah': { current: 74000, history: 68000 },
+      'Super Indo - Pesanggrahan': { current: 71900, history: 74900 },
+      'Hypermart - Puri Mall': { current: 73000, history: 73000 },
+      'Indogrosir Daan Mogot': { current: 67000, history: 62000 }
+    }
   },
   {
     id: 'prod-2',
@@ -75,7 +81,12 @@ const MOCKUP_NORMAL_CART = [
     category: 'Bahan Pokok',
     isSecondary: false,
     lastMonthPrice: 32000, // -Rp 4.000 hemat vs bln lalu (Skenario Uji 4)
-    image: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=300&auto=format&fit=crop&q=80'
+    prices: {
+      'Lotte Mart - Puri Indah': { current: 28000, history: 32000 },
+      'Super Indo - Pesanggrahan': { current: 27900, history: 31900 },
+      'Hypermart - Puri Mall': { current: 29000, history: 29000 },
+      'Indogrosir Daan Mogot': { current: 25500, history: 24000 }
+    }
   },
   {
     id: 'prod-3',
@@ -87,7 +98,12 @@ const MOCKUP_NORMAL_CART = [
     category: 'Bahan Pokok',
     isSecondary: false,
     lastMonthPrice: 5000, // Harga Stabil (Skenario Uji 4)
-    image: 'https://images.unsplash.com/photo-1518110925495-5fe2fda0442c?w=300&auto=format&fit=crop&q=80'
+    prices: {
+      'Lotte Mart - Puri Indah': { current: 5000, history: 5000 },
+      'Super Indo - Pesanggrahan': { current: 4900, history: 6500 },
+      'Hypermart - Puri Mall': { current: 5000, history: 5000 },
+      'Indogrosir Daan Mogot': { current: 4200, history: 3900 }
+    }
   },
   {
     id: 'prod-4',
@@ -100,7 +116,12 @@ const MOCKUP_NORMAL_CART = [
     category: 'Bahan Pokok',
     isSecondary: false,
     lastMonthPrice: 36000,
-    image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=300&auto=format&fit=crop&q=80'
+    prices: {
+      'Lotte Mart - Puri Indah': { current: 33500, history: 36000 },
+      'Super Indo - Pesanggrahan': { current: 32900, history: 35900 },
+      'Hypermart - Puri Mall': { current: 33500, history: 33500 },
+      'Indogrosir Daan Mogot': { current: 29500, history: 27500 }
+    }
   },
   {
     id: 'prod-5',
@@ -113,7 +134,12 @@ const MOCKUP_NORMAL_CART = [
     category: 'Perlengkapan Mandi',
     isSecondary: false,
     lastMonthPrice: 28500,
-    image: 'https://images.unsplash.com/photo-1608248597359-54359483c6f8?w=300&auto=format&fit=crop&q=80'
+    prices: {
+      'Lotte Mart - Puri Indah': { current: 28500, history: 28500 },
+      'Super Indo - Pesanggrahan': { current: 27900, history: 30900 },
+      'Hypermart - Puri Mall': { current: 28500, history: 28500 },
+      'Indogrosir Daan Mogot': { current: 25000, history: 23500 }
+    }
   },
   {
     id: 'prod-6',
@@ -125,11 +151,16 @@ const MOCKUP_NORMAL_CART = [
     category: 'Bahan Pokok',
     isSecondary: false,
     lastMonthPrice: 20000,
-    image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&auto=format&fit=crop&q=80'
+    prices: {
+      'Lotte Mart - Puri Indah': { current: 21500, history: 20000 },
+      'Super Indo - Pesanggrahan': { current: 20900, history: 23900 },
+      'Hypermart - Puri Mall': { current: 21500, history: 21500 },
+      'Indogrosir Daan Mogot': { current: 18900, history: 17500 }
+    }
   }
 ];
 
-// Mockup 3 Dataset (Overbudget: Rp 382.500 / Rp 350.000 - Real Photos + Top-Left Emoji)
+// Mockup 3 Dataset (Overbudget: 100% Emoji + Dynamic 4-Store Pricing)
 const MOCKUP_OVERBUDGET_CART = [
   {
     id: 'over-1',
@@ -142,7 +173,12 @@ const MOCKUP_OVERBUDGET_CART = [
     subcat: 'Kategori: Confectionery',
     isSecondary: true, // Sekunder - Rekomendasi Batalkan
     lastMonthPrice: 45000,
-    image: 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=300&auto=format&fit=crop&q=80'
+    prices: {
+      'Lotte Mart - Puri Indah': { current: 45000, history: 45000 },
+      'Super Indo - Pesanggrahan': { current: 43900, history: 47900 },
+      'Hypermart - Puri Mall': { current: 45000, history: 45000 },
+      'Indogrosir Daan Mogot': { current: 39500, history: 37000 }
+    }
   },
   {
     id: 'over-2',
@@ -155,7 +191,12 @@ const MOCKUP_OVERBUDGET_CART = [
     subcat: 'Kategori: Minuman Manis',
     isSecondary: true, // Sekunder - Rekomendasi Batalkan
     lastMonthPrice: 9000,
-    image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=300&auto=format&fit=crop&q=80'
+    prices: {
+      'Lotte Mart - Puri Indah': { current: 9000, history: 9000 },
+      'Super Indo - Pesanggrahan': { current: 8900, history: 9900 },
+      'Hypermart - Puri Mall': { current: 9000, history: 9000 },
+      'Indogrosir Daan Mogot': { current: 7800, history: 7200 }
+    }
   },
   {
     id: 'over-3',
@@ -168,7 +209,12 @@ const MOCKUP_OVERBUDGET_CART = [
     subcat: 'Kebutuhan Pokok Utama',
     isSecondary: false,
     lastMonthPrice: 68000,
-    image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&auto=format&fit=crop&q=80'
+    prices: {
+      'Lotte Mart - Puri Indah': { current: 74000, history: 68000 },
+      'Super Indo - Pesanggrahan': { current: 71900, history: 74900 },
+      'Hypermart - Puri Mall': { current: 73000, history: 73000 },
+      'Indogrosir Daan Mogot': { current: 67000, history: 62000 }
+    }
   },
   {
     id: 'over-4',
@@ -181,7 +227,12 @@ const MOCKUP_OVERBUDGET_CART = [
     subcat: 'Protein Harian',
     isSecondary: false,
     lastMonthPrice: 32000,
-    image: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=300&auto=format&fit=crop&q=80'
+    prices: {
+      'Lotte Mart - Puri Indah': { current: 28000, history: 32000 },
+      'Super Indo - Pesanggrahan': { current: 27900, history: 31900 },
+      'Hypermart - Puri Mall': { current: 29000, history: 29000 },
+      'Indogrosir Daan Mogot': { current: 25500, history: 24000 }
+    }
   },
   {
     id: 'over-5',
@@ -194,7 +245,12 @@ const MOCKUP_OVERBUDGET_CART = [
     subcat: 'Sembako Rumah Tangga',
     isSecondary: false,
     lastMonthPrice: 37000,
-    image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=300&auto=format&fit=crop&q=80'
+    prices: {
+      'Lotte Mart - Puri Indah': { current: 37000, history: 37000 },
+      'Super Indo - Pesanggrahan': { current: 35900, history: 38900 },
+      'Hypermart - Puri Mall': { current: 37000, history: 37000 },
+      'Indogrosir Daan Mogot': { current: 32500, history: 30000 }
+    }
   }
 ];
 
@@ -337,10 +393,11 @@ export default function Home() {
               try {
                 const parsedCart = JSON.parse(savedCart);
                 if (Array.isArray(parsedCart)) {
-                  setCartItems(parsedCart.map((item) => ({
-                    ...item,
-                    image: item.image || getProductImage(item.name, item.category)
-                  })));
+                  setCartItems(parsedCart.map((item) => {
+                    const clean = { ...item };
+                    delete clean.image;
+                    return clean;
+                  }));
                 }
               } catch (e) {}
             }
@@ -539,6 +596,7 @@ export default function Home() {
           name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0],
           email: u.email,
           avatar_url: u.user_metadata?.avatar_url || u.user_metadata?.picture || null,
+          user_metadata: u.user_metadata || {},
           provider: session.user.app_metadata?.provider || 'supabase',
           role: 'user',
           authenticated_at: new Date().toISOString()
@@ -778,6 +836,7 @@ export default function Home() {
           name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0],
           email: u.email,
           avatar_url: u.user_metadata?.avatar_url || u.user_metadata?.picture || null,
+          user_metadata: u.user_metadata || {},
           provider: session.user.app_metadata?.provider || 'supabase',
           role: 'user',
           authenticated_at: new Date().toISOString()
@@ -1046,9 +1105,9 @@ export default function Home() {
   const handleAddToCart = (newItem) => {
     if (!newItem) return;
     const cleanItem = {
-      ...newItem,
-      image: newItem.image || getProductImage(newItem.name, newItem.category)
+      ...newItem
     };
+    delete cleanItem.image;
     setCartItems((prev) => {
       const existing = prev.find((i) => i.name.toLowerCase() === cleanItem.name.toLowerCase());
       let updated;
@@ -1127,9 +1186,13 @@ export default function Home() {
     setIsDeleteModalOpen(false);
 
     if (isDeletingAll) {
+      await clearAllShoppingHistory(currentUser?.id);
       setHistoryList([]);
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem(STORAGE_KEYS.HISTORY);
+        if (currentUser?.id) {
+          localStorage.removeItem(`${STORAGE_KEYS.HISTORY}_${currentUser.id}`);
+        }
       }
       try {
         supabaseSyncChannelRef.current?.send({
@@ -1138,13 +1201,16 @@ export default function Home() {
           payload: {}
         });
       } catch (e) {}
-      await clearAllShoppingHistory(currentUser?.id);
     } else if (deleteTargetItem?.id) {
       const targetId = deleteTargetItem.id;
+      await deleteShoppingTrip(targetId, currentUser?.id);
       setHistoryList(prev => {
         const updated = (prev || []).filter(h => h.id !== targetId);
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(updated));
+          if (currentUser?.id) {
+            localStorage.setItem(`${STORAGE_KEYS.HISTORY}_${currentUser.id}`, JSON.stringify(updated));
+          }
         }
         return updated;
       });
@@ -1155,7 +1221,6 @@ export default function Home() {
           payload: { tripId: targetId }
         });
       } catch (e) {}
-      await deleteShoppingTrip(targetId, currentUser?.id);
     }
     setDeleteTargetItem(null);
     setIsDeletingAll(false);
@@ -1173,8 +1238,13 @@ export default function Home() {
     setActiveTab('input');
   };
 
-  // Checkout Save & Double Submit Prevention
-  const totalCartPrice = cartItems.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+  // Checkout Save & Double Submit Prevention (Evaluasi Dinamis Berdasarkan Toko Terpilih)
+  const totalCartPrice = cartItems.reduce((acc, i) => {
+    const sp = getItemStorePrice(i, currentStore);
+    const p = sp.current || i.price || 0;
+    return acc + (p * (i.quantity || 1));
+  }, 0);
+
   const handleConfirmCheckout = async () => {
     // 1. Cegah eksekusi ganda jika sedang proses simpan atau keranjang kosong
     if (isCheckoutLoading) return;
@@ -1186,13 +1256,16 @@ export default function Home() {
 
     try {
       // 2. Simpan transaksi secara permanen ke Supabase Cloud PostgreSQL
-      // Ambil string tanggal ISO (YYYY-MM-DD) murni dari state transactionDate
-      // Mencegah pergeseran timezone UTC yang mengubah tanggal (misal 1 November menjadi 31 Oktober)
       const safeShoppingDate = toISODateString(transactionDate);
 
       // Hitung rincian subtotal, promo potongan, dan simulasi pajak PPN 11%
-      const subtotalVal = cartItems.reduce((acc, i) => acc + ((i.originalPrice || i.price) * (i.quantity || 1)), 0);
-      const promoVal = Math.max(0, cartItems.reduce((acc, i) => acc + (((i.originalPrice || i.price) - i.price) * (i.quantity || 1)), 0));
+      const subtotalVal = cartItems.reduce((acc, i) => {
+        const sp = getItemStorePrice(i, currentStore);
+        const orig = sp.history || i.originalPrice || sp.current || i.price || 0;
+        return acc + (orig * (i.quantity || 1));
+      }, 0);
+
+      const promoVal = Math.max(0, subtotalVal - totalCartPrice);
       const pajakVal = Math.round(totalCartPrice * 0.11);
       const grandTotalVal = totalCartPrice + pajakVal;
 
@@ -1204,14 +1277,19 @@ export default function Home() {
         time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
         customerName: currentUser?.user_metadata?.full_name || currentUser?.name || currentUser?.email?.split('@')[0] || 'Pelanggan Setia',
         cashier: 'Self-Checkout (Smart Grocery)',
-        items: cartItems.map(i => ({
-          name: i.name,
-          price: i.price,
-          originalPrice: i.originalPrice || i.price,
-          quantity: i.quantity || 1,
-          unit: i.unit || 'pcs',
-          category: i.category || 'Bahan Pokok'
-        })),
+        items: cartItems.map(i => {
+          const sp = getItemStorePrice(i, currentStore);
+          const p = sp.current || i.price || 0;
+          const orig = sp.history || i.originalPrice || p;
+          return {
+            name: i.name,
+            price: p,
+            originalPrice: orig,
+            quantity: i.quantity || 1,
+            unit: i.unit || 'pcs',
+            category: i.category || 'Bahan Pokok'
+          };
+        }),
         subtotal: subtotalVal,
         promo: promoVal,
         pajak: pajakVal,
@@ -1224,15 +1302,20 @@ export default function Home() {
         shopping_date: safeShoppingDate,
         total_spent: totalCartPrice,
         notes: currentStore
-      }, cartItems.map(i => ({
-        nama_barang: i.name,
-        kategori: i.category,
-        satuan: i.unit,
-        kuantitas: i.quantity,
-        harga_satuan: i.originalPrice || i.price,
-        harga_akhir_per_satuan: i.price,
-        total_harga_item: i.price * i.quantity
-      })), currentUser?.id);
+      }, cartItems.map(i => {
+        const sp = getItemStorePrice(i, currentStore);
+        const p = sp.current || i.price || 0;
+        const orig = sp.history || i.originalPrice || p;
+        return {
+          nama_barang: i.name,
+          kategori: i.category,
+          satuan: i.unit,
+          kuantitas: i.quantity || 1,
+          harga_satuan: orig,
+          harga_akhir_per_satuan: p,
+          total_harga_item: p * (i.quantity || 1)
+        };
+      }), currentUser?.id);
 
       // 3. Broadcast sinyal checkout ke perangkat lain via Realtime Channel
       try {

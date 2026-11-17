@@ -155,86 +155,69 @@ export function getProductImage(itemName = '', category = '') {
 }
 
 /**
- * Standard Product Image Thumbnail with Top-Left Floating Emoji Badge
- * Tailwind class: absolute top-1 left-1 w-6 h-6 bg-white/90 rounded-full flex items-center justify-center text-xs shadow-sm
+ * Product Emoji Container: 100% Large Emoji Box (No <img> tag, No floating absolute badge)
+ * User required styling:
+ * w-20 h-20 flex-shrink-0 bg-gray-100 flex items-center justify-center rounded-xl text-5xl
  */
-export function ProductImageThumbnail({ image, name = '', category = '', className = '' }) {
-  const imgSrc = image || getProductImage(name, category);
+export function ProductEmojiBox({ name = '', category = '', className = '' }) {
   const emoji = getProductEmoji(name, category);
-
   return (
-    <div className={`relative w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-slate-200 bg-slate-100 shadow-2xs group ${className}`}>
-      <img 
-        src={imgSrc} 
-        alt={name || 'Produk'} 
-        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-        onError={(e) => {
-          e.target.src = getProductImage(name, category);
-        }}
-      />
-      {/* Badge Emoji Kecil di Sudut Kiri Atas */}
-      <div 
-        className="absolute top-1 left-1 w-6 h-6 bg-white/90 backdrop-blur-xs rounded-full flex items-center justify-center text-xs shadow-sm border border-slate-100 select-none z-10"
-        title={`Kategori: ${category || 'Produk'}`}
-      >
-        <span>{emoji}</span>
-      </div>
+    <div 
+      className={`w-20 h-20 flex-shrink-0 bg-gray-100 flex items-center justify-center rounded-xl text-5xl select-none shadow-2xs border border-slate-200/60 ${className}`}
+      title={`${name} (${category})`}
+    >
+      <span className="leading-none">{emoji}</span>
     </div>
   );
 }
 
 /**
- * Fallback Emoji Box Component (if pure emoji container is needed)
+ * Backward compatibility alias for ProductImageThumbnail: renders full emoji box
  */
-export function ProductEmojiBox({ name, category, className = '' }) {
-  return <ProductImageThumbnail name={name} category={category} className={className} />;
+export function ProductImageThumbnail({ name = '', category = '', className = '' }) {
+  return <ProductEmojiBox name={name} category={category} className={className} />;
 }
 
 /**
  * Price Fluctuation Badge Component
  * Implements Skenario Uji 4 (SRS F-04):
- * - Harga Turun: Green badge [↓ Hemat Rp X] + Strikethrough old price next to it
- * - Harga Naik: Red badge [↑ Naik Rp X]
- * - Harga Stabil: Gray badge [= Harga Stabil]
+ * - Harga Naik: Badge merah muda [↑ +Rp [Selisih] Naik]
+ * - Harga Turun: Badge hijau muda [↓ -Rp [Selisih] Hemat] + Strikethrough old price next to it
+ * - Harga Stabil: Badge abu-abu [= Harga Stabil]
  */
-export function PriceFluctuationBadge({ price = 0, lastMonthPrice, showOldPrice = true }) {
-  if (lastMonthPrice === undefined || lastMonthPrice === null) {
-    return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-        <span>=</span>
-        <span>Harga Stabil</span>
-      </span>
-    );
-  }
-
-  const diff = Number(price) - Number(lastMonthPrice);
+export function PriceFluctuationBadge({ currentPrice, historyPrice, price, lastMonthPrice, showOldPrice = true }) {
+  const current = currentPrice !== undefined ? Number(currentPrice) : Number(price || 0);
+  const history = historyPrice !== undefined 
+    ? Number(historyPrice) 
+    : (lastMonthPrice !== undefined && lastMonthPrice !== null ? Number(lastMonthPrice) : current);
+  const diff = current - history;
 
   if (diff > 0) {
-    // Harga Naik (Lebih Mahal)
+    // Harga Naik (Lebih Mahal): badge merah muda, panah merah ke atas (↑), dan teks "+Rp [Selisih] Naik"
     return (
       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200">
         <span>↑</span>
-        <span>Naik Rp {diff.toLocaleString('id-ID')}</span>
+        <span>+Rp {diff.toLocaleString('id-ID')} Naik</span>
       </span>
     );
   } else if (diff < 0) {
-    // Harga Turun (Hemat / Lebih Murah)
+    // Harga Turun (Hemat / Lebih Murah): badge hijau muda, panah hijau ke bawah (↓), dan teks "-Rp [Selisih] Hemat"
     const hemat = Math.abs(diff);
     return (
       <div className="inline-flex items-center gap-1.5 flex-wrap">
         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
           <span>↓</span>
-          <span>Hemat Rp {hemat.toLocaleString('id-ID')}</span>
+          <span>-Rp {hemat.toLocaleString('id-ID')} Hemat</span>
         </span>
         {showOldPrice && (
           <span className="line-through text-slate-400 font-normal text-[10px]">
-            Rp {Number(lastMonthPrice).toLocaleString('id-ID')}
+            Rp {Number(history).toLocaleString('id-ID')}
           </span>
         )}
       </div>
     );
   } else {
-    // Harga Stabil (Sama)
+    // Harga Stabil (Sama): badge abu-abu, tanda (=), dan teks "Harga Stabil"
     return (
       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
         <span>=</span>
