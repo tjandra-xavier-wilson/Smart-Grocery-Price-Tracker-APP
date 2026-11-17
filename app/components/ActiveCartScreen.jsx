@@ -366,8 +366,8 @@ export default function ActiveCartScreen({
         className="bg-white rounded-2xl border border-rose-100/90 p-3 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
       >
         <div>
-          {/* Top Emoji Container: Soft Pink Rounded Box exactly like Image 2 */}
-          <div className="w-20 h-20 mx-auto rounded-2xl bg-rose-50/70 border border-rose-100/60 flex items-center justify-center text-4xl mb-2.5 shadow-2xs group-hover:scale-105 transition-transform select-none">
+          {/* Top Emoji Container: 100% Emoji, No <img> Tag */}
+          <div className="w-16 h-16 mx-auto bg-gray-100 rounded-md flex items-center justify-center text-3xl shrink-0 select-none mb-2.5 shadow-sm group-hover:scale-105 transition-transform">
             <span>{emoji}</span>
           </div>
 

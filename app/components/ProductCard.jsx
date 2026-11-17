@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Plus, Minus, Star } from 'lucide-react';
 import { playTapSound } from '../utils/sound';
-import { ProductEmojiBox } from '../utils/emoji';
+import { ProductEmojiBox, getProductEmoji } from '../utils/emoji';
 
 export default function ProductCard({ 
   product, 
@@ -36,17 +36,13 @@ export default function ProductCard({
       className="bg-white rounded-2xl border border-slate-200/80 p-2.5 shadow-card hover:shadow-md transition-all duration-200 flex flex-col justify-between group relative overflow-hidden active-press"
     >
       <div>
-        {/* Product Emoji Container (Soft Pink Rounded Box matching Image 2) */}
-        <div className="w-20 h-20 mx-auto rounded-2xl bg-rose-50/70 border border-rose-100/60 mb-2.5 flex items-center justify-center text-4xl shadow-2xs relative">
-          <ProductEmojiBox 
-            name={product.name} 
-            category={product.category} 
-            className="w-full h-full text-4xl bg-transparent border-none shadow-none" 
-          />
+        {/* Product Emoji Container: 100% Emoji, No <img> Tag */}
+        <div className="w-16 h-16 mx-auto bg-gray-100 rounded-md flex items-center justify-center text-3xl shrink-0 select-none mb-2.5 relative">
+          <span>{getProductEmoji(product.name, product.category)}</span>
 
           {/* Discount Badge Overlay */}
           {product.discountPercent > 0 && (
-            <div className="absolute top-1 left-1 bg-red-600 text-white font-extrabold text-[9px] px-1.5 py-0.2 rounded-full shadow-xs">
+            <div className="absolute -top-1 -left-1 bg-red-600 text-white font-extrabold text-[9px] px-1.5 py-0.2 rounded-full shadow-xs">
               {product.discountPercent}% OFF
             </div>
           )}

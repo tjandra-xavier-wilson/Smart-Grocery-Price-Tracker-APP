@@ -16,7 +16,7 @@ export function getProductEmoji(itemName = '', category = '') {
   if (text.includes('beras') || text.includes('nasi') || text.includes('rice')) return '🌾';
   if (text.includes('telur') || text.includes('egg')) return '🥚';
   if (text.includes('susu') || text.includes('milk') || text.includes('cream')) return '🥛';
-  if (text.includes('minyak') || text.includes('oil')) return '🧴';
+  if (text.includes('minyak') || text.includes('oil')) return '🛢️';
   if (text.includes('garam') || text.includes('salt')) return '🧂';
   if (text.includes('gula') || text.includes('sugar')) return '🍬';
   if (text.includes('tepung') || text.includes('terigu') || text.includes('flour')) return '🌾';
@@ -84,19 +84,19 @@ export function getProductEmoji(itemName = '', category = '') {
   // 7. Snacks / Camilan
   if (text.includes('camilan') || text.includes('snack') || text.includes('keripik') || text.includes('chitato') || text.includes('snack')) return '🍿';
 
-  // Fallback Emoji
-  return '🛍️';
+  // Fallback Emoji (Strictly 📦)
+  return '📦';
 }
 
 /**
  * Standard Uniform Product Emoji Container Component
- * Styled with soft-pink rounded container matching Image 2 mockup
+ * Strictly styled to Tailwind: `w-16 h-16 bg-gray-100 rounded-md flex items-center justify-center text-3xl shrink-0`
  */
 export function ProductEmojiBox({ name, category, className = '' }) {
   const emoji = getProductEmoji(name, category);
   return (
     <div 
-      className={`w-16 h-16 bg-rose-50/70 border border-rose-100/60 rounded-2xl flex items-center justify-center text-3xl shadow-2xs shrink-0 select-none ${className}`}
+      className={`w-16 h-16 bg-gray-100 rounded-md flex items-center justify-center text-3xl shrink-0 select-none ${className}`}
       aria-label={name || 'Produk'}
     >
       <span>{emoji}</span>

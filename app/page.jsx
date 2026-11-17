@@ -831,15 +831,16 @@ export default function Home() {
   const persistState = (newCart, newBudget, newStore, newDate) => {
     if (typeof localStorage === 'undefined') return;
 
-    const finalCart = newCart !== undefined ? newCart : cartItems;
+    const rawCart = newCart !== undefined ? newCart : cartItems;
+    const finalCart = (rawCart || []).map(({ image, ...rest }) => rest);
     const finalBudget = newBudget !== undefined ? newBudget : budgetLimit;
     const finalStore = newStore !== undefined ? newStore : currentStore;
     const finalDate = newDate !== undefined ? newDate : transactionDate;
 
     if (newCart !== undefined) {
-      localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(newCart));
+      localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(finalCart));
       if (currentUser?.id) {
-        localStorage.setItem(`${STORAGE_KEYS.CART}_${currentUser.id}`, JSON.stringify(newCart));
+        localStorage.setItem(`${STORAGE_KEYS.CART}_${currentUser.id}`, JSON.stringify(finalCart));
       }
     }
     if (newBudget !== undefined) {
@@ -1020,15 +1021,17 @@ export default function Home() {
   };
 
   const handleAddToCart = (newItem) => {
+    // 100% Emoji Architecture: Hapus secara permanen atribut image jika terbawa
+    const { image, ...cleanItem } = newItem || {};
     setCartItems((prev) => {
-      const existing = prev.find((i) => i.name.toLowerCase() === newItem.name.toLowerCase());
+      const existing = prev.find((i) => i.name.toLowerCase() === cleanItem.name.toLowerCase());
       let updated;
       if (existing) {
         updated = prev.map((i) =>
-          i.id === existing.id ? { ...i, quantity: i.quantity + newItem.quantity } : i
+          i.id === existing.id ? { ...i, quantity: i.quantity + (cleanItem.quantity || 1) } : i
         );
       } else {
-        updated = [newItem, ...prev];
+        updated = [cleanItem, ...prev];
       }
       persistState(updated);
       return updated;
