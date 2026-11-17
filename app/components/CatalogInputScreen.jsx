@@ -18,9 +18,10 @@ import {
 } from 'lucide-react';
 import { playTapSound, playSuccessSound } from '../utils/sound';
 import { GROCERY_PRODUCTS } from '../data/groceryData';
+import { getProductEmoji, ProductEmojiBox, PriceFluctuationBadge } from '../utils/emoji';
 
 export default function CatalogInputScreen({
-  currentStore = 'Lotte Mart Grocery',
+  currentStore = 'Lotte Mart Grocery - Puri Indah',
   currentRemainingBudget = 125500,
   onAddToCart,
   onOpenBarcodeModal,
@@ -29,10 +30,9 @@ export default function CatalogInputScreen({
 }) {
   const [itemName, setItemName] = useState(initialValues?.name || '');
   const [category, setCategory] = useState(initialValues?.category || 'Bahan Pokok');
-  const [unit, setUnit] = useState(initialValues?.unit || 'karung/5kg');
+  const [unit, setUnit] = useState(initialValues?.unit || '5kg');
   const [quantity, setQuantity] = useState(initialValues?.quantity || 1);
   const [normalPrice, setNormalPrice] = useState(initialValues?.price ? String(initialValues.price) : '');
-  const [selectedImage, setSelectedImage] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   
   // Discount Scheme: 'tunggal' | 'kompound'
@@ -43,35 +43,30 @@ export default function CatalogInputScreen({
   // Validation state
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Consolidated Master Products for Autocomplete
+  // Skenario Uji 4 (SRS F-04): 3 Mock Items Wajib
+  const srsMockItems = [
+    { name: 'Beras 5kg', price: 74000, lastMonthPrice: 68000, category: 'Bahan Pokok', unit: '5kg' },
+    { name: 'Telur Ayam Ras 1kg', price: 28000, lastMonthPrice: 32000, category: 'Bahan Pokok', unit: '1 kg' },
+    { name: 'Garam 500g', price: 5000, lastMonthPrice: 5000, category: 'Bahan Pokok', unit: '500g' }
+  ];
+
+  // Consolidated Master Products for Autocomplete (Tanpa Properti Image)
   const allMasterItems = useMemo(() => {
-    const list = [...(GROCERY_PRODUCTS || [])];
+    const list = [...srsMockItems];
 
     const extraStaples = [
-      { name: 'Mie Instan Indomie Goreng', price: 3500, category: 'Bahan Pokok', unit: 'pcs/85g' },
-      { name: 'Mie Instan Indomie Kuah Soto', price: 3500, category: 'Bahan Pokok', unit: 'pcs/75g' },
-      { name: 'Mie Sedaap Goreng', price: 3500, category: 'Bahan Pokok', unit: 'pcs/90g' },
-      { name: 'Minyak Goreng Sawit Murni 2L', price: 38500, category: 'Bahan Pokok', unit: 'pouch/2L' },
-      { name: 'Minyak Goreng Sania 2L', price: 39000, category: 'Bahan Pokok', unit: 'pouch/2L' },
-      { name: 'Minyak Goreng Bimoli 2L', price: 42000, category: 'Bahan Pokok', unit: 'pouch/2L' },
-      { name: 'Minyak Goreng SunCo 2L', price: 43000, category: 'Bahan Pokok', unit: 'pouch/2L' },
-      { name: 'Minyak Goreng Tropical 2L', price: 41500, category: 'Bahan Pokok', unit: 'botol/2L' },
-      { name: 'Minyak Goreng Sasa 2L', price: 38000, category: 'Bahan Pokok', unit: 'pouch/2L' },
-      { name: 'Kecap Manis Bango 550ml', price: 24500, category: 'Bumbu Dapur', unit: 'pouch/550ml' },
-      { name: 'Saus Sambal ABC Extra Pedas', price: 14500, category: 'Bumbu Dapur', unit: 'botol/335ml' },
-      { name: 'Beras Rojolele Super Pulen 5kg', price: 74000, category: 'Bahan Pokok', unit: 'karung/5kg' },
-      { name: 'Beras Pandan Wangi 5kg', price: 82000, category: 'Bahan Pokok', unit: 'karung/5kg' },
-      { name: 'Beras Setra Ramos 5kg', price: 76000, category: 'Bahan Pokok', unit: 'karung/5kg' },
-      { name: 'Bawang Merah Brebes 500g', price: 19000, category: 'Bumbu Dapur', unit: '500g' },
-      { name: 'Bawang Putih Kating 500g', price: 22000, category: 'Bumbu Dapur', unit: '500g' },
-      { name: 'Cabe Rawit Merah 250g', price: 18000, category: 'Sayur & Buah', unit: '250g' },
-      { name: 'Susu Kental Manis Frisian Flag', price: 13500, category: 'Bahan Pokok', unit: 'kaleng/370g' },
-      { name: 'Susu UHT Ultra Milk 1L', price: 19500, category: 'Bahan Pokok', unit: 'kotak/1L' },
-      { name: 'Teh Celup Sariwangi 25s', price: 7500, category: 'Minuman & Camilan', unit: 'box/25s' },
-      { name: 'Sabun Mandi Lifebuoy 450ml', price: 24000, category: 'Perlengkapan Mandi', unit: 'pouch/450ml' },
-      { name: 'Deterjen Rinso Cair 750ml', price: 21500, category: 'Perlengkapan Mandi', unit: 'pouch/750ml' },
-      { name: 'Sabun Cuci Sunlight Jeruk Nipis', price: 16000, category: 'Perlengkapan Mandi', unit: 'pouch/700ml' },
-      { name: 'Pasta Gigi Pepsodent 190g', price: 16500, category: 'Perlengkapan Mandi', unit: 'tube/190g' }
+      { name: 'Minyak Goreng Sawit Murni 2L', price: 38500, lastMonthPrice: 35000, category: 'Bahan Pokok', unit: 'pouch/2L' },
+      { name: 'Mie Instan Indomie Goreng', price: 3500, lastMonthPrice: 3500, category: 'Bahan Pokok', unit: 'pcs/85g' },
+      { name: 'Mie Instan Indomie Kuah Soto', price: 3500, lastMonthPrice: 3500, category: 'Bahan Pokok', unit: 'pcs/75g' },
+      { name: 'Gula Pasir Kristal Putih 1kg', price: 17500, lastMonthPrice: 17500, category: 'Bahan Pokok', unit: '1 kg' },
+      { name: 'Kecap Manis Bango 550ml', price: 24500, lastMonthPrice: 22000, category: 'Bumbu Dapur', unit: 'pouch/550ml' },
+      { name: 'Saus Sambal ABC Extra Pedas', price: 14500, lastMonthPrice: 14500, category: 'Bumbu Dapur', unit: 'botol/335ml' },
+      { name: 'Bawang Merah Brebes 500g', price: 19000, lastMonthPrice: 22000, category: 'Bumbu Dapur', unit: '500g' },
+      { name: 'Bawang Putih Kating 500g', price: 22000, lastMonthPrice: 21000, category: 'Bumbu Dapur', unit: '500g' },
+      { name: 'Cabe Rawit Merah 250g', price: 18000, lastMonthPrice: 16000, category: 'Sayur & Buah', unit: '250g' },
+      { name: 'Susu UHT Ultra Milk 1L', price: 19500, lastMonthPrice: 21000, category: 'Bahan Pokok', unit: 'kotak/1L' },
+      { name: 'Sabun Mandi Dettol 400ml', price: 26500, lastMonthPrice: 29000, category: 'Perlengkapan Mandi', unit: 'pouch/400ml' },
+      { name: 'Deterjen Rinso Cair 750ml', price: 21500, lastMonthPrice: 20000, category: 'Perlengkapan Mandi', unit: 'pouch/750ml' }
     ];
 
     extraStaples.forEach(item => {
@@ -93,8 +88,8 @@ export default function CatalogInputScreen({
                 name: hItem.name,
                 category: hItem.category || 'Bahan Pokok',
                 price: hItem.price || 0,
-                unit: hItem.unit || 'pcs',
-                image: hItem.image || ''
+                lastMonthPrice: hItem.lastMonthPrice !== undefined ? hItem.lastMonthPrice : hItem.price,
+                unit: hItem.unit || 'pcs'
               });
             }
           });
@@ -132,7 +127,6 @@ export default function CatalogInputScreen({
     if (product.price) setNormalPrice(String(product.price));
     if (product.unit) setUnit(product.unit);
     if (product.category) setCategory(mapCategory(product.category));
-    if (product.image) setSelectedImage(product.image);
     setShowSuggestions(false);
   };
 
@@ -145,14 +139,14 @@ export default function CatalogInputScreen({
     { id: 'b1g1', label: 'Beli 1 Gratis 1', mode: 'tunggal', d1: 50, d2: 0, text: 'Beli 1 Gratis 1' },
   ];
 
-  // Quick Items "Sering Dibeli"
+  // Quick Items "Sering Dibeli" (Diinjeksi dengan Skenario Uji 4)
   const quickItems = [
-    { name: 'Beras Rojolele 5kg', price: 100000, category: 'Bahan Pokok', unit: 'karung/5kg' },
-    { name: 'Minyak Goreng 2L', price: 39500, category: 'Bahan Pokok', unit: 'pouch/2L' },
-    { name: 'Susu UHT Full Cream', price: 21500, category: 'Bahan Pokok', unit: 'kotak/1L' },
-    { name: 'Telur Ayam 1kg', price: 32000, category: 'Sayur & Buah', unit: 'kg' },
-    { name: 'Daging Ayam Fillet', price: 48000, category: 'Daging & Ikan', unit: 'kg' },
-    { name: 'Sabun Mandi Dettol', price: 28500, category: 'Perlengkapan Mandi', unit: 'pouch/450ml' },
+    { name: 'Beras 5kg', price: 74000, lastMonthPrice: 68000, category: 'Bahan Pokok', unit: '5kg' },
+    { name: 'Telur Ayam Ras 1kg', price: 28000, lastMonthPrice: 32000, category: 'Bahan Pokok', unit: '1 kg' },
+    { name: 'Garam 500g', price: 5000, lastMonthPrice: 5000, category: 'Bahan Pokok', unit: '500g' },
+    { name: 'Minyak Goreng Sawit 2L', price: 38500, lastMonthPrice: 35000, category: 'Bahan Pokok', unit: 'pouch/2L' },
+    { name: 'Susu UHT Ultra Milk 1L', price: 19500, lastMonthPrice: 21000, category: 'Bahan Pokok', unit: 'kotak/1L' },
+    { name: 'Sabun Mandi Dettol', price: 26500, lastMonthPrice: 29000, category: 'Perlengkapan Mandi', unit: 'pouch/400ml' }
   ];
 
   // Parse discounts from formula or preset
@@ -219,6 +213,12 @@ export default function CatalogInputScreen({
 
     setErrorMessage('');
 
+    // Check if matched in master for exact lastMonthPrice
+    const matched = allMasterItems.find(p => p.name.toLowerCase() === itemName.trim().toLowerCase());
+    const effectiveLastMonth = (matched && matched.lastMonthPrice !== undefined)
+      ? matched.lastMonthPrice
+      : (priceNum > 50000 ? priceNum - 4000 : (priceNum > 20000 ? priceNum + 2000 : priceNum));
+
     const newItem = {
       id: 'item-' + Date.now(),
       name: itemName.trim(),
@@ -229,15 +229,13 @@ export default function CatalogInputScreen({
       quantity: quantity,
       isSecondary: category === 'Lainnya' || category === 'Minuman & Camilan',
       discountLabel: (d1 > 0 || d2 > 0) ? `${d1}%${d2 > 0 ? ` + ${d2}%` : ''}` : null,
-      lastMonthPrice: priceNum > 50000 ? priceNum - 4000 : (priceNum > 20000 ? priceNum + 2000 : priceNum),
-      image: selectedImage || 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&auto=format&fit=crop&q=80'
+      lastMonthPrice: effectiveLastMonth
     };
 
     playSuccessSound();
     if (onAddToCart) onAddToCart(newItem);
     setItemName('');
     setNormalPrice('');
-    setSelectedImage('');
     setShowSuggestions(false);
   };
 
@@ -247,7 +245,7 @@ export default function CatalogInputScreen({
       <div className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-xs space-y-2.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
-            <div className="w-10 h-10 rounded-xl bg-emerald-800 text-white flex items-center justify-center shadow-xs">
+            <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-xs">
               <Store className="w-5 h-5" />
             </div>
             <div>
@@ -259,8 +257,8 @@ export default function CatalogInputScreen({
               </h3>
             </div>
           </div>
-          <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 font-bold text-[10px] rounded-full border border-emerald-200">
-            🟢 Ready
+          <span className="px-2.5 py-1 bg-red-50 text-red-700 font-bold text-[10px] rounded-full border border-red-200">
+            🔴 Ready
           </span>
         </div>
 
@@ -268,13 +266,13 @@ export default function CatalogInputScreen({
         <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-600 mb-1.5">
             <span>Sisa Plafon Saat Ini:</span>
-            <strong className="text-emerald-800 font-extrabold text-sm">
+            <strong className="text-red-600 font-extrabold text-sm">
               Rp {currentRemainingBudget.toLocaleString('id-ID')}
             </strong>
           </div>
           <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
             <div 
-              className="h-full bg-emerald-700 rounded-full transition-all"
+              className="h-full bg-red-600 rounded-full transition-all"
               style={{ width: `${Math.min(100, Math.max(10, (currentRemainingBudget / 350000) * 100))}%` }}
             />
           </div>
@@ -283,7 +281,7 @@ export default function CatalogInputScreen({
 
       {/* 2. FORM INPUT UTAMA */}
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3.5">
-        {/* Nama Barang with Barcode Scanner Icon inside & Autocomplete Dropdown */}
+        {/* Nama Barang with Autocomplete Dropdown & Emoji Support */}
         <div className="relative">
           <div className="flex items-center justify-between text-xs font-bold text-slate-800 mb-1">
             <span>Nama Barang *</span>
@@ -299,11 +297,11 @@ export default function CatalogInputScreen({
               }}
               onFocus={() => setShowSuggestions(true)}
               onBlur={() => {
-                setTimeout(() => setShowSuggestions(false), 200);
+                setTimeout(() => setShowSuggestions(false), 250);
               }}
-              placeholder="Ketik nama barang (contoh: Minyak, Beras, Mie)"
+              placeholder="Ketik nama barang (contoh: Beras 5kg, Telur, Garam)"
               required
-              className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-700 focus:bg-white"
+              className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-red-600 focus:bg-white"
             />
             <button
               type="button"
@@ -311,15 +309,15 @@ export default function CatalogInputScreen({
                 playTapSound();
                 if (onOpenBarcodeModal) onOpenBarcodeModal();
               }}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-700 hover:text-emerald-800 p-1"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-red-600 hover:text-red-700 p-1 cursor-pointer"
               title="Pindai Barcode Supermarket"
             >
               <Scan className="w-5 h-5" />
             </button>
 
-            {/* Dropdown Rekomendasi / Autocomplete */}
+            {/* Dropdown Rekomendasi / Autocomplete (100% Emoji & Fluctuation Badge) */}
             {showSuggestions && filteredSuggestions.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 z-50 max-h-56 overflow-y-auto divide-y divide-slate-100">
+              <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 z-50 max-h-64 overflow-y-auto divide-y divide-slate-100">
                 <div className="px-3 py-1 text-[9.5px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50 flex items-center justify-between">
                   <span>Rekomendasi Barang</span>
                   <span>{filteredSuggestions.length} ditemukan</span>
@@ -332,21 +330,31 @@ export default function CatalogInputScreen({
                       e.preventDefault();
                       handleSelectSuggestion(sug);
                     }}
-                    className="w-full px-3 py-2 text-left hover:bg-emerald-50/70 transition-colors flex items-center justify-between group cursor-pointer"
+                    className="w-full px-3 py-2 text-left hover:bg-red-50/50 transition-colors flex items-center justify-between group cursor-pointer gap-2"
                   >
-                    <div className="min-w-0 pr-2">
-                      <div className="text-xs font-bold text-slate-800 group-hover:text-emerald-800 truncate">
-                        {sug.name}
+                    <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                      {/* Emoji Icon Container */}
+                      <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-xl shrink-0">
+                        {getProductEmoji(sug.name, sug.category)}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-medium">
-                        {sug.unit || 'pcs'}
+                      <div className="min-w-0 pr-1">
+                        <div className="text-xs font-bold text-slate-800 group-hover:text-red-600 truncate">
+                          {sug.name}
+                        </div>
+                        <div className="flex items-center space-x-1 mt-0.5">
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {sug.unit || 'pcs'}
+                          </span>
+                          <span>•</span>
+                          <PriceFluctuationBadge price={sug.price} lastMonthPrice={sug.lastMonthPrice} showOldPrice={false} />
+                        </div>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="text-xs font-black text-emerald-800">
+                      <div className="text-xs font-black text-slate-900">
                         Rp {Number(sug.price || 0).toLocaleString('id-ID')}
                       </div>
-                      <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded-md">
+                      <span className="text-[9px] font-bold text-red-700 bg-red-50 px-1.5 py-0.2 rounded-md">
                         {sug.category || 'Bahan Pokok'}
                       </span>
                     </div>
@@ -358,14 +366,14 @@ export default function CatalogInputScreen({
 
           {/* Quick chips below input */}
           <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar pt-2 text-[10px]">
-            {quickItems.slice(0, 3).map((item, idx) => (
+            {quickItems.slice(0, 4).map((item, idx) => (
               <button
                 key={idx}
                 type="button"
                 onClick={() => handleSelectQuickItem(item)}
-                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 rounded-full border border-slate-200/80 font-semibold flex items-center space-x-1 transition-colors shrink-0"
+                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-600 rounded-full border border-slate-200/80 font-semibold flex items-center space-x-1 transition-colors shrink-0 cursor-pointer"
               >
-                <Clock className="w-2.5 h-2.5 text-slate-400" />
+                <span>{getProductEmoji(item.name, item.category)}</span>
                 <span>{item.name}</span>
               </button>
             ))}
@@ -393,9 +401,9 @@ export default function CatalogInputScreen({
                     playTapSound();
                     setCategory(cat.id);
                   }}
-                  className={`py-2 px-2 rounded-xl text-[11px] font-bold transition-all border flex items-center justify-center space-x-1 ${
+                  className={`py-2 px-2 rounded-xl text-[11px] font-bold transition-all border flex items-center justify-center space-x-1 cursor-pointer ${
                     isActive
-                      ? 'bg-emerald-800 text-white border-emerald-900 shadow-2xs'
+                      ? 'bg-red-600 text-white border-red-700 shadow-2xs'
                       : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                   }`}
                 >
@@ -416,17 +424,17 @@ export default function CatalogInputScreen({
             <select
               value={unit}
               onChange={(e) => setUnit(e.target.value)}
-              className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-700"
+              className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-red-600"
             >
-              <option value="karung/5kg">karung/5kg</option>
+              <option value="5kg">5kg</option>
+              <option value="1 kg">1 kg</option>
+              <option value="500g">500g</option>
+              <option value="250g">250g</option>
               <option value="pouch/2L">pouch/2L</option>
               <option value="kotak/1L">kotak/1L</option>
-              <option value="pouch/450ml">pouch/450ml</option>
-              <option value="liter">liter</option>
-              <option value="kg">kg</option>
-              <option value="tray">tray</option>
+              <option value="pouch/400ml">pouch/400ml</option>
               <option value="pcs">pcs</option>
-              <option value="zak">zak</option>
+              <option value="ikat">ikat</option>
             </select>
           </div>
 
@@ -441,7 +449,7 @@ export default function CatalogInputScreen({
                   playTapSound();
                   setQuantity(Math.max(1, quantity - 1));
                 }}
-                className="w-8 h-8 rounded-lg bg-white text-slate-700 flex items-center justify-center shadow-2xs hover:bg-slate-100 font-bold"
+                className="w-8 h-8 rounded-lg bg-white text-slate-700 flex items-center justify-center shadow-2xs hover:bg-slate-100 font-bold cursor-pointer"
               >
                 <Minus className="w-3.5 h-3.5" />
               </button>
@@ -454,7 +462,7 @@ export default function CatalogInputScreen({
                   playTapSound();
                   setQuantity(quantity + 1);
                 }}
-                className="w-8 h-8 rounded-lg bg-white text-slate-700 flex items-center justify-center shadow-2xs hover:bg-slate-100 font-bold"
+                className="w-8 h-8 rounded-lg bg-white text-slate-700 flex items-center justify-center shadow-2xs hover:bg-slate-100 font-bold cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
@@ -462,89 +470,62 @@ export default function CatalogInputScreen({
           </div>
         </div>
 
-        {/* Harga Satuan Normal with Validation */}
+        {/* Harga Satuan Normal (Rp) */}
         <div>
-          <div className="flex items-center justify-between text-xs font-bold text-slate-800 mb-1">
-            <span>Harga Satuan Normal *</span>
-            <span className="text-[10px] text-slate-400 font-semibold">Numeric Numpad</span>
-          </div>
+          <label className="text-xs font-bold text-slate-800 mb-1 block">
+            Harga Satuan Normal (Rp) *
+          </label>
           <div className="relative">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-extrabold text-slate-900">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
               Rp
             </span>
             <input
-              type="number"
+              type="text"
               inputMode="numeric"
-              value={priceNum || ''}
-              onChange={(e) => setNormalPrice(e.target.value)}
-              placeholder="100.000"
-              min="0"
-              step="500"
+              value={normalPrice}
+              onChange={(e) => {
+                const numeric = e.target.value.replace(/\D/g, '');
+                setNormalPrice(numeric);
+              }}
+              placeholder="74.000"
               required
-              className="w-full pl-11 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-extrabold text-slate-900 focus:outline-none focus:border-emerald-700 focus:bg-white"
+              className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-red-600 focus:bg-white"
             />
           </div>
         </div>
 
-        {/* 3. SKEMA PROMO DISKON (F-03) */}
-        <div className="bg-amber-50/50 border border-amber-200/80 rounded-2xl p-3.5 space-y-3">
+        {/* 3. SKEMA DISKON BERSTANDAR SRS F-03 */}
+        <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-200/90 space-y-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-1.5 text-xs font-extrabold text-slate-900">
-              <span className="w-5 h-5 rounded-md bg-amber-200 text-amber-900 flex items-center justify-center text-[10px]">
-                %
+            <div className="flex items-center space-x-1.5">
+              <Percent className="w-4 h-4 text-red-600" />
+              <span className="text-xs font-black text-slate-900">
+                Skema Promo &amp; Diskon Bertingkat
               </span>
-              <span>Skema Promo Diskon</span>
             </div>
-
-            {/* Toggle Tabs: Tunggal | Kompound */}
-            <div className="flex p-0.5 bg-slate-200/80 rounded-lg text-[10px] font-bold">
-              <button
-                type="button"
-                onClick={() => {
-                  playTapSound();
-                  setDiscountMode('tunggal');
-                }}
-                className={`px-2.5 py-1 rounded-md transition-colors ${
-                  discountMode === 'tunggal' ? 'bg-white text-emerald-900 shadow-2xs' : 'text-slate-500'
-                }`}
-              >
-                Tunggal
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  playTapSound();
-                  setDiscountMode('kompound');
-                }}
-                className={`px-2.5 py-1 rounded-md transition-colors ${
-                  discountMode === 'kompound' ? 'bg-white text-emerald-900 shadow-2xs' : 'text-slate-500'
-                }`}
-              >
-                Kompound
-              </button>
-            </div>
+            <span className="text-[10px] text-slate-400 font-semibold">SRS F-03</span>
           </div>
 
-          {/* Preset Cepat Supermarket */}
+          {/* Quick Presets */}
           <div>
-            <span className="text-[10px] font-semibold text-slate-500 mb-1.5 block">
-              Preset Cepat Supermarket:
+            <span className="text-[11px] font-bold text-slate-600 mb-1.5 block">
+              Pilih Cepat Diskon:
             </span>
             <div className="flex flex-wrap gap-1.5">
-              {presets.map((p) => {
-                const isSelected = selectedPreset === p.id;
+              {presets.map((pr) => {
+                const isSelected = selectedPreset === pr.id;
                 return (
                   <button
-                    key={p.id}
+                    key={pr.id}
                     type="button"
-                    onClick={() => handleSelectPreset(p)}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all border ${
+                    onClick={() => handleSelectPreset(pr)}
+                    className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold border transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-amber-700 text-white border-amber-800 shadow-2xs'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        ? 'bg-red-600 text-white border-red-700 shadow-2xs'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                     }`}
                   >
-                    {p.label}
+                    {pr.label}
                   </button>
                 );
               })}
@@ -555,7 +536,7 @@ export default function CatalogInputScreen({
           <div>
             <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 mb-1">
               <span>Formula Diskon (% atau %)</span>
-              <span className="text-[10px] text-amber-800 font-semibold">
+              <span className="text-[10px] text-red-600 font-semibold">
                 {discountMode === 'kompound' ? 'Mode Diskon Kompound' : 'Mode Diskon Tunggal'}
               </span>
             </div>
@@ -565,7 +546,7 @@ export default function CatalogInputScreen({
                 value={discountFormula}
                 onChange={(e) => setDiscountFormula(e.target.value)}
                 placeholder="50% + 20%"
-                className="w-full pl-3 pr-8 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-700"
+                className="w-full pl-3 pr-8 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-red-600"
               />
               {discountFormula && (
                 <button
@@ -574,7 +555,7 @@ export default function CatalogInputScreen({
                     setDiscountFormula('0%');
                     setSelectedPreset('');
                   }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -600,7 +581,7 @@ export default function CatalogInputScreen({
                 <span className="font-bold text-emerald-700">Rp {finalUnitPrice.toLocaleString('id-ID')} ({d2}%)</span>
               </div>
             )}
-            <div className="flex justify-between text-amber-800 font-extrabold pt-1.5 border-t border-slate-100">
+            <div className="flex justify-between text-red-600 font-extrabold pt-1.5 border-t border-slate-100">
               <span className="flex items-center space-x-1">
                 <span>🎁 Total Hemat Diskon:</span>
               </span>
@@ -610,7 +591,7 @@ export default function CatalogInputScreen({
         </div>
 
         {/* 4. SIMULASI DAMPAK PLAFON */}
-        <div className="bg-sky-50/70 border border-sky-200/80 rounded-2xl p-3 text-xs space-y-1.5">
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="font-bold text-slate-800 flex items-center space-x-1">
               <span>⚡ Simulasi Dampak Plafon:</span>
@@ -623,7 +604,7 @@ export default function CatalogInputScreen({
           </div>
           <div className="flex items-center justify-between text-slate-600">
             <span>Saldo sesudah item ini:</span>
-            <strong className={`font-extrabold text-sm ${isBudgetSafe ? 'text-emerald-800' : 'text-red-600'}`}>
+            <strong className={`font-extrabold text-sm ${isBudgetSafe ? 'text-emerald-700' : 'text-red-600'}`}>
               Rp {simulatedRemaining.toLocaleString('id-ID')}
             </strong>
           </div>
@@ -637,10 +618,10 @@ export default function CatalogInputScreen({
           <p className="text-xs text-rose-600 font-bold text-center">{errorMessage}</p>
         )}
 
-        {/* 5. CTA BUTTON BESAR HIJAU */}
+        {/* 5. CTA BUTTON BESAR LOTTE RED */}
         <button
           type="submit"
-          className="w-full py-3.5 bg-emerald-800 hover:bg-emerald-900 active:bg-emerald-950 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center space-x-2 transition-all cursor-pointer"
+          className="w-full py-3.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center space-x-2 transition-all cursor-pointer"
         >
           <ShoppingCart className="w-4 h-4" />
           <span>Tambah ke Keranjang (+)</span>
@@ -657,4 +638,3 @@ export default function CatalogInputScreen({
     </div>
   );
 }
-

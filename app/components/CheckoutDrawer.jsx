@@ -16,6 +16,7 @@ import {
   Truck
 } from 'lucide-react';
 import { playTapSound, playSuccessSound } from '../utils/sound';
+import { ProductEmojiBox } from '../utils/emoji';
 import { saveShoppingTrip } from '../../src/lib/supabaseClient';
 
 export default function CheckoutDrawer({
@@ -256,10 +257,10 @@ export default function CheckoutDrawer({
                       className="flex items-center justify-between p-2.5 bg-white border border-slate-200/80 rounded-xl"
                     >
                       <div className="flex items-center space-x-2.5">
-                        <img 
-                          src={item.image} 
-                          alt={item.name} 
-                          className="w-12 h-12 object-cover rounded-lg shrink-0 bg-slate-100" 
+                        <ProductEmojiBox 
+                          name={item.name} 
+                          category={item.category} 
+                          className="w-12 h-12 text-2xl" 
                         />
                         <div>
                           <h5 className="text-xs font-bold text-slate-800 line-clamp-1 max-w-[150px]">

@@ -46,14 +46,14 @@ export default function BottomNav({ activeTab = 'cart', onChangeTab, cartCount =
                 <Icon
                   className={`w-6 h-6 transition-all duration-200 ${
                     isActive
-                      ? 'text-emerald-700 scale-105 stroke-[2.3]'
+                      ? 'text-red-600 scale-105 stroke-[2.3]'
                       : 'text-slate-400 group-hover:text-slate-600 stroke-[1.8]'
                   }`}
                 />
 
                 {/* Badge indicator on Cart */}
                 {tab.badge !== null && tab.badge !== undefined && (
-                  <span className="absolute -top-1.5 -right-3 bg-emerald-700 text-white text-[10px] font-extrabold px-1.5 py-0.2 rounded-full border-2 border-white shadow-sm min-w-[18px] text-center">
+                  <span className="absolute -top-1.5 -right-3 bg-red-600 text-white text-[10px] font-extrabold px-1.5 py-0.2 rounded-full border-2 border-white shadow-sm min-w-[18px] text-center">
                     {tab.badge}
                   </span>
                 )}
@@ -62,16 +62,16 @@ export default function BottomNav({ activeTab = 'cart', onChangeTab, cartCount =
               <span
                 className={`text-[11px] mt-1 font-semibold tracking-tight transition-colors ${
                   isActive
-                    ? 'text-emerald-800 font-bold'
+                    ? 'text-red-600 font-bold'
                     : 'text-slate-500 group-hover:text-slate-700'
                 }`}
               >
                 {tab.label}
               </span>
 
-              {/* Active indicator bar */}
+              {/* Active indicator bar - Lotte Red */}
               {isActive && (
-                <span className="absolute top-0 w-10 h-0.5 bg-emerald-700 rounded-full" />
+                <span className="absolute top-0 w-10 h-0.5 bg-red-600 rounded-full" />
               )}
             </button>
           );

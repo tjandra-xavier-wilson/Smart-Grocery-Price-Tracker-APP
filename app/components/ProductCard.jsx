@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Plus, Minus, Star } from 'lucide-react';
 import { playTapSound } from '../utils/sound';
+import { ProductEmojiBox } from '../utils/emoji';
 
 export default function ProductCard({ 
   product, 
@@ -35,18 +36,17 @@ export default function ProductCard({
       className="bg-white rounded-2xl border border-slate-200/80 p-2.5 shadow-card hover:shadow-md transition-all duration-200 flex flex-col justify-between group relative overflow-hidden active-press"
     >
       <div>
-        {/* Product Image Container */}
-        <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-100 mb-2">
-          <img
-            src={product.image}
-            alt={product.name}
-            loading="lazy"
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        {/* Product Emoji Container (100% Emoji, No <img> Tag) */}
+        <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-100 mb-2 flex items-center justify-center">
+          <ProductEmojiBox 
+            name={product.name} 
+            category={product.category} 
+            className="w-full h-full text-5xl bg-slate-50" 
           />
 
           {/* Discount Badge Overlay */}
           {product.discountPercent > 0 && (
-            <div className="absolute top-2 left-2 bg-rose-500 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-full shadow-xs">
+            <div className="absolute top-2 left-2 bg-red-600 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-full shadow-xs">
               {product.discountPercent}% OFF
             </div>
           )}
@@ -81,28 +81,28 @@ export default function ProductCard({
             </span>
           )}
 
-          {/* Price (Indigo modern accent) */}
-          <span className="text-[14px] sm:text-[15px] font-extrabold text-indigo-600 leading-tight">
+          {/* Price (Lotte Red accent) */}
+          <span className="text-[14px] sm:text-[15px] font-extrabold text-red-600 leading-tight">
             {formatRupiah(product.price)}
           </span>
         </div>
 
-        {/* Indigo Stepper / Add to Cart Button */}
+        {/* Lotte Red Stepper / Add to Cart Button */}
         {quantityInCart > 0 ? (
-          <div className="flex items-center space-x-1 bg-indigo-50 border border-indigo-200 rounded-full p-0.5 shadow-xs">
+          <div className="flex items-center space-x-1 bg-red-50 border border-red-200 rounded-full p-0.5 shadow-xs">
             <button
               onClick={handleRemove}
-              className="w-6 h-6 rounded-full bg-white text-indigo-600 flex items-center justify-center hover:bg-slate-100 active-press shadow-xs"
+              className="w-6 h-6 rounded-full bg-white text-red-600 flex items-center justify-center hover:bg-slate-100 active-press shadow-xs cursor-pointer"
               aria-label="Kurangi kuantitas"
             >
               <Minus className="w-3.5 h-3.5 stroke-[2.5]" />
             </button>
-            <span className="text-xs font-bold text-indigo-900 px-1 min-w-[14px] text-center">
+            <span className="text-xs font-bold text-red-900 px-1 min-w-[14px] text-center">
               {quantityInCart}
             </span>
             <button
               onClick={handleAdd}
-              className={`w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700 active-press shadow-xs ${
+              className={`w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center hover:bg-red-700 active-press shadow-xs cursor-pointer ${
                 isBouncing ? 'animate-bounce-short' : ''
               }`}
               aria-label="Tambah kuantitas"
@@ -113,7 +113,7 @@ export default function ProductCard({
         ) : (
           <button
             onClick={handleAdd}
-            className={`w-8 h-8 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center shadow-brand active-press transition-transform duration-150 ${
+            className={`w-8 h-8 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center shadow-md active-press transition-transform duration-150 cursor-pointer ${
               isBouncing ? 'animate-bounce-short' : ''
             }`}
             aria-label="Tambah ke Keranjang"

@@ -50,22 +50,44 @@ const STORAGE_KEYS = {
   SPLASH_SHOWN: 'sentinel_splash_shown'
 };
 
-// Initial Mockup 2 Dataset (Normal: Rp 284.000 / Rp 350.000)
+// Initial Mockup 2 Dataset (Normal: Rp 284.000 / Rp 350.000 - 100% Emoji)
 const MOCKUP_NORMAL_CART = [
   {
     id: 'prod-1',
-    name: 'Beras Premium Rojolele 5kg',
+    name: 'Beras 5kg',
     price: 74000,
     originalPrice: 74000,
     quantity: 1,
-    unit: 'karung / 5kg',
+    unit: '5kg',
     category: 'Bahan Pokok',
     isSecondary: false,
-    lastMonthPrice: 70000, // +Rp 4.000 vs bln lalu
-    image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&auto=format&fit=crop&q=80'
+    lastMonthPrice: 68000 // +Rp 6.000 vs bln lalu (Skenario Uji 4)
   },
   {
     id: 'prod-2',
+    name: 'Telur Ayam Ras 1kg',
+    price: 28000,
+    originalPrice: 32000,
+    discountLabel: 'Diskon Hemat',
+    quantity: 1,
+    unit: '1 kg',
+    category: 'Bahan Pokok',
+    isSecondary: false,
+    lastMonthPrice: 32000 // -Rp 4.000 hemat vs bln lalu (Skenario Uji 4)
+  },
+  {
+    id: 'prod-3',
+    name: 'Garam 500g',
+    price: 5000,
+    originalPrice: 5000,
+    quantity: 2,
+    unit: '500g',
+    category: 'Bahan Pokok',
+    isSecondary: false,
+    lastMonthPrice: 5000 // Harga Stabil (Skenario Uji 4)
+  },
+  {
+    id: 'prod-4',
     name: 'Minyak Goreng Sania 2L',
     price: 33500,
     originalPrice: 39500,
@@ -74,11 +96,10 @@ const MOCKUP_NORMAL_CART = [
     unit: 'pouch / 2L',
     category: 'Bahan Pokok',
     isSecondary: false,
-    lastMonthPrice: 36000, // -Rp 2.500 hemat vs bln lalu
-    image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80'
+    lastMonthPrice: 36000
   },
   {
-    id: 'prod-3',
+    id: 'prod-5',
     name: 'Sabun Mandi Dettol Reff 450ml',
     price: 28500,
     originalPrice: 35000,
@@ -87,24 +108,22 @@ const MOCKUP_NORMAL_CART = [
     unit: 'pouch / 450ml',
     category: 'Perlengkapan Mandi',
     isSecondary: false,
-    lastMonthPrice: 28500, // Harga Stabil
-    image: 'https://images.unsplash.com/photo-1608248597359-54359483c6f8?w=600&auto=format&fit=crop&q=80'
+    lastMonthPrice: 28500
   },
   {
-    id: 'prod-4',
+    id: 'prod-6',
     name: 'Susu UHT Full Cream Greenfields 1L',
     price: 21500,
     originalPrice: 21500,
-    quantity: 4,
+    quantity: 2,
     unit: 'kotak / 1L',
-    category: 'Produk Susu & Telur',
+    category: 'Bahan Pokok',
     isSecondary: false,
-    lastMonthPrice: 20000, // +Rp 1.500 vs bln lalu
-    image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=600&auto=format&fit=crop&q=80'
+    lastMonthPrice: 20000
   }
 ];
 
-// Mockup 3 Dataset (Overbudget: Rp 382.500 / Rp 350.000)
+// Mockup 3 Dataset (Overbudget: Rp 382.500 / Rp 350.000 - 100% Emoji)
 const MOCKUP_OVERBUDGET_CART = [
   {
     id: 'over-1',
@@ -116,7 +135,7 @@ const MOCKUP_OVERBUDGET_CART = [
     category: 'Confectionery',
     subcat: 'Kategori: Confectionery',
     isSecondary: true, // Sekunder - Rekomendasi Batalkan
-    image: 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=600&auto=format&fit=crop&q=80'
+    lastMonthPrice: 45000
   },
   {
     id: 'over-2',
@@ -128,31 +147,31 @@ const MOCKUP_OVERBUDGET_CART = [
     category: 'Minuman Manis',
     subcat: 'Kategori: Minuman Manis',
     isSecondary: true, // Sekunder - Rekomendasi Batalkan
-    image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=600&auto=format&fit=crop&q=80'
+    lastMonthPrice: 9000
   },
   {
     id: 'over-3',
-    name: 'Beras Premium Pandan Wangi 5kg',
-    price: 78500,
-    originalPrice: 78500,
+    name: 'Beras 5kg',
+    price: 74000,
+    originalPrice: 74000,
     quantity: 1,
-    unit: 'zak',
+    unit: '5kg',
     category: 'Primer / Pokok',
     subcat: 'Kebutuhan Pokok Utama',
     isSecondary: false,
-    image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&auto=format&fit=crop&q=80'
+    lastMonthPrice: 68000
   },
   {
     id: 'over-4',
-    name: 'Telur Ayam Negeri Fresh 1 Tray',
-    price: 56000,
-    originalPrice: 56000,
-    quantity: 1,
-    unit: 'tray',
+    name: 'Telur Ayam Ras 1kg',
+    price: 28000,
+    originalPrice: 32000,
+    quantity: 2,
+    unit: '1 kg',
     category: 'Primer / Protein',
     subcat: 'Protein Harian',
     isSecondary: false,
-    image: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=600&auto=format&fit=crop&q=80'
+    lastMonthPrice: 32000
   },
   {
     id: 'over-5',
@@ -164,7 +183,7 @@ const MOCKUP_OVERBUDGET_CART = [
     category: 'Primer / Dapur',
     subcat: 'Sembako Rumah Tangga',
     isSecondary: false,
-    image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80'
+    lastMonthPrice: 37000
   }
 ];
 
@@ -180,7 +199,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('cart');
 
   // Core App State
-  const [currentStore, setCurrentStore] = useState('Lotte Mart - Puri Indah');
+  const [currentStore, setCurrentStore] = useState('Lotte Mart Grocery - Puri Indah');
   const [transactionDate, setTransactionDate] = useState('24 Mei 2025');
   const [budgetLimit, setBudgetLimit] = useState(350000);
   // State keranjang belanja terisolasi per akun (akun baru tanpa transaksi mulai dari state kosong [])
@@ -926,7 +945,7 @@ export default function Home() {
     setCartItems([]);
     setHistoryList([]);
     setBudgetLimit(350000);
-    setCurrentStore('Lotte Mart - Puri Indah');
+    setCurrentStore('Lotte Mart Grocery - Puri Indah');
     setTransactionDate(toIndoDisplayDate(new Date()));
     setCurrentUser(null);
     setIsAuthenticated(false);
@@ -1266,10 +1285,10 @@ export default function Home() {
 
   if (!isMounted) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-[#e2e8f0] via-[#e8eff2] to-[#d6e6e6] flex items-center justify-center p-0 md:p-6 lg:p-8 font-sans selection:bg-teal-600 selection:text-white">
+      <main className="min-h-screen bg-gradient-to-br from-[#e2e8f0] via-[#e8eff2] to-[#d6e6e6] flex items-center justify-center p-0 md:p-6 lg:p-8 font-sans selection:bg-red-600 selection:text-white">
         <div className="w-full max-w-[430px] bg-white min-h-screen md:min-h-[900px] md:max-h-[920px] md:rounded-[44px] shadow-2xl md:ring-12 md:ring-slate-800/90 overflow-hidden flex flex-col items-center justify-center relative">
           <div className="flex flex-col items-center space-y-3">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-800 flex items-center justify-center text-white shadow-md animate-pulse">
+            <div className="w-14 h-14 rounded-2xl bg-red-600 flex items-center justify-center text-white shadow-md animate-pulse">
               <span className="text-2xl font-bold">🛒</span>
             </div>
             <span className="text-xs font-bold text-slate-500">Memuat Smart Grocery Sentinel...</span>
@@ -1280,7 +1299,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-[#e2e8f0] via-[#e8eff2] to-[#d6e6e6] flex items-center justify-center p-0 md:p-6 lg:p-8 font-sans selection:bg-teal-600 selection:text-white">
+    <main className="min-h-screen bg-gradient-to-br from-[#e2e8f0] via-[#e8eff2] to-[#d6e6e6] flex items-center justify-center p-0 md:p-6 lg:p-8 font-sans selection:bg-red-600 selection:text-white">
       {/* Mobile Shell Mockup Wrapper (iPhone 16 Pro Max 430px Standard) */}
       <div className="w-full max-w-[430px] bg-white min-h-screen md:min-h-[900px] md:max-h-[920px] md:rounded-[44px] shadow-2xl md:ring-12 md:ring-slate-800/90 overflow-hidden flex flex-col relative transition-all duration-300">
         
