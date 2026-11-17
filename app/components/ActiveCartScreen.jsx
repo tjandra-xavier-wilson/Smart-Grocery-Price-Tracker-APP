@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Store, 
   Wallet, 
@@ -491,6 +491,63 @@ export default function ActiveCartScreen({
     }
   };
 
+  // =========================================================================
+  // SISTEM PAGINATION REKOMENDASI BELANJA (Mencegah Nested Scroll Trap)
+  // =========================================================================
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 3;
+
+  // Reset currentPage kembali ke 1 setiap kali pengguna mengganti kategori belanja di atasnya
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeCategory]);
+
+  // Daftar seluruh barang yang dinormalisasi dengan info grup kategori
+  const currentCategoryItems = useMemo(() => {
+    if (activeCategory === 'all') {
+      return Object.entries(RECOMMENDED_PRODUCTS_BY_CATEGORY).flatMap(([catKey, catGroup]) => 
+        catGroup.items.map(item => ({
+          ...item,
+          categoryKey: catKey,
+          categoryName: catGroup.categoryName,
+          categoryEmoji: catGroup.iconEmoji,
+          categoryTotalCount: catGroup.items.length
+        }))
+      );
+    }
+    const group = RECOMMENDED_PRODUCTS_BY_CATEGORY[activeCategory];
+    if (!group) return [];
+    return group.items.map(item => ({
+      ...item,
+      categoryKey: activeCategory,
+      categoryName: group.categoryName,
+      categoryEmoji: group.iconEmoji,
+      categoryTotalCount: group.items.length
+    }));
+  }, [activeCategory]);
+
+  const totalPages = Math.max(1, Math.ceil(currentCategoryItems.length / itemsPerPage));
+
+  // Slice item untuk halaman saat ini
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return currentCategoryItems.slice(startIndex, startIndex + itemsPerPage);
+  }, [currentCategoryItems, currentPage, itemsPerPage]);
+
+  // Helper nomor halaman angka "1, 2, 3..."
+  const getPageNumbers = () => {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (currentPage <= 3) {
+      return [1, 2, 3, 4, '...', totalPages];
+    }
+    if (currentPage >= totalPages - 2) {
+      return [1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    }
+    return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+  };
+
   const handleAddRecommended = (prod) => {
     playTapSound();
     if (onAddToCart) {
@@ -923,8 +980,8 @@ export default function ActiveCartScreen({
           </button>
         </div>
 
-        {/* 2. KATALOG REKOMENDASI BELANJA DENGAN SCROLL VERTICAL */}
-        <div className="mx-4 bg-white rounded-2xl p-3.5 border border-slate-200 shadow-xs space-y-2.5">
+        {/* 2. KATALOG REKOMENDASI BELANJA DENGAN SISTEM PAGINATION (BEBAS DARI NESTED SCROLL TRAP) */}
+        <div className="mx-4 bg-white rounded-2xl p-3.5 border border-slate-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <div className="flex items-center space-x-1.5">
               <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-800 flex items-center justify-center">
@@ -941,29 +998,100 @@ export default function ActiveCartScreen({
             </span>
           </div>
 
-          {/* Kontainer Vertikal Scrollable (Scroll wheel ke bawah) */}
-          <div className="max-h-[380px] overflow-y-auto pr-1 space-y-3 scroll-smooth no-scrollbar">
-            {activeCategory === 'all' ? (
-              // Mode 'Semua': Tampilkan seluruh barang dari segala kategori, dikelompokkan berdasarkan kategorinya
-              Object.entries(RECOMMENDED_PRODUCTS_BY_CATEGORY).map(([catKey, catGroup]) => (
-                <div key={catKey} className="space-y-2">
-                  <div className="flex items-center space-x-1.5 pt-1 pb-1 border-b border-slate-100 text-slate-800 font-extrabold text-[11px] sticky top-0 bg-white/95 backdrop-blur-xs z-10">
-                    <span>{catGroup.iconEmoji}</span>
-                    <span>{catGroup.categoryName}</span>
-                    <span className="text-[9.5px] font-bold text-slate-400">({catGroup.items.length})</span>
-                  </div>
-
-                  <div className="space-y-2">
-                    {catGroup.items.map((prod) => renderProductCard(prod))}
-                  </div>
-                </div>
-              ))
-            ) : (
-              // Mode Kategori Spesifik: Tampilkan daftar produk kategori terkait dalam 1 kolom list horizontal
-              <div className="space-y-2">
-                {(RECOMMENDED_PRODUCTS_BY_CATEGORY[activeCategory]?.items || []).map((prod) => renderProductCard(prod))}
+          {/* Kontainer Dinamis Tanpa Scroll Internal (h-auto overflow-visible) */}
+          <div className="h-auto overflow-visible space-y-2">
+            {paginatedItems.length === 0 ? (
+              <div className="py-6 text-center text-xs text-slate-400">
+                Tidak ada barang rekomendasi untuk kategori ini.
               </div>
+            ) : (
+              paginatedItems.map((prod, index) => {
+                const prevProd = paginatedItems[index - 1];
+                const isFirstOfCategory = !prevProd || prevProd.categoryName !== prod.categoryName;
+                return (
+                  <React.Fragment key={prod.id}>
+                    {isFirstOfCategory && (
+                      <div className="flex items-center space-x-1.5 pt-1 pb-1 border-b border-slate-100 text-slate-800 font-extrabold text-[11px]">
+                        <span>{prod.categoryEmoji}</span>
+                        <span>{prod.categoryName}</span>
+                        <span className="text-[9.5px] font-bold text-slate-400">
+                          ({prod.categoryTotalCount})
+                        </span>
+                      </div>
+                    )}
+                    {renderProductCard(prod)}
+                  </React.Fragment>
+                );
+              })
             )}
+          </div>
+
+          {/* 3. Komponen Navigasi Halaman (Pagination UI) */}
+          <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-1 select-none">
+            {/* Tombol Sebelumnya */}
+            <button
+              type="button"
+              onClick={() => {
+                playTapSound();
+                setCurrentPage(prev => Math.max(1, prev - 1));
+              }}
+              disabled={currentPage <= 1}
+              className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 shrink-0"
+              title="Halaman Sebelumnya"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Sebelumnya</span>
+            </button>
+
+            {/* Nomor Halaman Angka (1, 2, 3...) */}
+            <div className="flex items-center space-x-1">
+              {getPageNumbers().map((pageNum, idx) => {
+                if (pageNum === '...') {
+                  return (
+                    <span 
+                      key={`dots-${idx}`} 
+                      className="w-7 h-7 flex items-center justify-center text-xs text-slate-400 font-bold select-none"
+                    >
+                      ...
+                    </span>
+                  );
+                }
+                const isActive = currentPage === pageNum;
+                return (
+                  <button
+                    key={`page-${pageNum}`}
+                    type="button"
+                    onClick={() => {
+                      playTapSound();
+                      setCurrentPage(pageNum);
+                    }}
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all cursor-pointer active:scale-95 ${
+                      isActive
+                        ? 'bg-emerald-700 text-white shadow-xs font-extrabold'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 font-semibold'
+                    }`}
+                    title={`Ke Halaman ${pageNum}`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Tombol Selanjutnya */}
+            <button
+              type="button"
+              onClick={() => {
+                playTapSound();
+                setCurrentPage(prev => Math.min(totalPages, prev + 1));
+              }}
+              disabled={currentPage >= totalPages}
+              className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 shrink-0"
+              title="Halaman Selanjutnya"
+            >
+              <span className="hidden sm:inline">Selanjutnya</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </section>

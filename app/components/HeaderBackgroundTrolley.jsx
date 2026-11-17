@@ -17,7 +17,7 @@ import React from 'react';
 export default function HeaderBackgroundTrolley() {
   return (
     <div 
-      className="absolute inset-0 z-0 pointer-events-none overflow-hidden opacity-[0.16] select-none flex items-center justify-center"
+      className="absolute inset-0 z-0 pointer-events-none overflow-hidden opacity-[0.20] select-none flex items-center justify-center"
       aria-hidden="true"
     >
       {/* Custom Keyframes untuk Jiggle Troli, Putaran Roda, Struk Berkibar & Garis Angin */}

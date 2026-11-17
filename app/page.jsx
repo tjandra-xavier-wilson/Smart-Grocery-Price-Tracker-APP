@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import SplashScreen from './components/SplashScreen';
+import HeaderBackgroundTrolley from './components/HeaderBackgroundTrolley';
 import HeaderBar from './components/HeaderBar';
 import BottomNav from './components/BottomNav';
 import LoginScreen from './components/LoginScreen';
@@ -1477,9 +1478,12 @@ export default function Home() {
         ) : (
           <>
             {/* ============================================================== */}
-            {/* HEADER TOP BAR CONTAINER: Clean Production Header */}
+            {/* HEADER TOP BAR CONTAINER: Sticky Header dengan Background Troli Bergerak Kontinu */}
             {/* ============================================================== */}
-            <header className="relative bg-white/95 backdrop-blur-md border-b border-slate-200/80 shrink-0 sticky top-0 z-30 shadow-2xs">
+            <header className="relative overflow-hidden bg-white/95 backdrop-blur-md border-b border-slate-200/80 shrink-0 sticky top-0 z-30 shadow-2xs">
+              {/* Background Animasi Troli & Garis Angin Kecepatan Tinggi (Continuous Loop) */}
+              <HeaderBackgroundTrolley />
+
               {/* Foreground UI Elements */}
               <div className="relative z-10">
                 {/* Global Header Bar: Info Toko, Avatar, Tanggal, Limit Budget */}
