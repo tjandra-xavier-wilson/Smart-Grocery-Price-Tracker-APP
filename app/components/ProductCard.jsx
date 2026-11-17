@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Plus, Minus, Star } from 'lucide-react';
 import { playTapSound } from '../utils/sound';
-import { ProductEmojiBox, getProductEmoji } from '../utils/emoji';
+import { ProductImageThumbnail } from '../utils/emoji';
 
 export default function ProductCard({ 
   product, 
@@ -36,16 +36,14 @@ export default function ProductCard({
       className="bg-white rounded-2xl border border-slate-200/80 p-2.5 shadow-card hover:shadow-md transition-all duration-200 flex flex-col justify-between group relative overflow-hidden active-press"
     >
       <div>
-        {/* Product Emoji Container: 100% Emoji, No <img> Tag */}
-        <div className="w-16 h-16 mx-auto bg-gray-100 rounded-md flex items-center justify-center text-3xl shrink-0 select-none mb-2.5 relative">
-          <span>{getProductEmoji(product.name, product.category)}</span>
-
-          {/* Discount Badge Overlay */}
-          {product.discountPercent > 0 && (
-            <div className="absolute -top-1 -left-1 bg-red-600 text-white font-extrabold text-[9px] px-1.5 py-0.2 rounded-full shadow-xs">
-              {product.discountPercent}% OFF
-            </div>
-          )}
+        {/* Product Image Container with Top-Left Floating Emoji Badge */}
+        <div className="flex justify-center mb-2.5">
+          <ProductImageThumbnail
+            image={product.image}
+            name={product.name}
+            category={product.category}
+            className="w-20 h-20"
+          />
         </div>
 
         {/* Product Name */}
@@ -69,28 +67,28 @@ export default function ProductCard({
             </span>
           )}
 
-          {/* Price (Lotte Red accent) */}
-          <span className="text-[14px] sm:text-[15px] font-extrabold text-red-600 leading-tight">
+          {/* Price (Emerald Green accent) */}
+          <span className="text-[14px] sm:text-[15px] font-extrabold text-emerald-800 leading-tight">
             {formatRupiah(product.price)}
           </span>
         </div>
 
-        {/* Lotte Red Stepper / Add to Cart Button */}
+        {/* Emerald Green Stepper / Add to Cart Button */}
         {quantityInCart > 0 ? (
-          <div className="flex items-center space-x-1 bg-red-50 border border-red-200 rounded-full p-0.5 shadow-xs">
+          <div className="flex items-center space-x-1 bg-emerald-50 border border-emerald-200 rounded-full p-0.5 shadow-xs">
             <button
               onClick={handleRemove}
-              className="w-6 h-6 rounded-full bg-white text-red-600 flex items-center justify-center hover:bg-slate-100 active-press shadow-xs cursor-pointer"
+              className="w-6 h-6 rounded-full bg-white text-emerald-800 flex items-center justify-center hover:bg-slate-100 active-press shadow-xs cursor-pointer"
               aria-label="Kurangi kuantitas"
             >
               <Minus className="w-3.5 h-3.5 stroke-[2.5]" />
             </button>
-            <span className="text-xs font-bold text-red-900 px-1 min-w-[14px] text-center">
+            <span className="text-xs font-bold text-emerald-950 px-1 min-w-[14px] text-center">
               {quantityInCart}
             </span>
             <button
               onClick={handleAdd}
-              className={`w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center hover:bg-red-700 active-press shadow-xs cursor-pointer ${
+              className={`w-6 h-6 rounded-full bg-emerald-800 text-white flex items-center justify-center hover:bg-emerald-900 active-press shadow-xs cursor-pointer ${
                 isBouncing ? 'animate-bounce-short' : ''
               }`}
               aria-label="Tambah kuantitas"
@@ -101,7 +99,7 @@ export default function ProductCard({
         ) : (
           <button
             onClick={handleAdd}
-            className={`w-8 h-8 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center shadow-md active-press transition-transform duration-150 cursor-pointer ${
+            className={`w-8 h-8 rounded-full bg-emerald-800 hover:bg-emerald-900 text-white flex items-center justify-center shadow-md active-press transition-transform duration-150 cursor-pointer ${
               isBouncing ? 'animate-bounce-short' : ''
             }`}
             aria-label="Tambah ke Keranjang"

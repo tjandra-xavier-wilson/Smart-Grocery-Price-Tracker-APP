@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { playTapSound, playSuccessSound } from '../utils/sound';
 import { GROCERY_PRODUCTS } from '../data/groceryData';
-import { getProductEmoji, ProductEmojiBox, PriceFluctuationBadge } from '../utils/emoji';
+import { getProductEmoji, getProductImage, ProductEmojiBox, PriceFluctuationBadge } from '../utils/emoji';
 
 export default function CatalogInputScreen({
   currentStore = 'Lotte Mart Grocery - Puri Indah',
@@ -229,7 +229,8 @@ export default function CatalogInputScreen({
       quantity: quantity,
       isSecondary: category === 'Lainnya' || category === 'Minuman & Camilan',
       discountLabel: (d1 > 0 || d2 > 0) ? `${d1}%${d2 > 0 ? ` + ${d2}%` : ''}` : null,
-      lastMonthPrice: effectiveLastMonth
+      lastMonthPrice: effectiveLastMonth,
+      image: getProductImage(itemName.trim(), category)
     };
 
     playSuccessSound();
@@ -245,7 +246,7 @@ export default function CatalogInputScreen({
       <div className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-xs space-y-2.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
-            <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-xs">
+            <div className="w-10 h-10 rounded-xl bg-emerald-800 text-white flex items-center justify-center shadow-xs">
               <Store className="w-5 h-5" />
             </div>
             <div>
@@ -257,8 +258,8 @@ export default function CatalogInputScreen({
               </h3>
             </div>
           </div>
-          <span className="px-2.5 py-1 bg-red-50 text-red-700 font-bold text-[10px] rounded-full border border-red-200">
-            🔴 Ready
+          <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 font-bold text-[10px] rounded-full border border-emerald-200">
+            🟢 Ready
           </span>
         </div>
 
@@ -266,13 +267,13 @@ export default function CatalogInputScreen({
         <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-600 mb-1.5">
             <span>Sisa Plafon Saat Ini:</span>
-            <strong className="text-red-600 font-extrabold text-sm">
+            <strong className="text-emerald-700 font-extrabold text-sm">
               Rp {currentRemainingBudget.toLocaleString('id-ID')}
             </strong>
           </div>
           <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
             <div 
-              className="h-full bg-red-600 rounded-full transition-all"
+              className="h-full bg-emerald-700 rounded-full transition-all"
               style={{ width: `${Math.min(100, Math.max(10, (currentRemainingBudget / 350000) * 100))}%` }}
             />
           </div>
@@ -301,7 +302,7 @@ export default function CatalogInputScreen({
               }}
               placeholder="Ketik nama barang (contoh: Beras 5kg, Telur, Garam)"
               required
-              className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-red-600 focus:bg-white"
+              className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white"
             />
             <button
               type="button"
@@ -309,7 +310,7 @@ export default function CatalogInputScreen({
                 playTapSound();
                 if (onOpenBarcodeModal) onOpenBarcodeModal();
               }}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-red-600 hover:text-red-700 p-1 cursor-pointer"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-700 hover:text-emerald-800 p-1 cursor-pointer"
               title="Pindai Barcode Supermarket"
             >
               <Scan className="w-5 h-5" />
@@ -330,7 +331,7 @@ export default function CatalogInputScreen({
                       e.preventDefault();
                       handleSelectSuggestion(sug);
                     }}
-                    className="w-full px-3 py-2 text-left hover:bg-red-50/50 transition-colors flex items-center justify-between group cursor-pointer gap-2"
+                    className="w-full px-3 py-2 text-left hover:bg-emerald-50/50 transition-colors flex items-center justify-between group cursor-pointer gap-2"
                   >
                     <div className="flex items-center space-x-2.5 min-w-0 flex-1">
                       {/* Emoji Icon Container */}
@@ -338,7 +339,7 @@ export default function CatalogInputScreen({
                         {getProductEmoji(sug.name, sug.category)}
                       </div>
                       <div className="min-w-0 pr-1">
-                        <div className="text-xs font-bold text-slate-800 group-hover:text-red-600 truncate">
+                        <div className="text-xs font-bold text-slate-800 group-hover:text-emerald-700 truncate">
                           {sug.name}
                         </div>
                         <div className="flex items-center space-x-1 mt-0.5">
@@ -354,7 +355,7 @@ export default function CatalogInputScreen({
                       <div className="text-xs font-black text-slate-900">
                         Rp {Number(sug.price || 0).toLocaleString('id-ID')}
                       </div>
-                      <span className="text-[9px] font-bold text-red-700 bg-red-50 px-1.5 py-0.2 rounded-md">
+                      <span className="text-[9px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded-md">
                         {sug.category || 'Bahan Pokok'}
                       </span>
                     </div>
@@ -371,7 +372,7 @@ export default function CatalogInputScreen({
                 key={idx}
                 type="button"
                 onClick={() => handleSelectQuickItem(item)}
-                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-600 rounded-full border border-slate-200/80 font-semibold flex items-center space-x-1 transition-colors shrink-0 cursor-pointer"
+                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 rounded-full border border-slate-200/80 font-semibold flex items-center space-x-1 transition-colors shrink-0 cursor-pointer"
               >
                 <span>{getProductEmoji(item.name, item.category)}</span>
                 <span>{item.name}</span>
@@ -403,7 +404,7 @@ export default function CatalogInputScreen({
                   }}
                   className={`py-2 px-2 rounded-xl text-[11px] font-bold transition-all border flex items-center justify-center space-x-1 cursor-pointer ${
                     isActive
-                      ? 'bg-red-600 text-white border-red-700 shadow-2xs'
+                      ? 'bg-emerald-800 text-white border-emerald-900 shadow-2xs'
                       : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                   }`}
                 >
@@ -424,7 +425,7 @@ export default function CatalogInputScreen({
             <select
               value={unit}
               onChange={(e) => setUnit(e.target.value)}
-              className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-red-600"
+              className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600"
             >
               <option value="5kg">5kg</option>
               <option value="1 kg">1 kg</option>
@@ -489,7 +490,7 @@ export default function CatalogInputScreen({
               }}
               placeholder="74.000"
               required
-              className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-red-600 focus:bg-white"
+              className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white"
             />
           </div>
         </div>
@@ -498,7 +499,7 @@ export default function CatalogInputScreen({
         <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-200/90 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-1.5">
-              <Percent className="w-4 h-4 text-red-600" />
+              <Percent className="w-4 h-4 text-emerald-700" />
               <span className="text-xs font-black text-slate-900">
                 Skema Promo &amp; Diskon Bertingkat
               </span>
@@ -521,7 +522,7 @@ export default function CatalogInputScreen({
                     onClick={() => handleSelectPreset(pr)}
                     className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold border transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-red-600 text-white border-red-700 shadow-2xs'
+                        ? 'bg-emerald-800 text-white border-emerald-900 shadow-2xs'
                         : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                     }`}
                   >
@@ -536,7 +537,7 @@ export default function CatalogInputScreen({
           <div>
             <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 mb-1">
               <span>Formula Diskon (% atau %)</span>
-              <span className="text-[10px] text-red-600 font-semibold">
+              <span className="text-[10px] text-emerald-700 font-semibold">
                 {discountMode === 'kompound' ? 'Mode Diskon Kompound' : 'Mode Diskon Tunggal'}
               </span>
             </div>
@@ -546,7 +547,7 @@ export default function CatalogInputScreen({
                 value={discountFormula}
                 onChange={(e) => setDiscountFormula(e.target.value)}
                 placeholder="50% + 20%"
-                className="w-full pl-3 pr-8 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-red-600"
+                className="w-full pl-3 pr-8 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
               />
               {discountFormula && (
                 <button
@@ -581,7 +582,7 @@ export default function CatalogInputScreen({
                 <span className="font-bold text-emerald-700">Rp {finalUnitPrice.toLocaleString('id-ID')} ({d2}%)</span>
               </div>
             )}
-            <div className="flex justify-between text-red-600 font-extrabold pt-1.5 border-t border-slate-100">
+            <div className="flex justify-between text-emerald-700 font-extrabold pt-1.5 border-t border-slate-100">
               <span className="flex items-center space-x-1">
                 <span>🎁 Total Hemat Diskon:</span>
               </span>
@@ -597,14 +598,14 @@ export default function CatalogInputScreen({
               <span>⚡ Simulasi Dampak Plafon:</span>
             </span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-              isBudgetSafe ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+              isBudgetSafe ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
             }`}>
               {isBudgetSafe ? 'Masih Aman' : 'Peringatan Limit!'}
             </span>
           </div>
           <div className="flex items-center justify-between text-slate-600">
             <span>Saldo sesudah item ini:</span>
-            <strong className={`font-extrabold text-sm ${isBudgetSafe ? 'text-emerald-700' : 'text-red-600'}`}>
+            <strong className={`font-extrabold text-sm ${isBudgetSafe ? 'text-emerald-700' : 'text-rose-600'}`}>
               Rp {simulatedRemaining.toLocaleString('id-ID')}
             </strong>
           </div>
@@ -618,10 +619,10 @@ export default function CatalogInputScreen({
           <p className="text-xs text-rose-600 font-bold text-center">{errorMessage}</p>
         )}
 
-        {/* 5. CTA BUTTON BESAR LOTTE RED */}
+        {/* 5. CTA BUTTON BESAR EMERALD GREEN */}
         <button
           type="submit"
-          className="w-full py-3.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center space-x-2 transition-all cursor-pointer"
+          className="w-full py-3.5 bg-emerald-800 hover:bg-emerald-900 active:bg-emerald-950 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center space-x-2 transition-all cursor-pointer"
         >
           <ShoppingCart className="w-4 h-4" />
           <span>Tambah ke Keranjang (+)</span>

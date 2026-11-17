@@ -36,6 +36,7 @@ import {
 } from '../src/lib/supabaseClient';
 import { toIndoDisplayDate, toISODateString } from './utils/date';
 import { playTapSound, playSuccessSound } from './utils/sound';
+import { getProductImage } from './utils/emoji';
 
 // Storage Keys for LocalStorage Persistence
 const STORAGE_KEYS = {
@@ -49,7 +50,7 @@ const STORAGE_KEYS = {
   SPLASH_SHOWN: 'sentinel_splash_shown'
 };
 
-// Initial Mockup 2 Dataset (Normal: Rp 284.000 / Rp 350.000 - 100% Emoji)
+// Initial Mockup 2 Dataset (Normal: Rp 284.000 / Rp 350.000 - Real Photos + Top-Left Emoji)
 const MOCKUP_NORMAL_CART = [
   {
     id: 'prod-1',
@@ -60,7 +61,8 @@ const MOCKUP_NORMAL_CART = [
     unit: '5kg',
     category: 'Bahan Pokok',
     isSecondary: false,
-    lastMonthPrice: 68000 // +Rp 6.000 vs bln lalu (Skenario Uji 4)
+    lastMonthPrice: 68000, // +Rp 6.000 vs bln lalu (Skenario Uji 4)
+    image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&auto=format&fit=crop&q=80'
   },
   {
     id: 'prod-2',
@@ -72,7 +74,8 @@ const MOCKUP_NORMAL_CART = [
     unit: '1 kg',
     category: 'Bahan Pokok',
     isSecondary: false,
-    lastMonthPrice: 32000 // -Rp 4.000 hemat vs bln lalu (Skenario Uji 4)
+    lastMonthPrice: 32000, // -Rp 4.000 hemat vs bln lalu (Skenario Uji 4)
+    image: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=300&auto=format&fit=crop&q=80'
   },
   {
     id: 'prod-3',
@@ -83,7 +86,8 @@ const MOCKUP_NORMAL_CART = [
     unit: '500g',
     category: 'Bahan Pokok',
     isSecondary: false,
-    lastMonthPrice: 5000 // Harga Stabil (Skenario Uji 4)
+    lastMonthPrice: 5000, // Harga Stabil (Skenario Uji 4)
+    image: 'https://images.unsplash.com/photo-1518110925495-5fe2fda0442c?w=300&auto=format&fit=crop&q=80'
   },
   {
     id: 'prod-4',
@@ -95,7 +99,8 @@ const MOCKUP_NORMAL_CART = [
     unit: 'pouch / 2L',
     category: 'Bahan Pokok',
     isSecondary: false,
-    lastMonthPrice: 36000
+    lastMonthPrice: 36000,
+    image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=300&auto=format&fit=crop&q=80'
   },
   {
     id: 'prod-5',
@@ -107,7 +112,8 @@ const MOCKUP_NORMAL_CART = [
     unit: 'pouch / 450ml',
     category: 'Perlengkapan Mandi',
     isSecondary: false,
-    lastMonthPrice: 28500
+    lastMonthPrice: 28500,
+    image: 'https://images.unsplash.com/photo-1608248597359-54359483c6f8?w=300&auto=format&fit=crop&q=80'
   },
   {
     id: 'prod-6',
@@ -118,11 +124,12 @@ const MOCKUP_NORMAL_CART = [
     unit: 'kotak / 1L',
     category: 'Bahan Pokok',
     isSecondary: false,
-    lastMonthPrice: 20000
+    lastMonthPrice: 20000,
+    image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&auto=format&fit=crop&q=80'
   }
 ];
 
-// Mockup 3 Dataset (Overbudget: Rp 382.500 / Rp 350.000 - 100% Emoji)
+// Mockup 3 Dataset (Overbudget: Rp 382.500 / Rp 350.000 - Real Photos + Top-Left Emoji)
 const MOCKUP_OVERBUDGET_CART = [
   {
     id: 'over-1',
@@ -134,7 +141,8 @@ const MOCKUP_OVERBUDGET_CART = [
     category: 'Confectionery',
     subcat: 'Kategori: Confectionery',
     isSecondary: true, // Sekunder - Rekomendasi Batalkan
-    lastMonthPrice: 45000
+    lastMonthPrice: 45000,
+    image: 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=300&auto=format&fit=crop&q=80'
   },
   {
     id: 'over-2',
@@ -146,7 +154,8 @@ const MOCKUP_OVERBUDGET_CART = [
     category: 'Minuman Manis',
     subcat: 'Kategori: Minuman Manis',
     isSecondary: true, // Sekunder - Rekomendasi Batalkan
-    lastMonthPrice: 9000
+    lastMonthPrice: 9000,
+    image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=300&auto=format&fit=crop&q=80'
   },
   {
     id: 'over-3',
@@ -158,7 +167,8 @@ const MOCKUP_OVERBUDGET_CART = [
     category: 'Primer / Pokok',
     subcat: 'Kebutuhan Pokok Utama',
     isSecondary: false,
-    lastMonthPrice: 68000
+    lastMonthPrice: 68000,
+    image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&auto=format&fit=crop&q=80'
   },
   {
     id: 'over-4',
@@ -170,7 +180,8 @@ const MOCKUP_OVERBUDGET_CART = [
     category: 'Primer / Protein',
     subcat: 'Protein Harian',
     isSecondary: false,
-    lastMonthPrice: 32000
+    lastMonthPrice: 32000,
+    image: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=300&auto=format&fit=crop&q=80'
   },
   {
     id: 'over-5',
@@ -182,7 +193,8 @@ const MOCKUP_OVERBUDGET_CART = [
     category: 'Primer / Dapur',
     subcat: 'Sembako Rumah Tangga',
     isSecondary: false,
-    lastMonthPrice: 37000
+    lastMonthPrice: 37000,
+    image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=300&auto=format&fit=crop&q=80'
   }
 ];
 
@@ -325,7 +337,10 @@ export default function Home() {
               try {
                 const parsedCart = JSON.parse(savedCart);
                 if (Array.isArray(parsedCart)) {
-                  setCartItems(parsedCart.map(({ image, ...rest }) => rest));
+                  setCartItems(parsedCart.map((item) => ({
+                    ...item,
+                    image: item.image || getProductImage(item.name, item.category)
+                  })));
                 }
               } catch (e) {}
             }
@@ -832,7 +847,10 @@ export default function Home() {
     if (typeof localStorage === 'undefined') return;
 
     const rawCart = newCart !== undefined ? newCart : cartItems;
-    const finalCart = (rawCart || []).map(({ image, ...rest }) => rest);
+    const finalCart = (rawCart || []).map((item) => ({
+      ...item,
+      image: item.image || getProductImage(item.name, item.category)
+    }));
     const finalBudget = newBudget !== undefined ? newBudget : budgetLimit;
     const finalStore = newStore !== undefined ? newStore : currentStore;
     const finalDate = newDate !== undefined ? newDate : transactionDate;
@@ -922,7 +940,12 @@ export default function Home() {
         const saved = localStorage.getItem(userCartKey);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) initialUserCart = parsed.map(({ image, ...rest }) => rest);
+          if (Array.isArray(parsed)) {
+            initialUserCart = parsed.map((item) => ({
+              ...item,
+              image: item.image || getProductImage(item.name, item.category)
+            }));
+          }
         }
       } catch (e) {}
     }
@@ -1021,8 +1044,11 @@ export default function Home() {
   };
 
   const handleAddToCart = (newItem) => {
-    // 100% Emoji Architecture: Hapus secara permanen atribut image jika terbawa
-    const { image, ...cleanItem } = newItem || {};
+    if (!newItem) return;
+    const cleanItem = {
+      ...newItem,
+      image: newItem.image || getProductImage(newItem.name, newItem.category)
+    };
     setCartItems((prev) => {
       const existing = prev.find((i) => i.name.toLowerCase() === cleanItem.name.toLowerCase());
       let updated;
@@ -1302,10 +1328,10 @@ export default function Home() {
 
   if (!isMounted) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-[#e2e8f0] via-[#e8eff2] to-[#d6e6e6] flex items-center justify-center p-0 md:p-6 lg:p-8 font-sans selection:bg-red-600 selection:text-white">
+      <main className="min-h-screen bg-gradient-to-br from-[#e2e8f0] via-[#e8eff2] to-[#d6e6e6] flex items-center justify-center p-0 md:p-6 lg:p-8 font-sans selection:bg-emerald-800 selection:text-white">
         <div className="w-full max-w-[430px] bg-white min-h-screen md:min-h-[900px] md:max-h-[920px] md:rounded-[44px] shadow-2xl md:ring-12 md:ring-slate-800/90 overflow-hidden flex flex-col items-center justify-center relative">
           <div className="flex flex-col items-center space-y-3">
-            <div className="w-14 h-14 rounded-2xl bg-red-600 flex items-center justify-center text-white shadow-md animate-pulse">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-800 flex items-center justify-center text-white shadow-md animate-pulse">
               <span className="text-2xl font-bold">🛒</span>
             </div>
             <span className="text-xs font-bold text-slate-500">Memuat Smart Grocery Sentinel...</span>
@@ -1316,7 +1342,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-[#e2e8f0] via-[#e8eff2] to-[#d6e6e6] flex items-center justify-center p-0 md:p-6 lg:p-8 font-sans selection:bg-red-600 selection:text-white">
+    <main className="min-h-screen bg-gradient-to-br from-[#e2e8f0] via-[#e8eff2] to-[#d6e6e6] flex items-center justify-center p-0 md:p-6 lg:p-8 font-sans selection:bg-emerald-800 selection:text-white">
       {/* Mobile Shell Mockup Wrapper (iPhone 16 Pro Max 430px Standard) */}
       <div className="w-full max-w-[430px] bg-white min-h-screen md:min-h-[900px] md:max-h-[920px] md:rounded-[44px] shadow-2xl md:ring-12 md:ring-slate-800/90 overflow-hidden flex flex-col relative transition-all duration-300">
         

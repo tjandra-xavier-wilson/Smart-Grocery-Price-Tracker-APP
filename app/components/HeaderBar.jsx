@@ -36,13 +36,13 @@ export default function HeaderBar({
       <div className="flex items-center justify-between">
         {/* Left: Avatar & Supermarket Info */}
         <div className="flex items-center space-x-2.5 min-w-0">
-          {/* Avatar button with Lotte Red */}
+          {/* Avatar button with Emerald Green */}
           <button
             onClick={() => {
               playTapSound();
               if (onOpenAuthModal) onOpenAuthModal();
             }}
-            className="w-10 h-10 rounded-full bg-red-600 text-white flex items-center justify-center font-bold text-xs shadow-xs hover:ring-2 hover:ring-red-400 transition-all cursor-pointer overflow-hidden relative shrink-0"
+            className="w-10 h-10 rounded-full bg-emerald-800 text-white flex items-center justify-center font-bold text-xs shadow-xs hover:ring-2 hover:ring-emerald-400 transition-all cursor-pointer overflow-hidden relative shrink-0"
             title="Kelola Akun Pemilik"
           >
             <span className="text-xl select-none">👤</span>
@@ -51,13 +51,13 @@ export default function HeaderBar({
           {/* Store Name & Ganti Button */}
           <div className="flex flex-col text-left min-w-0">
             <div className="flex items-center space-x-1.5">
-              <Store className="w-3.5 h-3.5 text-red-600 shrink-0" />
+              <Store className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
               <button
                 onClick={() => {
                   playTapSound();
                   if (onOpenStoreModal) onOpenStoreModal();
                 }}
-                className="text-xs font-black text-slate-900 hover:text-red-600 transition-colors text-left truncate max-w-[140px] sm:max-w-[180px]"
+                className="text-xs font-black text-slate-900 hover:text-emerald-800 transition-colors text-left truncate max-w-[140px] sm:max-w-[180px]"
                 title="Ganti Supermarket"
               >
                 {currentStore}
@@ -67,7 +67,7 @@ export default function HeaderBar({
                   playTapSound();
                   if (onOpenStoreModal) onOpenStoreModal();
                 }}
-                className="px-1.5 py-0.5 bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-extrabold rounded-md border border-red-200 transition-colors cursor-pointer shrink-0"
+                className="px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-extrabold rounded-md border border-emerald-200 transition-colors cursor-pointer shrink-0"
               >
                 Ganti ⇄
               </button>
@@ -88,14 +88,14 @@ export default function HeaderBar({
         {/* Tanggal Transaksi dengan Interactive Date Picker */}
         <div 
           onClick={handleOpenDatePicker}
-          className="flex-1 flex items-center justify-between px-2.5 py-1.5 bg-slate-50 hover:bg-red-50/70 text-slate-800 border border-slate-200 hover:border-red-200 rounded-xl text-[11px] font-bold cursor-pointer transition-all shadow-2xs group relative min-w-0"
+          className="flex-1 flex items-center justify-between px-2.5 py-1.5 bg-slate-50 hover:bg-emerald-50/70 text-slate-800 border border-slate-200 hover:border-emerald-200 rounded-xl text-[11px] font-bold cursor-pointer transition-all shadow-2xs group relative min-w-0"
           title="Klik untuk ubah tanggal transaksi"
         >
           <div className="flex items-center space-x-1.5 min-w-0 truncate">
-            <Calendar className="w-3.5 h-3.5 text-red-600 shrink-0" />
+            <Calendar className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
             <span className="truncate text-[10.5px]">📅 {transactionDate}</span>
           </div>
-          <span className="text-[10px] font-extrabold text-red-700 bg-red-100/80 px-1.5 py-0.5 rounded-md shrink-0 ml-1">
+          <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-100/80 px-1.5 py-0.5 rounded-md shrink-0 ml-1">
             Ubah
           </span>
 
@@ -122,14 +122,14 @@ export default function HeaderBar({
             playTapSound();
             if (onOpenBudgetModal) onOpenBudgetModal();
           }}
-          className="flex-1 flex items-center justify-between px-2.5 py-1.5 bg-red-50/60 hover:bg-red-100/70 text-slate-900 border border-red-200 rounded-xl text-[11px] font-extrabold transition-all shadow-2xs cursor-pointer group min-w-0"
+          className="flex-1 flex items-center justify-between px-2.5 py-1.5 bg-emerald-50/60 hover:bg-emerald-100/70 text-slate-900 border border-emerald-200 rounded-xl text-[11px] font-extrabold transition-all shadow-2xs cursor-pointer group min-w-0"
           title="Klik untuk mengatur batas saldo budget"
         >
           <div className="flex items-center space-x-1.5 min-w-0 truncate">
-            <Wallet className="w-3.5 h-3.5 text-red-600 shrink-0" />
+            <Wallet className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
             <span className="truncate text-[10.5px]">Limit: Rp {Number(budgetLimit || 0).toLocaleString('id-ID')}</span>
           </div>
-          <span className="flex items-center space-x-0.5 text-[10px] font-black text-red-700 bg-white border border-red-300 px-1.5 py-0.5 rounded-md shrink-0 ml-1">
+          <span className="flex items-center space-x-0.5 text-[10px] font-black text-emerald-800 bg-white border border-emerald-300 px-1.5 py-0.5 rounded-md shrink-0 ml-1">
             <Pencil className="w-2.5 h-2.5" />
             <span>Atur</span>
           </span>

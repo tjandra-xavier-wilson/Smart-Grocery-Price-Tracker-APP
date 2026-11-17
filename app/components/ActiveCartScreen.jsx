@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 import { playTapSound, playSuccessSound, playWarningBeep } from '../utils/sound';
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
-import { getProductEmoji, ProductEmojiBox, PriceFluctuationBadge } from '../utils/emoji';
+import { getProductEmoji, getProductImage, ProductImageThumbnail, ProductEmojiBox, PriceFluctuationBadge } from '../utils/emoji';
 
 export default function ActiveCartScreen({
   cartItems = [],
@@ -68,8 +68,8 @@ export default function ActiveCartScreen({
     { id: 'kebersihan', name: 'Peralatan Kebersihan', emoji: '🧼' }
   ];
 
-  // 2. Data Katalog Rekomendasi Belanja Berdasarkan Kategori Lengkap (100% Emoji, Bebas Tag <img>)
-  // Skenario Uji 4 (SRS F-04): 3 item pertama sembako persis Beras 5kg, Telur Ayam Ras 1kg, Garam 500g
+  // 2. Data Katalog Rekomendasi Belanja Berdasarkan Kategori Lengkap (Gambar Asli + Floating Emoji)
+  // Skenario Uji 4 (SRS F-04): Beras 5kg, Telur Ayam Ras 1kg, Garam 500g
   const RECOMMENDED_PRODUCTS_BY_CATEGORY = {
     sembako: {
       categoryName: 'Bahan Pokok',
@@ -82,7 +82,8 @@ export default function ActiveCartScreen({
           unit: '5kg',
           price: 74000,
           lastMonthPrice: 68000,
-          description: 'Beras putih pulen berkualitas tanpa pemutih'
+          description: 'Beras putih pulen berkualitas tanpa pemutih',
+          image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-sembako-2',
@@ -91,7 +92,8 @@ export default function ActiveCartScreen({
           unit: '1 kg',
           price: 28000,
           lastMonthPrice: 32000,
-          description: 'Telur ayam ras segar kaya protein hewani'
+          description: 'Telur ayam ras segar kaya protein hewani',
+          image: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-sembako-3',
@@ -100,7 +102,8 @@ export default function ActiveCartScreen({
           unit: '500g',
           price: 5000,
           lastMonthPrice: 5000,
-          description: 'Garam dapur beryodium murni standar SNI'
+          description: 'Garam dapur beryodium murni standar SNI',
+          image: 'https://images.unsplash.com/photo-1518110925495-5fe2fda0442c?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-sembako-indomie',
@@ -109,7 +112,8 @@ export default function ActiveCartScreen({
           unit: '5 pcs',
           price: 15500,
           lastMonthPrice: 15500,
-          description: 'Mie instan goreng favorit keluarga Indonesia'
+          description: 'Mie instan goreng favorit keluarga Indonesia',
+          image: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-sembako-4',
@@ -118,7 +122,8 @@ export default function ActiveCartScreen({
           unit: '2L',
           price: 38500,
           lastMonthPrice: 35000,
-          description: 'Jernih tahan panas dengan vitamin E'
+          description: 'Jernih tahan panas dengan vitamin E',
+          image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-sembako-5',
@@ -127,7 +132,8 @@ export default function ActiveCartScreen({
           unit: '1 kg',
           price: 17500,
           lastMonthPrice: 17500,
-          description: 'Gula tebu butiran bersih standar SNI'
+          description: 'Gula tebu butiran bersih standar SNI',
+          image: 'https://images.unsplash.com/photo-1622484212850-eb596d769edc?w=300&auto=format&fit=crop&q=80'
         }
       ]
     },
@@ -142,7 +148,8 @@ export default function ActiveCartScreen({
           unit: '500g',
           price: 9500,
           lastMonthPrice: 8500,
-          description: 'Manis renyah kaya beta-karoten'
+          description: 'Manis renyah kaya beta-karoten',
+          image: 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-sayur-2',
@@ -151,7 +158,8 @@ export default function ActiveCartScreen({
           unit: '1 ikat',
           price: 6000,
           lastMonthPrice: 6000,
-          description: 'Segar bebas pestisida kaya zat besi'
+          description: 'Segar bebas pestisida kaya zat besi',
+          image: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-sayur-3',
@@ -160,7 +168,8 @@ export default function ActiveCartScreen({
           unit: '500g',
           price: 16000,
           lastMonthPrice: 17500,
-          description: 'Brokoli segar kaya antioksidan sehat'
+          description: 'Brokoli segar kaya antioksidan sehat',
+          image: 'https://images.unsplash.com/photo-1459411621453-7b03977f4bfc?w=300&auto=format&fit=crop&q=80'
         }
       ]
     },
@@ -175,7 +184,8 @@ export default function ActiveCartScreen({
           unit: '1 kg',
           price: 34000,
           lastMonthPrice: 38000,
-          description: 'Renyah manis kaya serat & vitamin alami'
+          description: 'Renyah manis kaya serat & vitamin alami',
+          image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-buah-2',
@@ -184,7 +194,8 @@ export default function ActiveCartScreen({
           unit: '1 sisir',
           price: 22000,
           lastMonthPrice: 20000,
-          description: 'Manis legit sumber energi harian'
+          description: 'Manis legit sumber energi harian',
+          image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-buah-3',
@@ -193,7 +204,8 @@ export default function ActiveCartScreen({
           unit: '1 kg',
           price: 26000,
           lastMonthPrice: 26000,
-          description: 'Bulir berair manis menyegarkan'
+          description: 'Bulir berair manis menyegarkan',
+          image: 'https://images.unsplash.com/photo-1547514701-42782101795e?w=300&auto=format&fit=crop&q=80'
         }
       ]
     },
@@ -208,7 +220,8 @@ export default function ActiveCartScreen({
           unit: '1 kg',
           price: 46000,
           lastMonthPrice: 50000,
-          description: 'Dada ayam tanpa tulang tinggi protein'
+          description: 'Dada ayam tanpa tulang tinggi protein',
+          image: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-daging-2',
@@ -217,7 +230,8 @@ export default function ActiveCartScreen({
           unit: '500g',
           price: 68000,
           lastMonthPrice: 65000,
-          description: 'Sapi lokal empuk rendah lemak'
+          description: 'Sapi lokal empuk rendah lemak',
+          image: 'https://images.unsplash.com/photo-1588168333986-5078d3ae3976?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-daging-3',
@@ -226,7 +240,8 @@ export default function ActiveCartScreen({
           unit: '200g',
           price: 55000,
           lastMonthPrice: 55000,
-          description: 'Kaya Omega-3 untuk kesehatan jantung'
+          description: 'Kaya Omega-3 untuk kesehatan jantung',
+          image: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=300&auto=format&fit=crop&q=80'
         }
       ]
     },
@@ -241,7 +256,8 @@ export default function ActiveCartScreen({
           unit: '300g',
           price: 11500,
           lastMonthPrice: 11500,
-          description: 'Biskuit kelapa renyah kaya vitamin'
+          description: 'Biskuit kelapa renyah kaya vitamin',
+          image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-camilan-2',
@@ -250,7 +266,8 @@ export default function ActiveCartScreen({
           unit: '68g',
           price: 12000,
           lastMonthPrice: 11000,
-          description: 'Keripik kentang bergelombang gurih'
+          description: 'Keripik kentang bergelombang gurih',
+          image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-camilan-3',
@@ -259,7 +276,8 @@ export default function ActiveCartScreen({
           unit: '133g',
           price: 9800,
           lastMonthPrice: 10500,
-          description: 'Biskuit cokelat sandwich krim lezat'
+          description: 'Biskuit cokelat sandwich krim lezat',
+          image: 'https://images.unsplash.com/photo-1582293041079-7814c2f12063?w=300&auto=format&fit=crop&q=80'
         }
       ]
     },
@@ -274,7 +292,8 @@ export default function ActiveCartScreen({
           unit: '1L',
           price: 19500,
           lastMonthPrice: 21000,
-          description: 'Susu sapi murni kaya kalsium alami'
+          description: 'Susu sapi murni kaya kalsium alami',
+          image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-minuman-2',
@@ -283,7 +302,8 @@ export default function ActiveCartScreen({
           unit: '10 sachet',
           price: 14500,
           lastMonthPrice: 14500,
-          description: 'Kopi tubruk gula mantap harum'
+          description: 'Kopi tubruk gula mantap harum',
+          image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-minuman-3',
@@ -292,7 +312,8 @@ export default function ActiveCartScreen({
           unit: '1L',
           price: 9500,
           lastMonthPrice: 9500,
-          description: 'Seduhan daun teh melati asli alami'
+          description: 'Seduhan daun teh melati asli alami',
+          image: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=300&auto=format&fit=crop&q=80'
         }
       ]
     },
@@ -307,7 +328,8 @@ export default function ActiveCartScreen({
           unit: '4 pcs',
           price: 16000,
           lastMonthPrice: 16000,
-          description: 'Perlindungan kuman & higienis untuk keluarga'
+          description: 'Perlindungan kuman & higienis untuk keluarga',
+          image: 'https://images.unsplash.com/photo-1608248597359-54359483c6f8?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-kebersihan-1',
@@ -316,7 +338,8 @@ export default function ActiveCartScreen({
           unit: '400ml',
           price: 26500,
           lastMonthPrice: 29000,
-          description: 'Sabun cair antiseptik perlindungan kuman'
+          description: 'Sabun cair antiseptik perlindungan kuman',
+          image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-kebersihan-2',
@@ -325,7 +348,8 @@ export default function ActiveCartScreen({
           unit: '750ml',
           price: 21500,
           lastMonthPrice: 20000,
-          description: 'Hilangkan noda membandel 1x kucek'
+          description: 'Hilangkan noda membandel 1x kucek',
+          image: 'https://images.unsplash.com/photo-1610557892470-55d9e80c0bce?w=300&auto=format&fit=crop&q=80'
         },
         {
           id: 'rec-kebersihan-3',
@@ -334,7 +358,8 @@ export default function ActiveCartScreen({
           unit: '700ml',
           price: 15500,
           lastMonthPrice: 15500,
-          description: 'Bersihkan lemak membandel seketika'
+          description: 'Bersihkan lemak membandel seketika',
+          image: 'https://images.unsplash.com/photo-1585670270638-74dd014045c7?w=300&auto=format&fit=crop&q=80'
         }
       ]
     }
@@ -352,55 +377,65 @@ export default function ActiveCartScreen({
         unit: prod.unit || 'pcs',
         quantity: 1,
         isSecondary: false,
+        image: prod.image || getProductImage(prod.name, prod.category),
         lastMonthPrice: prod.lastMonthPrice !== undefined ? prod.lastMonthPrice : prod.price
       });
     }
   };
 
-  // Render Product Card (Grid 2-Column Card matching User's Mockup in Image 2)
-  const renderProductCard = (prod) => {
-    const emoji = getProductEmoji(prod.name, prod.category);
-    return (
-      <div 
-        key={prod.id}
-        className="bg-white rounded-2xl border border-rose-100/90 p-3 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
-      >
-        <div>
-          {/* Top Emoji Container: 100% Emoji, No <img> Tag */}
-          <div className="w-16 h-16 mx-auto bg-gray-100 rounded-md flex items-center justify-center text-3xl shrink-0 select-none mb-2.5 shadow-sm group-hover:scale-105 transition-transform">
-            <span>{emoji}</span>
-          </div>
+  // Render Product Card (Horizontal List Layout with Real Image & Top-Left Emoji Badge)
+  const renderProductCard = (prod) => (
+    <div 
+      key={prod.id}
+      className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-emerald-50/40 hover:border-emerald-200 flex items-center justify-between gap-3 transition-all group"
+    >
+      {/* Bagian Kiri: Gambar Produk Asli dengan Emoji Kecil di Sudut Kiri Atas */}
+      <ProductImageThumbnail 
+        image={prod.image} 
+        name={prod.name} 
+        category={prod.category} 
+      />
 
-          {/* Product Title */}
-          <h5 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug line-clamp-2 min-h-[36px]">
-            {prod.name}
-          </h5>
-
-          {/* Price Fluctuation Badge (SRS F-04 Skenario Uji 4) */}
-          <div className="mt-1">
-            <PriceFluctuationBadge price={prod.price} lastMonthPrice={prod.lastMonthPrice} showOldPrice={true} />
-          </div>
+      {/* Bagian Tengah: Judul produk, Deskripsi singkat, Kategori & Fluktuasi Harga */}
+      <div className="flex-1 min-w-0">
+        <h5 className="text-xs font-bold text-slate-900 truncate leading-snug">
+          {prod.name}
+        </h5>
+        <p className="text-[10.5px] text-slate-500 line-clamp-1 mt-0.5">
+          {prod.description}
+        </p>
+        <div className="flex items-center space-x-1.5 mt-1">
+          <span className="text-[9px] font-semibold text-slate-500 bg-white border border-slate-200 px-1.5 py-0.2 rounded">
+            {prod.unit}
+          </span>
+          <span className="text-[9px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200/60">
+            {prod.category}
+          </span>
         </div>
-
-        <div className="mt-2.5">
-          {/* Price in Bold Lotte Red */}
-          <div className="text-sm sm:text-base font-extrabold text-[#ED1C24] mb-2 leading-none">
-            Rp {prod.price.toLocaleString('id-ID')}
-          </div>
-
-          {/* Full-width + Tambah Button */}
-          <button
-            type="button"
-            onClick={() => handleAddRecommended(prod)}
-            className="w-full py-2 bg-[#ED1C24] hover:bg-red-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center space-x-1 cursor-pointer"
-            title={`Tambah ${prod.name} ke Keranjang`}
-          >
-            <span>+ Tambah</span>
-          </button>
+        {/* Indikator Fluktuasi Harga Skenario Uji 4 */}
+        <div className="mt-1">
+          <PriceFluctuationBadge price={prod.price} lastMonthPrice={prod.lastMonthPrice} showOldPrice={true} />
         </div>
       </div>
-    );
-  };
+
+      {/* Bagian Kanan: Nominal harga & Tombol Tambah Hijau */}
+      <div className="text-right shrink-0 flex items-center space-x-2">
+        <div>
+          <span className="text-xs font-black text-slate-900 block">
+            Rp {prod.price.toLocaleString('id-ID')}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => handleAddRecommended(prod)}
+          className="w-8 h-8 rounded-xl bg-emerald-800 hover:bg-emerald-900 active:scale-95 text-white flex items-center justify-center shadow-xs transition-all cursor-pointer"
+          title={`Tambah ${prod.name} ke Keranjang`}
+        >
+          <Plus className="w-4 h-4 stroke-[2.5]" />
+        </button>
+      </div>
+    </div>
+  );
 
   // Calculations
   const totalCartPrice = cartItems.reduce((acc, item) => {
@@ -530,7 +565,7 @@ export default function ActiveCartScreen({
                   playTapSound();
                   if (onCutSecondaryItems) onCutSecondaryItems();
                 }}
-                className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-extrabold text-[10px] rounded-lg shadow-2xs flex items-center space-x-1 transition-colors cursor-pointer"
+                className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[10px] rounded-lg shadow-2xs flex items-center space-x-1 transition-colors cursor-pointer"
               >
                 <Scissors className="w-3 h-3" />
                 <span>Pangkas Otomatis</span>
@@ -566,7 +601,7 @@ export default function ActiveCartScreen({
               playTapSound();
               if (onOpenBudgetModal) onOpenBudgetModal();
             }}
-            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
             title="Ubah Batas Saldo Dompet"
           >
             <Pencil className="w-4 h-4" />
@@ -633,7 +668,7 @@ export default function ActiveCartScreen({
               playTapSound();
               if (onLoadMockupNormal) onLoadMockupNormal();
             }}
-            className="text-red-600 hover:underline font-bold"
+            className="text-emerald-700 hover:underline font-bold"
           >
             Mockup 2 (Normal)
           </button>
@@ -643,7 +678,7 @@ export default function ActiveCartScreen({
               playTapSound();
               if (onLoadMockupOverbudget) onLoadMockupOverbudget();
             }}
-            className="text-red-700 hover:underline font-bold"
+            className="text-amber-700 hover:underline font-bold"
           >
             Mockup 3 (Overbudget)
           </button>
@@ -655,7 +690,7 @@ export default function ActiveCartScreen({
         {/* Category Header */}
         <div className="px-4 flex items-center justify-between">
           <div className="flex items-center space-x-1.5 text-xs font-extrabold text-slate-900 tracking-tight">
-            <Sparkles className="w-4 h-4 text-red-600" />
+            <Sparkles className="w-4 h-4 text-emerald-700" />
             <span>Kategori Belanja</span>
           </div>
           <span className="text-[10px] text-slate-400 font-medium">
@@ -686,7 +721,7 @@ export default function ActiveCartScreen({
                 <div 
                   className={`relative w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200 ${
                     isSelected 
-                      ? 'bg-red-600 text-white shadow-md ring-2 ring-red-600 ring-offset-2 scale-105' 
+                      ? 'bg-emerald-800 text-white shadow-md ring-2 ring-emerald-800 ring-offset-2 scale-105' 
                       : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
                 >
@@ -695,7 +730,7 @@ export default function ActiveCartScreen({
 
                 <span className={`text-[10px] mt-1.5 text-center leading-tight transition-colors whitespace-nowrap px-0.5 ${
                   isSelected 
-                    ? 'text-red-600 font-black' 
+                    ? 'text-emerald-900 font-black' 
                     : 'text-slate-500 font-semibold group-hover:text-slate-800'
                 }`}>
                   {cat.name}
@@ -713,7 +748,7 @@ export default function ActiveCartScreen({
             disabled={!canScrollCategoryLeft}
             className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-[10.5px] font-bold border transition-all active:scale-95 cursor-pointer shadow-2xs ${
               canScrollCategoryLeft
-                ? 'bg-white border-slate-200 text-slate-700 hover:bg-red-50 hover:text-red-600 hover:border-red-300'
+                ? 'bg-white border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300'
                 : 'bg-slate-100/60 border-slate-200/50 text-slate-300 cursor-not-allowed opacity-40 shadow-none'
             }`}
             title="Geser kategori ke kiri"
@@ -727,7 +762,7 @@ export default function ActiveCartScreen({
           <div className="flex-1 max-w-[130px] flex items-center justify-center">
             <div className="w-full h-1.5 bg-slate-200/90 rounded-full overflow-hidden p-[1px] flex items-center">
               <div 
-                className="h-1 bg-gradient-to-r from-red-600 via-rose-500 to-red-400 rounded-full transition-all duration-150"
+                className="h-1 bg-gradient-to-r from-emerald-800 via-emerald-600 to-teal-500 rounded-full transition-all duration-150"
                 style={{
                   width: '38%',
                   transform: `translateX(${categoryScrollProgress * 1.63}%)`,
@@ -742,7 +777,7 @@ export default function ActiveCartScreen({
             disabled={!canScrollCategoryRight}
             className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-[10.5px] font-bold border transition-all active:scale-95 cursor-pointer shadow-2xs ${
               canScrollCategoryRight
-                ? 'bg-white border-slate-200 text-slate-700 hover:bg-red-50 hover:text-red-600 hover:border-red-300'
+                ? 'bg-white border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300'
                 : 'bg-slate-100/60 border-slate-200/50 text-slate-300 cursor-not-allowed opacity-40 shadow-none'
             }`}
             title="Geser kategori ke kanan"
@@ -757,14 +792,14 @@ export default function ActiveCartScreen({
         <div className="mx-4 bg-white rounded-2xl p-3.5 border border-slate-200 shadow-xs space-y-2.5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <div className="flex items-center space-x-1.5">
-              <div className="w-6 h-6 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
+              <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-800 flex items-center justify-center">
                 <Sparkles className="w-3.5 h-3.5" />
               </div>
               <h4 className="text-xs font-extrabold text-slate-900">
                 Rekomendasi Belanja
               </h4>
             </div>
-            <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200/80">
+            <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/80">
               {activeCategory === 'all' 
                 ? 'Semua Kategori' 
                 : CART_CATEGORIES.find(c => c.id === activeCategory)?.name}
@@ -783,14 +818,14 @@ export default function ActiveCartScreen({
                     <span className="text-[9.5px] font-bold text-slate-400">({catGroup.items.length})</span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-2">
                     {catGroup.items.map((prod) => renderProductCard(prod))}
                   </div>
                 </div>
               ))
             ) : (
-              // Mode Kategori Spesifik: Tampilkan daftar produk kategori terkait dalam 2 kolom grid
-              <div className="grid grid-cols-2 gap-2.5">
+              // Mode Kategori Spesifik: Tampilkan daftar produk kategori terkait dalam 1 kolom list horizontal
+              <div className="space-y-2">
                 {(RECOMMENDED_PRODUCTS_BY_CATEGORY[activeCategory]?.items || []).map((prod) => renderProductCard(prod))}
               </div>
             )}
@@ -817,7 +852,7 @@ export default function ActiveCartScreen({
                 playTapSound();
                 if (onClearCart) onClearCart();
               }}
-              className="text-[11px] font-bold text-red-600 hover:underline flex items-center space-x-1 cursor-pointer"
+              className="text-[11px] font-bold text-rose-600 hover:underline flex items-center space-x-1 cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Kosongkan</span>
@@ -854,8 +889,9 @@ export default function ActiveCartScreen({
                   }`}
                 >
                   <div className="flex space-x-3">
-                    {/* Item Thumbnail: 100% Emoji Container (w-16 h-16 bg-gray-100 rounded-md) */}
-                    <ProductEmojiBox 
+                    {/* Item Thumbnail: Gambar Asli dengan Badge Emoji di Sudut Kiri Atas */}
+                    <ProductImageThumbnail 
+                      image={item.image}
                       name={item.name} 
                       category={item.category || item.unit} 
                     />
@@ -877,7 +913,7 @@ export default function ActiveCartScreen({
                           </>
                         ) : (
                           <>
-                            <span className="px-1.5 py-0.2 bg-red-50 text-red-700 border border-red-100 rounded-md text-[9px] font-bold">
+                            <span className="px-1.5 py-0.2 bg-emerald-50 text-emerald-800 border border-emerald-100 rounded-md text-[9px] font-bold">
                               {item.category || 'Bahan Pokok'}
                             </span>
                             {item.unit && (
@@ -966,7 +1002,7 @@ export default function ActiveCartScreen({
                         playTapSound();
                         onRemoveItem(item.id);
                       }}
-                      className="absolute top-2.5 right-2.5 p-1 text-slate-300 hover:text-red-600 transition-colors cursor-pointer"
+                      className="absolute top-2.5 right-2.5 p-1 text-slate-300 hover:text-rose-600 transition-colors cursor-pointer"
                       title="Hapus Barang"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -981,7 +1017,7 @@ export default function ActiveCartScreen({
         {/* 6. BARCODE SCANNER PROMPT BANNER */}
         <div className="mt-4 p-3 bg-white border border-slate-200/90 rounded-2xl flex items-center justify-between shadow-2xs">
           <div className="flex items-center space-x-2.5 text-xs text-slate-700 font-medium">
-            <Scan className="w-4 h-4 text-red-600" />
+            <Scan className="w-4 h-4 text-emerald-700" />
             <span>Ingin scan barcode item alternatif?</span>
           </div>
           <button
@@ -989,7 +1025,7 @@ export default function ActiveCartScreen({
               playTapSound();
               if (onOpenBarcodeModal) onOpenBarcodeModal();
             }}
-            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
+            className="px-3 py-1 bg-emerald-800 hover:bg-emerald-900 text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
           >
             Scan Lagi
           </button>
@@ -1004,9 +1040,9 @@ export default function ActiveCartScreen({
             <div>
               <div className="flex items-center space-x-1 text-[11px] font-bold text-slate-600">
                 <span>Sisa Saldo Dompet</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse" />
               </div>
-              <div className="text-base font-extrabold text-red-600 tracking-tight">
+              <div className="text-base font-extrabold text-rose-600 tracking-tight">
                 -Rp {deficitAmount.toLocaleString('id-ID')} <span className="text-xs font-bold">(Defisit)</span>
               </div>
               <div className="text-[10px] text-slate-400 font-medium">
@@ -1027,11 +1063,11 @@ export default function ActiveCartScreen({
             </button>
           </div>
         ) : (
-          /* Normal Mode: Total & Checkout CTA with Lotte Red */
+          /* Normal Mode: Total & Checkout CTA with Emerald Green */
           <div className="flex items-center justify-between">
             <div>
               <div className="text-[10px] text-slate-500 font-medium">
-                {cartItems.length} macam ({totalItemCount} Item) • <span className="text-red-600 font-bold">Sisa: Rp {remainingBudget.toLocaleString('id-ID')}</span>
+                {cartItems.length} macam ({totalItemCount} Item) • <span className="text-emerald-700 font-bold">Sisa: Rp {remainingBudget.toLocaleString('id-ID')}</span>
               </div>
               <div className="text-lg font-extrabold text-slate-900 tracking-tight">
                 Rp {totalCartPrice.toLocaleString('id-ID')}
@@ -1055,7 +1091,7 @@ export default function ActiveCartScreen({
                   playTapSound();
                   if (onOpenCheckout) onOpenCheckout();
                 }}
-                className="px-5 py-2.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-xs font-extrabold rounded-xl shadow-md flex items-center space-x-1.5 transition-colors cursor-pointer"
+                className="px-5 py-2.5 bg-emerald-800 hover:bg-emerald-900 active:bg-emerald-950 text-white text-xs font-extrabold rounded-xl shadow-md flex items-center space-x-1.5 transition-colors cursor-pointer"
               >
                 <span>Checkout</span>
                 <ArrowRight className="w-3.5 h-3.5" />
