@@ -311,6 +311,8 @@ export default function Home() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteTargetItem, setDeleteTargetItem] = useState(null);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
+  const [isDeletingLoading, setIsDeletingLoading] = useState(false);
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState('');
 
   // Quick autofill state for input tab
   const [inputInitialValues, setInputInitialValues] = useState(null);
@@ -434,15 +436,19 @@ export default function Home() {
         setTransactionDate(toIndoDisplayDate(new Date()));
       }
 
-      const savedHistory = localStorage.getItem(STORAGE_KEYS.HISTORY);
-      if (savedHistory) {
-        try {
-          const parsed = JSON.parse(savedHistory);
-          if (Array.isArray(parsed)) {
-            const unique = Array.from(new Map(parsed.map(item => [item?.id || Math.random(), item])).values());
-            setHistoryList(unique);
-          }
-        } catch (e) {}
+      // Area 3: Prioritas Sumber Data (Supabase vs LocalStorage)
+      // Jika pengguna sedang login (isAuth === 'true'), data MURNI HANYA dari Supabase.
+      // DILARANG memuat savedHistory dari LocalStorage saat login agar tidak muncul ghost data.
+      if (isAuth !== 'true') {
+        const savedHistory = localStorage.getItem(STORAGE_KEYS.HISTORY);
+        if (savedHistory) {
+          try {
+            const parsed = JSON.parse(savedHistory);
+            if (Array.isArray(parsed)) {
+              setHistoryList(parsed);
+            }
+          } catch (e) {}
+        }
       }
     } catch (e) {
       console.warn('LocalStorage load error:', e);
@@ -631,36 +637,34 @@ export default function Home() {
           } catch (e) {}
         }
 
+        // Ambil data riwayat murni langsung dari Supabase Cloud (Single Source of Truth)
         const cloudHistory = await getShoppingHistoryList(activeUid);
-        if (cloudHistory && Array.isArray(cloudHistory) && cloudHistory.length > 0) {
-          setHistoryList(() => {
-            // Deduplikasi array berdasarkan ID unik - Cloud sebagai Single Source of Truth
-            const uniqueHistory = Array.from(
-              new Map(cloudHistory.map(item => [item?.id, item])).values()
-            ).filter(Boolean);
-            if (typeof localStorage !== 'undefined') {
-              localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(uniqueHistory));
+
+        // Area 1 & 3: Jika query dari Supabase mengembalikan array (baik ada isi atau kosong []):
+        // State aplikasi HARUS menerima data murni tersebut dan TIDAK BOLEH fallback ke mock data.
+        if (Array.isArray(cloudHistory)) {
+          setHistoryList(cloudHistory);
+
+          if (typeof localStorage !== 'undefined') {
+            if (cloudHistory.length > 0) {
+              localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(cloudHistory));
               if (activeUid) {
-                localStorage.setItem(`${STORAGE_KEYS.HISTORY}_${activeUid}`, JSON.stringify(uniqueHistory));
+                localStorage.setItem(`${STORAGE_KEYS.HISTORY}_${activeUid}`, JSON.stringify(cloudHistory));
+              }
+            } else {
+              // Jika data di cloud sudah kosong ([]), bersihkan juga localStorage agar tidak ada data hantu tertinggal
+              localStorage.removeItem(STORAGE_KEYS.HISTORY);
+              localStorage.removeItem('shoppingHistory');
+              localStorage.removeItem('history');
+              if (activeUid) {
+                localStorage.removeItem(`${STORAGE_KEYS.HISTORY}_${activeUid}`);
               }
             }
-            return uniqueHistory;
-          });
-        } else {
-          // Jika data cloud kosong atau offline, ambil riwayat tersimpan di LocalStorage
-          const offlineData = getOfflineHistory(activeUid);
-          if (Array.isArray(offlineData) && offlineData.length > 0) {
-            setHistoryList(offlineData);
-          } else {
-            setHistoryList([]);
           }
         }
       } catch (e) {
         console.warn('[CloudHistory] Fetch error:', e);
-        const fallbackOffline = getOfflineHistory(overrideUserId || currentUserRef.current?.id);
-        if (Array.isArray(fallbackOffline) && fallbackOffline.length > 0) {
-          setHistoryList(fallbackOffline);
-        }
+        // Jangan menyuntikkan mock data apapun saat error
       }
     };
     loadCloudHistoryRef.current = fetchCloudHistory;
@@ -1168,62 +1172,101 @@ export default function Home() {
     persistState(undefined, undefined, undefined, finalDate);
   };
 
-  // Delete History Handlers (Safety Modal Confirmation)
+  // Delete History Handlers (Safety Modal Confirmation with Server Sync & Awaited Delete)
   const handleRequestDeleteTrip = (trip) => {
     setDeleteTargetItem(trip);
     setIsDeletingAll(false);
+    setDeleteErrorMessage('');
+    setIsDeletingLoading(false);
     setIsDeleteModalOpen(true);
   };
 
   const handleRequestClearAll = () => {
     setDeleteTargetItem(null);
     setIsDeletingAll(true);
+    setDeleteErrorMessage('');
+    setIsDeletingLoading(false);
     setIsDeleteModalOpen(true);
   };
 
   const handleConfirmDelete = async () => {
-    playSuccessSound();
-    setIsDeleteModalOpen(false);
+    setIsDeletingLoading(true);
+    setDeleteErrorMessage('');
 
-    if (isDeletingAll) {
-      await clearAllShoppingHistory(currentUser?.id);
-      setHistoryList([]);
-      if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(STORAGE_KEYS.HISTORY);
-        if (currentUser?.id) {
-          localStorage.removeItem(`${STORAGE_KEYS.HISTORY}_${currentUser.id}`);
+    try {
+      if (isDeletingAll) {
+        // a & b: Eksekusi await delete pada Supabase
+        const res = await clearAllShoppingHistory(currentUser?.id);
+
+        if (!res.success) {
+          // d: JIKA ada error dari Supabase, tampilkan pesan error, JANGAN kosongkan layar
+          setIsDeletingLoading(false);
+          setDeleteErrorMessage(res.error || 'Gagal menghapus riwayat dari server Supabase.');
+          return;
         }
-      }
-      try {
-        supabaseSyncChannelRef.current?.send({
-          type: 'broadcast',
-          event: 'REALTIME_CLEAR_ALL_HISTORY_EVENT',
-          payload: {}
-        });
-      } catch (e) {}
-    } else if (deleteTargetItem?.id) {
-      const targetId = deleteTargetItem.id;
-      await deleteShoppingTrip(targetId, currentUser?.id);
-      setHistoryList(prev => {
-        const updated = (prev || []).filter(h => h.id !== targetId);
+
+        // c: JIKA tidak ada error dari Supabase, BARU kosongkan state React dan LocalStorage
+        playSuccessSound();
+        setHistoryList([]);
         if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(updated));
+          localStorage.removeItem(STORAGE_KEYS.HISTORY);
+          localStorage.removeItem('shoppingHistory');
+          localStorage.removeItem('history');
           if (currentUser?.id) {
-            localStorage.setItem(`${STORAGE_KEYS.HISTORY}_${currentUser.id}`, JSON.stringify(updated));
+            localStorage.removeItem(`${STORAGE_KEYS.HISTORY}_${currentUser.id}`);
           }
         }
-        return updated;
-      });
-      try {
-        supabaseSyncChannelRef.current?.send({
-          type: 'broadcast',
-          event: 'REALTIME_DELETE_EVENT',
-          payload: { tripId: targetId }
+        try {
+          supabaseSyncChannelRef.current?.send({
+            type: 'broadcast',
+            event: 'REALTIME_CLEAR_ALL_HISTORY_EVENT',
+            payload: {}
+          });
+        } catch (e) {}
+
+        setIsDeletingLoading(false);
+        setIsDeleteModalOpen(false);
+        setIsDeletingAll(false);
+        setDeleteTargetItem(null);
+      } else if (deleteTargetItem?.id) {
+        const targetId = deleteTargetItem.id;
+        const res = await deleteShoppingTrip(targetId, currentUser?.id);
+
+        if (!res.success) {
+          // d: JIKA ada error dari Supabase, tampilkan pesan error, JANGAN kosongkan layar
+          setIsDeletingLoading(false);
+          setDeleteErrorMessage(res.error || 'Gagal menghapus transaksi dari server Supabase.');
+          return;
+        }
+
+        // c: JIKA tidak ada error dari Supabase, BARU update state React dan LocalStorage
+        playSuccessSound();
+        setHistoryList(prev => {
+          const updated = (prev || []).filter(h => h.id !== targetId);
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(updated));
+            if (currentUser?.id) {
+              localStorage.setItem(`${STORAGE_KEYS.HISTORY}_${currentUser.id}`, JSON.stringify(updated));
+            }
+          }
+          return updated;
         });
-      } catch (e) {}
+        try {
+          supabaseSyncChannelRef.current?.send({
+            type: 'broadcast',
+            event: 'REALTIME_DELETE_EVENT',
+            payload: { tripId: targetId }
+          });
+        } catch (e) {}
+
+        setIsDeletingLoading(false);
+        setIsDeleteModalOpen(false);
+        setDeleteTargetItem(null);
+      }
+    } catch (err) {
+      setIsDeletingLoading(false);
+      setDeleteErrorMessage(err.message || 'Terjadi kesalahan sistem saat menghapus data.');
     }
-    setDeleteTargetItem(null);
-    setIsDeletingAll(false);
   };
 
   // Barcode scanned item
@@ -1603,10 +1646,17 @@ export default function Home() {
 
                 <DeleteConfirmationModal
                   isOpen={isDeleteModalOpen}
-                  onClose={() => setIsDeleteModalOpen(false)}
+                  onClose={() => {
+                    if (!isDeletingLoading) {
+                      setIsDeleteModalOpen(false);
+                      setDeleteErrorMessage('');
+                    }
+                  }}
                   onConfirmDelete={handleConfirmDelete}
                   targetItem={deleteTargetItem}
                   isDeletingAll={isDeletingAll}
+                  isLoading={isDeletingLoading}
+                  errorMessage={deleteErrorMessage}
                 />
               </>
             )}

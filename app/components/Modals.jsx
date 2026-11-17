@@ -1322,7 +1322,9 @@ export function DeleteConfirmationModal({
   onClose,
   onConfirmDelete,
   targetItem = null,
-  isDeletingAll = false
+  isDeletingAll = false,
+  isLoading = false,
+  errorMessage = ''
 }) {
   if (!isOpen) return null;
 
@@ -1341,9 +1343,16 @@ export function DeleteConfirmationModal({
             {isDeletingAll ? 'Hapus Seluruh Riwayat Belanja?' : 'Hapus Riwayat Belanja Ini?'}
           </h3>
           <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-            Apakah Anda yakin ingin menghapus {isDeletingAll ? 'seluruh ' : ''}riwayat pembelanjaan ini? Tindakan ini permanen dan data tidak dapat dikembalikan.
+            Apakah Anda yakin ingin menghapus {isDeletingAll ? 'seluruh ' : ''}riwayat pembelanjaan ini? Tindakan ini permanen dan data di server Supabase akan dihapus.
           </p>
         </div>
+
+        {/* Error message banner jika query Supabase gagal */}
+        {errorMessage && (
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-left text-xs text-rose-700 font-medium">
+            <strong>Gagal menghapus:</strong> {errorMessage}
+          </div>
+        )}
 
         {targetItem && !isDeletingAll && (
           <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 text-left space-y-1">
@@ -1360,24 +1369,37 @@ export function DeleteConfirmationModal({
         <div className="grid grid-cols-2 gap-2.5 pt-2">
           <button
             type="button"
+            disabled={isLoading}
             onClick={() => {
+              if (isLoading) return;
               playTapSound();
               onClose();
             }}
-            className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+            className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
           >
             Batal
           </button>
           <button
             type="button"
+            disabled={isLoading}
             onClick={() => {
+              if (isLoading) return;
               playTapSound();
               onConfirmDelete();
             }}
-            className="w-full py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
+            className="w-full py-2.5 px-4 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-400 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
           >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Hapus Permanen</span>
+            {isLoading ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Menghapus...</span>
+              </>
+            ) : (
+              <>
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Hapus Permanen</span>
+              </>
+            )}
           </button>
         </div>
       </div>

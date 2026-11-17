@@ -333,8 +333,8 @@ export async function getShoppingHistoryList(userId = null) {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.warn('[Supabase getShoppingHistoryList] Cloud query error, using local fallback:', error.message);
-      return getOfflineHistory(targetUserId);
+      console.warn('[Supabase getShoppingHistoryList] Cloud query error:', error.message);
+      return [];
     }
 
     let data = rawData || [];
@@ -348,8 +348,10 @@ export async function getShoppingHistoryList(userId = null) {
       });
     }
 
+    // JIKA data di Supabase kosong (karena sudah dihapus atau akun baru):
+    // HARUS mengembalikan array kosong [], JANGAN PERNAH fallback ke mock/offline data!
     if (!data || data.length === 0) {
-      return getOfflineHistory(targetUserId);
+      return [];
     }
       return data.map(row => {
         const dateObj = new Date(row.created_at || row.shopping_date);
@@ -523,20 +525,16 @@ export async function deleteShoppingTrip(tripId, userId = null) {
     } catch (e) {}
 
     // B. Hapus dari Supabase PostgreSQL dengan ID unik
-    let deleteQuery = supabase.from('grocery_history').delete().eq('id', tripId);
-    if (targetUserId) {
-      deleteQuery = deleteQuery.eq('user_id', targetUserId);
-    }
-    let { error } = await deleteQuery;
+    const { error } = await supabase.from('grocery_history').delete().eq('id', tripId);
 
-    // Jika skema remote belum memiliki kolom user_id (error 42703/PGRST204), coba delete langsung berdasarkan id
-    if (error && (error.message?.includes('user_id') || error.code === '42703' || error.code === 'PGRST204')) {
-      const retry = await supabase.from('grocery_history').delete().eq('id', tripId);
-      error = retry.error;
-    }
+    // Coba juga di tabel history jika ada
+    try {
+      await supabase.from('history').delete().eq('id', tripId);
+    } catch (e) {}
 
     if (error) {
       console.warn('[Supabase deleteShoppingTrip] Supabase error:', error.message);
+      return { success: false, error: error.message };
     }
 
     // C. Hapus dari LocalStorage fallback (baik user-isolated maupun global)
@@ -549,6 +547,12 @@ export async function deleteShoppingTrip(tripId, userId = null) {
             const updated = list.filter(item => item.id !== tripId);
             localStorage.setItem(`${FALLBACK_KEYS.HISTORY}_${targetUserId}`, JSON.stringify(updated));
           }
+          const userV1 = localStorage.getItem(`sakugrosir_history_v1_${targetUserId}`);
+          if (userV1) {
+            const list = JSON.parse(userV1);
+            const updated = list.filter(item => item.id !== tripId);
+            localStorage.setItem(`sakugrosir_history_v1_${targetUserId}`, JSON.stringify(updated));
+          }
         }
         const raw = localStorage.getItem(FALLBACK_KEYS.HISTORY);
         if (raw) {
@@ -556,12 +560,15 @@ export async function deleteShoppingTrip(tripId, userId = null) {
           const updated = list.filter(item => item.id !== tripId);
           localStorage.setItem(FALLBACK_KEYS.HISTORY, JSON.stringify(updated));
         }
+        const v1Raw = localStorage.getItem('sakugrosir_history_v1');
+        if (v1Raw) {
+          const list = JSON.parse(v1Raw);
+          const updated = list.filter(item => item.id !== tripId);
+          localStorage.setItem('sakugrosir_history_v1', JSON.stringify(updated));
+        }
       } catch (e) {}
     }
 
-    if (error) {
-      return { success: false, error: error.message };
-    }
     return { success: true };
   } catch (err) {
     console.error('[Supabase deleteShoppingTrip] Exception caught:', err.message);
@@ -584,17 +591,54 @@ export async function clearAllShoppingHistory(userId = null) {
 
     let error = null;
     if (targetUserId) {
-      let res = await supabase.from('grocery_history').delete().eq('user_id', targetUserId);
-      error = res.error;
+      // 1. Ambil semua ID riwayat milik targetUserId
+      const { data: userTrips, error: fetchErr } = await supabase
+        .from('grocery_history')
+        .select('id, notes');
 
-      // Jika kolom user_id tidak ada, hapus baris yang memuat ##uid:targetUserId## di notes
-      if (error && (error.message?.includes('user_id') || error.code === '42703' || error.code === 'PGRST204')) {
-        const retry = await supabase.from('grocery_history').delete().like('notes', `%##uid:${targetUserId}##%`);
-        error = retry.error;
+      if (fetchErr) {
+        return { success: false, error: fetchErr.message };
       }
+
+      const matchingTrips = (userTrips || []).filter(t => {
+        if (t.user_id && t.user_id === targetUserId) return true;
+        if (t.notes && t.notes.includes(`##uid:${targetUserId}##`)) return true;
+        return false;
+      });
+
+      if (matchingTrips.length > 0) {
+        const tripIds = matchingTrips.map(t => t.id);
+
+        // Hapus child items dari grocery_items terlebih dahulu agar tidak terblokir foreign key
+        try {
+          await supabase.from('grocery_items').delete().in('history_id', tripIds);
+        } catch (e) {}
+
+        // Hapus dari grocery_history berdasarkan ID
+        const delRes = await supabase.from('grocery_history').delete().in('id', tripIds);
+        error = delRes.error;
+      } else {
+        // Coba delete langsung dengan pola tag notes
+        const delNotes = await supabase.from('grocery_history').delete().like('notes', `%##uid:${targetUserId}##%`);
+        error = delNotes.error;
+      }
+
+      // Coba juga jika ada tabel history
+      try {
+        await supabase.from('history').delete().eq('user_id', targetUserId);
+      } catch (e) {}
     } else {
+      // Bersihkan seluruh riwayat
+      try {
+        await supabase.from('grocery_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      } catch (e) {}
       const res = await supabase.from('grocery_history').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       error = res.error;
+    }
+
+    if (error) {
+      console.warn('[Supabase clearAllShoppingHistory] Error:', error.message);
+      return { success: false, error: error.message };
     }
 
     // Hapus dari LocalStorage fallback
@@ -602,13 +646,18 @@ export async function clearAllShoppingHistory(userId = null) {
       try {
         if (targetUserId) {
           localStorage.removeItem(`${FALLBACK_KEYS.HISTORY}_${targetUserId}`);
+          localStorage.removeItem(`sakugrosir_history_v1_${targetUserId}`);
         }
         localStorage.removeItem(FALLBACK_KEYS.HISTORY);
+        localStorage.removeItem('sakugrosir_history_v1');
+        localStorage.removeItem('shoppingHistory');
+        localStorage.removeItem('history');
       } catch (e) {}
     }
 
-    return { success: !error, error: error?.message };
+    return { success: true };
   } catch (err) {
+    console.error('[Supabase clearAllShoppingHistory] Exception:', err.message);
     return { success: false, error: err.message };
   }
 }
