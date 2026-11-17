@@ -108,7 +108,7 @@ export async function saveShoppingTrip(historyData, itemsList, userId = null) {
     } catch (e) {}
   }
 
-  const baseNotes = historyData.notes || 'Supermarket Grosir';
+  const baseNotes = historyData.notes || historyData.store_name || historyData.storeName || 'Supermarket Grosir';
   // Sematkan tag identitas pengguna ke dalam notes sebagai redundansi jika kolom user_id belum ada di remote
   const taggedNotes = targetUserId ? `${baseNotes} ##uid:${targetUserId}##` : baseNotes;
 
@@ -388,7 +388,7 @@ export async function getShoppingHistoryList(userId = null) {
         const totalItems = items.reduce((acc, curr) => acc + curr.quantity, 0);
 
         // Bersihkan tag ##uid:...## dari nama toko/notes untuk tampilan UI
-        const cleanStoreName = (row.notes || 'Supermarket Grosir')
+        const cleanStoreName = (row.notes || row.store_name || row.storeName || 'Supermarket Grosir')
           .replace(/\s*##uid:[^#]+##\s*/g, '')
           .trim();
 
@@ -475,7 +475,7 @@ function saveOfflineTrip(historyData, itemsList, userId = null) {
   try {
     const targetUserId = userId || historyData.user_id;
     const history = getOfflineHistory(targetUserId);
-    const cleanNotes = (historyData.notes || 'Supermarket Grosir')
+    const cleanNotes = (historyData.notes || historyData.store_name || historyData.storeName || 'Supermarket Grosir')
       .replace(/\s*##uid:[^#]+##\s*/g, '')
       .trim();
     const trip = {

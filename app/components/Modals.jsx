@@ -298,6 +298,26 @@ export function BarcodeScannerModal({ isOpen, onClose, onScannedItem }) {
  * 4. Modal Detail Struk Belanja
  */
 /**
+ * Helper pemetaan alamat cabang supermarket berdasarkan nama toko
+ */
+export function getStoreAddress(storeName = '') {
+  const s = String(storeName || '').toLowerCase();
+  if (s.includes('lotte')) {
+    return 'Mall Puri Indah, Kembangan, Jakarta Barat';
+  }
+  if (s.includes('super indo') || s.includes('superindo')) {
+    return 'Jl. Pesanggrahan, Jakarta Barat';
+  }
+  if (s.includes('hypermart')) {
+    return 'Puri Indah Mall, Jakarta Barat';
+  }
+  if (s.includes('indogrosir')) {
+    return 'Jl. Daan Mogot, Jakarta Barat';
+  }
+  return 'Jakarta Barat, DKI Jakarta';
+}
+
+/**
  * Helper normalisasi data struk agar seragam baik dari Checkout maupun Riwayat Belanja
  */
 export function normalizeReceiptData(data, currentUser) {
@@ -312,7 +332,20 @@ export function normalizeReceiptData(data, currentUser) {
     id = `TRX-${part1}-${part2}`;
   }
 
-  const storeName = 'LOTTE MART GROCERY - PURI INDAH';
+  // Ambil nama toko secara dinamis dari data transaksi, riwayat, atau state toko aktif
+  const rawStore = 
+    data.storeName || 
+    data.store_name || 
+    data.notes || 
+    currentUser?.currentStore || 
+    'Lotte Mart Grocery - Puri Indah';
+
+  const cleanStore = String(rawStore)
+    .replace(/\s*##uid:[^#]+##\s*/g, '')
+    .trim();
+
+  const storeName = cleanStore.toUpperCase();
+  const storeAddress = getStoreAddress(storeName);
   const customerName = 
     data.customerName || 
     currentUser?.user_metadata?.full_name || 
@@ -354,6 +387,7 @@ export function normalizeReceiptData(data, currentUser) {
   return {
     id,
     storeName,
+    storeAddress,
     date,
     time,
     customerName,
@@ -399,7 +433,7 @@ export function ThermalPaperReceiptModal({
       return `${item.name}\n${qtyStr} x Rp ${item.price.toLocaleString('id-ID')} = Rp ${item.lineTotal.toLocaleString('id-ID')}`;
     }).join('\n');
 
-    const receiptText = `LOTTE MART GROCERY - PURI INDAH
+    const receiptText = `${normalized.storeName}
 --------------------------------
 No. Struk: ${normalized.id}
 Tanggal: ${normalized.date}, ${normalized.time}
@@ -483,14 +517,14 @@ Status: ${normalized.status}`;
             <div className="inline-flex items-center justify-center space-x-1.5 mb-1">
               <Store className="w-4 h-4 text-emerald-800 shrink-0" />
               <span className="font-black text-sm tracking-wider uppercase text-slate-900">
-                LOTTE MART GROCERY - PURI INDAH
+                {normalized.storeName}
               </span>
             </div>
             <p className="text-[10px] text-slate-500 font-bold tracking-tight">
               SMART GROCERY SYSTEM • SELF-CHECKOUT
             </p>
             <p className="text-[9.5px] text-slate-400">
-              Mall Puri Indah, Kembangan, Jakarta Barat
+              {normalized.storeAddress}
             </p>
           </div>
 

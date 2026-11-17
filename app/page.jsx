@@ -1317,6 +1317,8 @@ export default function Home() {
       const receiptSnapshot = {
         id: 'TRX-' + Date.now().toString().slice(-6) + '-' + Math.floor(1000 + Math.random() * 9000),
         storeName: currentStore,
+        store_name: currentStore,
+        notes: currentStore,
         date: toIndoDisplayDate(safeShoppingDate),
         time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
         customerName: currentUser?.user_metadata?.full_name || currentUser?.name || currentUser?.email?.split('@')[0] || 'Pelanggan Setia',
@@ -1345,7 +1347,9 @@ export default function Home() {
         user_id: currentUser?.id,
         shopping_date: safeShoppingDate,
         total_spent: totalCartPrice,
-        notes: currentStore
+        notes: currentStore,
+        store_name: currentStore,
+        storeName: currentStore
       }, cartItems.map(i => {
         const sp = getItemStorePrice(i, currentStore);
         const p = sp.current || i.price || 0;
@@ -1562,7 +1566,13 @@ export default function Home() {
                   {activeTab === 'history' && (
                     <HistoryScreen
                       historyList={historyList}
-                      onOpenReceiptDetail={(session) => setSelectedReceipt(session)}
+                      onOpenReceiptDetail={(session) => {
+                        setSelectedReceipt({
+                          ...session,
+                          storeName: session.storeName || session.store_name || session.notes || currentStore,
+                          store_name: session.store_name || session.storeName || session.notes || currentStore
+                        });
+                      }}
                       onRequestDeleteTrip={handleRequestDeleteTrip}
                       onRequestClearAllHistory={handleRequestClearAll}
                     />
@@ -1610,7 +1620,7 @@ export default function Home() {
                   isOpen={Boolean(selectedReceipt)}
                   onClose={() => setSelectedReceipt(null)}
                   session={selectedReceipt}
-                  currentUser={currentUser}
+                  currentUser={{ ...currentUser, currentStore }}
                 />
 
                 <OrderSummaryModal
@@ -1642,7 +1652,7 @@ export default function Home() {
                   onClose={handleFinishAndShopAgain}
                   receiptData={digitalReceiptData}
                   onFinishAndShopAgain={handleFinishAndShopAgain}
-                  currentUser={currentUser}
+                  currentUser={{ ...currentUser, currentStore }}
                 />
 
                 <EmptyCartModal
