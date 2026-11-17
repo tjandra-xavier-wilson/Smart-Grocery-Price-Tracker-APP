@@ -35,6 +35,30 @@ import {
 import { playTapSound, playSuccessSound, playWarningBeep } from '../utils/sound';
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
 
+function CartItemThumbnail({ image, name, unit }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (image && !hasError) {
+    return (
+      <img 
+        src={image} 
+        alt={name || 'Produk'} 
+        onError={() => setHasError(true)}
+        className="w-16 h-16 rounded-xl object-cover border border-slate-200 shrink-0 bg-slate-100"
+      />
+    );
+  }
+
+  return (
+    <div className="w-16 h-16 rounded-xl bg-emerald-50 border border-emerald-200/80 flex flex-col items-center justify-center shrink-0 text-emerald-800 shadow-2xs">
+      <ShoppingBag className="w-6 h-6 text-emerald-700 stroke-[2]" />
+      <span className="text-[8.5px] font-bold text-emerald-800 truncate max-w-[56px] mt-0.5 px-0.5 text-center">
+        {unit || 'Item'}
+      </span>
+    </div>
+  );
+}
+
 export default function ActiveCartScreen({
   cartItems = [],
   budgetLimit = 350000,
@@ -79,6 +103,7 @@ export default function ActiveCartScreen({
           category: 'Bahan Pokok',
           unit: '5kg',
           price: 74000,
+          lastMonthPrice: 78000,
           description: 'Pulen alami tanpa pengawet & pemutih',
           image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&auto=format&fit=crop&q=80'
         },
@@ -88,6 +113,7 @@ export default function ActiveCartScreen({
           category: 'Bahan Pokok',
           unit: '2L',
           price: 38500,
+          lastMonthPrice: 35000,
           description: 'Jernih tahan panas dengan vitamin E',
           image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=300&auto=format&fit=crop&q=80'
         },
@@ -97,6 +123,7 @@ export default function ActiveCartScreen({
           category: 'Bahan Pokok',
           unit: '1 kg',
           price: 28000,
+          lastMonthPrice: 28000,
           description: 'Segar langsung dari peternak mitra',
           image: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=300&auto=format&fit=crop&q=80'
         },
@@ -106,6 +133,7 @@ export default function ActiveCartScreen({
           category: 'Bahan Pokok',
           unit: '1 kg',
           price: 17500,
+          lastMonthPrice: 17500,
           description: 'Gula tebu butiran bersih standar SNI',
           image: 'https://images.unsplash.com/photo-1622484212850-eb596d769edc?w=300&auto=format&fit=crop&q=80'
         }
@@ -121,6 +149,7 @@ export default function ActiveCartScreen({
           category: 'Sayuran Segar',
           unit: '500g',
           price: 9500,
+          lastMonthPrice: 8500,
           description: 'Manis renyah kaya beta-karoten',
           image: 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=300&auto=format&fit=crop&q=80'
         },
@@ -130,6 +159,7 @@ export default function ActiveCartScreen({
           category: 'Sayuran Segar',
           unit: '1 ikat',
           price: 6000,
+          lastMonthPrice: 6000,
           description: 'Segar bebas pestisida kaya zat besi',
           image: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=300&auto=format&fit=crop&q=80'
         },
@@ -139,6 +169,7 @@ export default function ActiveCartScreen({
           category: 'Sayuran Segar',
           unit: '500g',
           price: 16000,
+          lastMonthPrice: 17500,
           description: 'Brokoli segar kaya antioksidan sehat',
           image: 'https://images.unsplash.com/photo-1459411621453-7b03977f4bfc?w=300&auto=format&fit=crop&q=80'
         }
@@ -154,6 +185,7 @@ export default function ActiveCartScreen({
           category: 'Buah-buahan',
           unit: '1 kg',
           price: 34000,
+          lastMonthPrice: 38000,
           description: 'Renyah manis kaya serat & vitamin alami',
           image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300&auto=format&fit=crop&q=80'
         },
@@ -163,6 +195,7 @@ export default function ActiveCartScreen({
           category: 'Buah-buahan',
           unit: '1 sisir',
           price: 22000,
+          lastMonthPrice: 20000,
           description: 'Manis legit sumber energi harian',
           image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300&auto=format&fit=crop&q=80'
         },
@@ -172,6 +205,7 @@ export default function ActiveCartScreen({
           category: 'Buah-buahan',
           unit: '1 kg',
           price: 26000,
+          lastMonthPrice: 26000,
           description: 'Bulir berair manis menyegarkan',
           image: 'https://images.unsplash.com/photo-1547514701-42782101795e?w=300&auto=format&fit=crop&q=80'
         }
@@ -187,6 +221,7 @@ export default function ActiveCartScreen({
           category: 'Daging dan Lauk',
           unit: '1 kg',
           price: 46000,
+          lastMonthPrice: 50000,
           description: 'Dada ayam tanpa tulang tinggi protein',
           image: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=300&auto=format&fit=crop&q=80'
         },
@@ -196,6 +231,7 @@ export default function ActiveCartScreen({
           category: 'Daging dan Lauk',
           unit: '500g',
           price: 68000,
+          lastMonthPrice: 65000,
           description: 'Sapi lokal empuk rendah lemak',
           image: 'https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=300&auto=format&fit=crop&q=80'
         },
@@ -205,6 +241,7 @@ export default function ActiveCartScreen({
           category: 'Daging dan Lauk',
           unit: '200g',
           price: 55000,
+          lastMonthPrice: 55000,
           description: 'Kaya Omega-3 untuk kesehatan jantung',
           image: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=300&auto=format&fit=crop&q=80'
         }
@@ -220,6 +257,7 @@ export default function ActiveCartScreen({
           category: 'Camilan',
           unit: '300g',
           price: 11500,
+          lastMonthPrice: 11500,
           description: 'Biskuit kelapa renyah kaya vitamin',
           image: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=300&auto=format&fit=crop&q=80'
         },
@@ -229,6 +267,7 @@ export default function ActiveCartScreen({
           category: 'Camilan',
           unit: '68g',
           price: 12000,
+          lastMonthPrice: 11000,
           description: 'Keripik kentang bergelombang gurih',
           image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=300&auto=format&fit=crop&q=80'
         },
@@ -238,6 +277,7 @@ export default function ActiveCartScreen({
           category: 'Camilan',
           unit: '133g',
           price: 9800,
+          lastMonthPrice: 10500,
           description: 'Biskuit cokelat sandwich krim lezat',
           image: 'https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?w=300&auto=format&fit=crop&q=80'
         }
@@ -253,6 +293,7 @@ export default function ActiveCartScreen({
           category: 'Minuman',
           unit: '1L',
           price: 19500,
+          lastMonthPrice: 21000,
           description: 'Susu sapi murni kaya kalsium alami',
           image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&auto=format&fit=crop&q=80'
         },
@@ -262,6 +303,7 @@ export default function ActiveCartScreen({
           category: 'Minuman',
           unit: '10 sachet',
           price: 14500,
+          lastMonthPrice: 14500,
           description: 'Kopi tubruk gula mantap harum',
           image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300&auto=format&fit=crop&q=80'
         },
@@ -271,6 +313,7 @@ export default function ActiveCartScreen({
           category: 'Minuman',
           unit: '1L',
           price: 9500,
+          lastMonthPrice: 9500,
           description: 'Seduhan daun teh melati asli alami',
           image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=300&auto=format&fit=crop&q=80'
         }
@@ -286,6 +329,7 @@ export default function ActiveCartScreen({
           category: 'Peralatan Kebersihan',
           unit: '400ml',
           price: 26500,
+          lastMonthPrice: 29000,
           description: 'Sabun cair antiseptik perlindungan kuman',
           image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&auto=format&fit=crop&q=80'
         },
@@ -295,6 +339,7 @@ export default function ActiveCartScreen({
           category: 'Peralatan Kebersihan',
           unit: '750ml',
           price: 21500,
+          lastMonthPrice: 20000,
           description: 'Hilangkan noda membandel 1x kucek',
           image: 'https://images.unsplash.com/photo-1585421514738-01798e348b17?w=300&auto=format&fit=crop&q=80'
         },
@@ -304,6 +349,7 @@ export default function ActiveCartScreen({
           category: 'Peralatan Kebersihan',
           unit: '700ml',
           price: 15500,
+          lastMonthPrice: 15500,
           description: 'Bersihkan lemak membandel seketika',
           image: 'https://images.unsplash.com/photo-1585670210693-e7fdd16b142e?w=300&auto=format&fit=crop&q=80'
         }
@@ -322,7 +368,11 @@ export default function ActiveCartScreen({
         category: prod.category || 'Bahan Pokok',
         unit: prod.unit || 'pcs',
         quantity: 1,
-        isSecondary: false
+        isSecondary: false,
+        image: prod.image || '',
+        lastMonthPrice: prod.lastMonthPrice !== undefined 
+          ? prod.lastMonthPrice 
+          : (prod.price > 40000 ? prod.price - 3000 : (prod.price > 15000 ? prod.price + 2000 : prod.price))
       });
     }
   };
@@ -477,7 +527,7 @@ export default function ActiveCartScreen({
   return (
     <div className="pb-36 bg-slate-50 min-h-full">
       {/* 1. OVERBUDGET DANGER BANNER (Screen 2 / SRS F-05) */}
-      {isOverbudget ? (
+      {isOverbudget && (
         <div className="bg-gradient-to-r from-red-700 via-rose-700 to-red-800 text-white p-4 shadow-lg animate-fade-in border-b-2 border-red-900">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center space-x-1.5 font-extrabold text-xs tracking-wider uppercase">
@@ -516,18 +566,6 @@ export default function ActiveCartScreen({
                 📈 +Rp {deficitAmount.toLocaleString('id-ID')} Over Limit
               </span>
             </div>
-          </div>
-        </div>
-      ) : (
-        /* Normal Status Pills Row */
-        <div className="px-4 pt-3 flex items-center justify-between gap-2">
-          <div className="flex-1 flex items-center justify-center space-x-1.5 py-1 px-2.5 bg-emerald-50 border border-emerald-200/80 rounded-full text-[11px] font-semibold text-emerald-800 shadow-2xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Cloud Sync: Online &amp; Persistent</span>
-          </div>
-          <div className="flex items-center space-x-1 py-1 px-3 bg-slate-200/80 border border-slate-300 rounded-full text-[11px] font-semibold text-slate-700">
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-            <span>Offline Ready</span>
           </div>
         </div>
       )}
@@ -876,11 +914,11 @@ export default function ActiveCartScreen({
                   }`}
                 >
                   <div className="flex space-x-3">
-                    {/* Item Thumbnail */}
-                    <img 
-                      src={item.image || 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&auto=format&fit=crop&q=80'} 
-                      alt={item.name} 
-                      className="w-16 h-16 rounded-xl object-cover border border-slate-200 shrink-0 bg-slate-100"
+                    {/* Item Thumbnail with Universal Render & Fallback */}
+                    <CartItemThumbnail 
+                      image={item.image} 
+                      name={item.name} 
+                      unit={item.unit} 
                     />
 
                     {/* Item Info */}
@@ -929,27 +967,45 @@ export default function ActiveCartScreen({
                         </p>
                       )}
 
-                      {/* Price Fluctuation Trend */}
-                      {item.lastMonthPrice !== undefined && item.lastMonthPrice !== null && (
-                        <div className="mt-0.5">
-                          {item.price > item.lastMonthPrice ? (
-                            <span className="inline-flex items-center text-[10px] font-semibold text-rose-600">
-                              <ArrowUpRight className="w-3 h-3 stroke-[2.5]" />
-                              <span>+Rp {(item.price - item.lastMonthPrice).toLocaleString('id-ID')} vs bln lalu</span>
-                            </span>
-                          ) : item.price < item.lastMonthPrice ? (
-                            <span className="inline-flex items-center text-[10px] font-semibold text-emerald-700">
-                              <ArrowDownRight className="w-3 h-3 stroke-[2.5]" />
-                              <span>-Rp {(item.lastMonthPrice - item.price).toLocaleString('id-ID')} hemat vs bln lalu</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center text-[10px] font-semibold text-slate-400">
-                              <MinusIcon className="w-3 h-3" />
-                              <span>Harga Stabil</span>
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      {/* Price Fluctuation Trend (Universal) */}
+                      {(() => {
+                        const effectiveLastMonth = (item.lastMonthPrice !== undefined && item.lastMonthPrice !== null)
+                          ? item.lastMonthPrice
+                          : (item.originalPrice && item.originalPrice !== item.price
+                              ? item.originalPrice
+                              : (item.price > 40000 
+                                  ? item.price - 3000 
+                                  : (item.price > 15000 ? item.price + 2000 : item.price)));
+
+                        if (item.price > effectiveLastMonth) {
+                          return (
+                            <div className="mt-0.5">
+                              <span className="inline-flex items-center text-[10px] font-semibold text-rose-600">
+                                <ArrowUpRight className="w-3 h-3 stroke-[2.5]" />
+                                <span>+Rp {(item.price - effectiveLastMonth).toLocaleString('id-ID')} vs bln lalu</span>
+                              </span>
+                            </div>
+                          );
+                        } else if (item.price < effectiveLastMonth) {
+                          return (
+                            <div className="mt-0.5">
+                              <span className="inline-flex items-center text-[10px] font-semibold text-emerald-700">
+                                <ArrowDownRight className="w-3 h-3 stroke-[2.5]" />
+                                <span>-Rp {(effectiveLastMonth - item.price).toLocaleString('id-ID')} hemat vs bln lalu</span>
+                              </span>
+                            </div>
+                          );
+                        } else {
+                          return (
+                            <div className="mt-0.5">
+                              <span className="inline-flex items-center text-[10px] font-semibold text-slate-400">
+                                <MinusIcon className="w-3 h-3" />
+                                <span>Harga Stabil</span>
+                              </span>
+                            </div>
+                          );
+                        }
+                      })()}
 
                       {/* Price & Stepper Row */}
                       <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-50">

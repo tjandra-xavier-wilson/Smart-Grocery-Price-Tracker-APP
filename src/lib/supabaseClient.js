@@ -406,7 +406,7 @@ export async function getShoppingHistoryList(userId = null) {
           itemCount: totalItems || items.length,
           items_count: totalItems || items.length,
           statusTier: 'safe',
-          statusBadge: 'Tersimpan di Cloud',
+          statusBadge: 'Transaksi Sukses',
           iconType: 'cart',
           items: items
         };

@@ -298,7 +298,7 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
         {/* Pill Badge */}
         <div className="mt-2.5 px-3.5 py-1 bg-sky-50 border border-sky-100 text-sky-800 rounded-full text-[11px] font-bold flex items-center space-x-1.5 shadow-2xs">
           <ShieldCheck className="w-3.5 h-3.5 text-sky-600" />
-          <span>Offline-Ready • Cloud Sync Persistent</span>
+          <span>Pencatatan Belanja Cerdas &amp; Terpercaya</span>
         </div>
 
         {/* ============================================================== */}
@@ -564,7 +564,7 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
 
       {/* Footer info */}
       <div className="text-center text-[10px] text-slate-400 font-medium py-1">
-        Smart Grocery Sentinel v2.0 • Supabase Auth Integrated
+        Smart Grocery Sentinel • Solusi Cerdas Belanja Hemat
       </div>
     </div>
   );

@@ -17,7 +17,8 @@ import {
   Loader2,
   CheckCircle2,
   ShoppingBag,
-  ShoppingCart
+  ShoppingCart,
+  ArrowRight
 } from 'lucide-react';
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
 import { playTapSound, playSuccessSound, playWarningBeep } from '../utils/sound';
@@ -520,6 +521,135 @@ export function ThreeDimensionalCart({ itemCount = 0 }) {
 }
 
 /**
+ * 4.5 Modal Ringkasan Pesanan (Order Summary Pre-Checkout Confirmation)
+ */
+export function OrderSummaryModal({
+  isOpen,
+  onClose,
+  cartItems = [],
+  totalSpent = 0,
+  budgetLimit = 350000,
+  storeName = 'Lotte Mart',
+  onConfirmPay
+}) {
+  if (!isOpen) return null;
+
+  const remainingBudget = budgetLimit - totalSpent;
+  const isOverbudget = remainingBudget < 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/60 backdrop-blur-xs p-0 sm:p-4 animate-fade-in select-none">
+      <div 
+        className="w-full max-w-[420px] bg-white rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl border border-slate-100 animate-slide-up flex flex-col max-h-[88vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center border border-emerald-100">
+              <ShoppingBag className="w-5 h-5 text-emerald-700" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-900 tracking-tight">
+                Ringkasan Pesanan
+              </h3>
+              <p className="text-[11px] text-slate-500 font-medium">
+                {storeName} • {cartItems.reduce((acc, i) => acc + (i.quantity || 1), 0)} Item
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              playTapSound();
+              onClose();
+            }}
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+            title="Tutup"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Scrollable Item List */}
+        <div className="flex-1 overflow-y-auto no-scrollbar py-3 space-y-2 my-1 min-h-[120px] max-h-[40vh]">
+          {cartItems.map((item, idx) => {
+            const qty = item.quantity || 1;
+            const subtotal = (item.price || 0) * qty;
+            return (
+              <div 
+                key={item.id || idx}
+                className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/80 border border-slate-200/80"
+              >
+                <div className="min-w-0 pr-3">
+                  <h4 className="text-xs font-bold text-slate-900 truncate">
+                    {item.name}
+                  </h4>
+                  <div className="flex items-center space-x-2 text-[10px] text-slate-500 mt-0.5 font-medium">
+                    <span className="font-semibold text-slate-700">{qty} {item.unit || 'pcs'}</span>
+                    <span>•</span>
+                    <span>@Rp {(item.price || 0).toLocaleString('id-ID')}</span>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-xs font-black text-slate-900 block">
+                    Rp {subtotal.toLocaleString('id-ID')}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Summary Breakdown Card (Grand Total & Sisa Budget) */}
+        <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/90 space-y-2 shrink-0 mb-4">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-600">
+            <span>Total Keseluruhan Belanja:</span>
+            <span className="text-base font-black text-emerald-800">
+              Rp {totalSpent.toLocaleString('id-ID')}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 pt-1.5 border-t border-slate-200/70">
+            <span>Sisa Limit Saldo Budget:</span>
+            <span className={`font-bold ${isOverbudget ? 'text-rose-600 font-black' : 'text-slate-800'}`}>
+              {isOverbudget 
+                ? `-Rp ${Math.abs(remainingBudget).toLocaleString('id-ID')} (Overbudget)`
+                : `Rp ${remainingBudget.toLocaleString('id-ID')}`
+              }
+            </span>
+          </div>
+        </div>
+
+        {/* Action Buttons: Kembali / Batal and Konfirmasi & Bayar */}
+        <div className="grid grid-cols-2 gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              playTapSound();
+              onClose();
+            }}
+            className="py-3 px-3 rounded-xl border border-slate-200 hover:bg-slate-100 active:scale-98 text-slate-700 text-xs font-bold transition-all cursor-pointer text-center"
+          >
+            Kembali / Batal
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              playTapSound();
+              if (onConfirmPay) onConfirmPay();
+            }}
+            className="py-3 px-3 rounded-xl bg-emerald-800 hover:bg-emerald-900 active:scale-98 text-white text-xs font-extrabold shadow-md flex items-center justify-center space-x-1.5 transition-all cursor-pointer"
+          >
+            <span>Konfirmasi &amp; Bayar</span>
+            <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * 5. Modal Animasi Checkout ("Continuous Moving 3D Trolley" & "Transaksi Berhasil")
  */
 export function CheckoutModal({ 
@@ -813,7 +943,7 @@ export function CheckoutModal({
               </p>
               <div className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-[11px] font-extrabold text-emerald-800 mt-2 shadow-2xs">
                 <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Struk Tersimpan ke Cloud Supabase</span>
+                <span>Transaksi Selesai &amp; Tersimpan</span>
               </div>
             </div>
           </div>

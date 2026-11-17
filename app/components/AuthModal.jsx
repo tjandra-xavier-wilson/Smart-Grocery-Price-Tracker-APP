@@ -177,7 +177,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, currentUser 
         {/* Pill Badge */}
         <div className="mt-2.5 mb-5 px-3 py-1 bg-sky-50 border border-sky-100 text-sky-800 rounded-full text-[11px] font-semibold flex items-center space-x-1.5">
           <ShieldCheck className="w-3.5 h-3.5 text-sky-600" />
-          <span>Offline-Ready • Cloud Sync Persistent</span>
+          <span>Pencatatan Belanja Cerdas &amp; Terpercaya</span>
         </div>
 
         {/* Auth Card Container */}

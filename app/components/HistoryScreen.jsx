@@ -341,7 +341,7 @@ export default function HistoryScreen({
                     ) : (
                       <ShieldCheck className="w-2.5 h-2.5 text-sky-600" />
                     )}
-                    <span>{session.statusBadge || 'Tersimpan di Cloud'}</span>
+                    <span>{session.statusBadge ? (session.statusBadge.includes('Cloud') ? 'Transaksi Sukses' : session.statusBadge) : 'Transaksi Sukses'}</span>
                   </span>
 
                   <div className="flex items-center space-x-1.5">
@@ -397,11 +397,11 @@ export default function HistoryScreen({
         )}
       </section>
 
-      {/* 4. SYNC NOTICE KE DATABASE CLOUD */}
+      {/* 4. SYNC NOTICE */}
       <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold px-1 py-1">
         <div className="flex items-center space-x-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-          <span>Tersinkronisasi Realtime ke Cloud Supabase &amp; Firestore</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-600" />
+          <span>Riwayat belanja tersimpan aman &amp; otomatis</span>
         </div>
         <CloudCheck className="w-3.5 h-3.5 text-emerald-700" />
       </div>

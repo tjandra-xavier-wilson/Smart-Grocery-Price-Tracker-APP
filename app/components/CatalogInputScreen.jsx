@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Store, 
   Scan, 
@@ -13,22 +13,27 @@ import {
   X, 
   Clock, 
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Search
 } from 'lucide-react';
 import { playTapSound, playSuccessSound } from '../utils/sound';
+import { GROCERY_PRODUCTS } from '../data/groceryData';
 
 export default function CatalogInputScreen({
   currentStore = 'Lotte Mart Grocery',
   currentRemainingBudget = 125500,
   onAddToCart,
   onOpenBarcodeModal,
-  initialValues = null
+  initialValues = null,
+  historyList = []
 }) {
-  const [itemName, setItemName] = useState(initialValues?.name || 'Beras Rojolele 5kg');
+  const [itemName, setItemName] = useState(initialValues?.name || '');
   const [category, setCategory] = useState(initialValues?.category || 'Bahan Pokok');
   const [unit, setUnit] = useState(initialValues?.unit || 'karung/5kg');
   const [quantity, setQuantity] = useState(initialValues?.quantity || 1);
-  const [normalPrice, setNormalPrice] = useState(initialValues?.price ? String(initialValues.price) : '100000');
+  const [normalPrice, setNormalPrice] = useState(initialValues?.price ? String(initialValues.price) : '');
+  const [selectedImage, setSelectedImage] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
   
   // Discount Scheme: 'tunggal' | 'kompound'
   const [discountMode, setDiscountMode] = useState('kompound');
@@ -37,6 +42,99 @@ export default function CatalogInputScreen({
   
   // Validation state
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Consolidated Master Products for Autocomplete
+  const allMasterItems = useMemo(() => {
+    const list = [...(GROCERY_PRODUCTS || [])];
+
+    const extraStaples = [
+      { name: 'Mie Instan Indomie Goreng', price: 3500, category: 'Bahan Pokok', unit: 'pcs/85g' },
+      { name: 'Mie Instan Indomie Kuah Soto', price: 3500, category: 'Bahan Pokok', unit: 'pcs/75g' },
+      { name: 'Mie Sedaap Goreng', price: 3500, category: 'Bahan Pokok', unit: 'pcs/90g' },
+      { name: 'Minyak Goreng Sawit Murni 2L', price: 38500, category: 'Bahan Pokok', unit: 'pouch/2L' },
+      { name: 'Minyak Goreng Sania 2L', price: 39000, category: 'Bahan Pokok', unit: 'pouch/2L' },
+      { name: 'Minyak Goreng Bimoli 2L', price: 42000, category: 'Bahan Pokok', unit: 'pouch/2L' },
+      { name: 'Minyak Goreng SunCo 2L', price: 43000, category: 'Bahan Pokok', unit: 'pouch/2L' },
+      { name: 'Minyak Goreng Tropical 2L', price: 41500, category: 'Bahan Pokok', unit: 'botol/2L' },
+      { name: 'Minyak Goreng Sasa 2L', price: 38000, category: 'Bahan Pokok', unit: 'pouch/2L' },
+      { name: 'Kecap Manis Bango 550ml', price: 24500, category: 'Bumbu Dapur', unit: 'pouch/550ml' },
+      { name: 'Saus Sambal ABC Extra Pedas', price: 14500, category: 'Bumbu Dapur', unit: 'botol/335ml' },
+      { name: 'Beras Rojolele Super Pulen 5kg', price: 74000, category: 'Bahan Pokok', unit: 'karung/5kg' },
+      { name: 'Beras Pandan Wangi 5kg', price: 82000, category: 'Bahan Pokok', unit: 'karung/5kg' },
+      { name: 'Beras Setra Ramos 5kg', price: 76000, category: 'Bahan Pokok', unit: 'karung/5kg' },
+      { name: 'Bawang Merah Brebes 500g', price: 19000, category: 'Bumbu Dapur', unit: '500g' },
+      { name: 'Bawang Putih Kating 500g', price: 22000, category: 'Bumbu Dapur', unit: '500g' },
+      { name: 'Cabe Rawit Merah 250g', price: 18000, category: 'Sayur & Buah', unit: '250g' },
+      { name: 'Susu Kental Manis Frisian Flag', price: 13500, category: 'Bahan Pokok', unit: 'kaleng/370g' },
+      { name: 'Susu UHT Ultra Milk 1L', price: 19500, category: 'Bahan Pokok', unit: 'kotak/1L' },
+      { name: 'Teh Celup Sariwangi 25s', price: 7500, category: 'Minuman & Camilan', unit: 'box/25s' },
+      { name: 'Sabun Mandi Lifebuoy 450ml', price: 24000, category: 'Perlengkapan Mandi', unit: 'pouch/450ml' },
+      { name: 'Deterjen Rinso Cair 750ml', price: 21500, category: 'Perlengkapan Mandi', unit: 'pouch/750ml' },
+      { name: 'Sabun Cuci Sunlight Jeruk Nipis', price: 16000, category: 'Perlengkapan Mandi', unit: 'pouch/700ml' },
+      { name: 'Pasta Gigi Pepsodent 190g', price: 16500, category: 'Perlengkapan Mandi', unit: 'tube/190g' }
+    ];
+
+    extraStaples.forEach(item => {
+      if (!list.some(p => p.name.toLowerCase() === item.name.toLowerCase())) {
+        list.push({
+          id: 'extra-' + item.name.replace(/\s+/g, '-').toLowerCase(),
+          ...item
+        });
+      }
+    });
+
+    if (historyList && Array.isArray(historyList)) {
+      historyList.forEach(trip => {
+        if (trip.items && Array.isArray(trip.items)) {
+          trip.items.forEach(hItem => {
+            if (hItem.name && !list.some(p => p.name.toLowerCase() === hItem.name.toLowerCase())) {
+              list.push({
+                id: 'hist-' + (hItem.id || Math.random()),
+                name: hItem.name,
+                category: hItem.category || 'Bahan Pokok',
+                price: hItem.price || 0,
+                unit: hItem.unit || 'pcs',
+                image: hItem.image || ''
+              });
+            }
+          });
+        }
+      });
+    }
+
+    return list;
+  }, [historyList]);
+
+  // Autocomplete Filter
+  const filteredSuggestions = useMemo(() => {
+    const q = itemName.trim().toLowerCase();
+    if (!q || q.length < 1) return [];
+    return allMasterItems.filter(p => 
+      p.name.toLowerCase().includes(q)
+    ).slice(0, 6);
+  }, [itemName, allMasterItems]);
+
+  const mapCategory = (rawCat) => {
+    if (!rawCat) return 'Bahan Pokok';
+    const cat = String(rawCat).toLowerCase();
+    if (cat.includes('sembako') || cat.includes('pokok')) return 'Bahan Pokok';
+    if (cat.includes('sayur') || cat.includes('buah')) return 'Sayur & Buah';
+    if (cat.includes('daging') || cat.includes('ikan') || cat.includes('lauk')) return 'Daging & Ikan';
+    if (cat.includes('mandi') || cat.includes('bersih')) return 'Perlengkapan Mandi';
+    if (cat.includes('bumbu')) return 'Bumbu Dapur';
+    if (cat.includes('minum') || cat.includes('camilan') || cat.includes('snack')) return 'Minuman & Camilan';
+    return 'Bahan Pokok';
+  };
+
+  const handleSelectSuggestion = (product) => {
+    playTapSound();
+    setItemName(product.name);
+    if (product.price) setNormalPrice(String(product.price));
+    if (product.unit) setUnit(product.unit);
+    if (product.category) setCategory(mapCategory(product.category));
+    if (product.image) setSelectedImage(product.image);
+    setShowSuggestions(false);
+  };
 
   // Quick Preset Options
   const presets = [
@@ -131,12 +229,16 @@ export default function CatalogInputScreen({
       quantity: quantity,
       isSecondary: category === 'Lainnya' || category === 'Minuman & Camilan',
       discountLabel: (d1 > 0 || d2 > 0) ? `${d1}%${d2 > 0 ? ` + ${d2}%` : ''}` : null,
-      lastMonthPrice: priceNum > 50000 ? priceNum - 4000 : priceNum,
-      image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&auto=format&fit=crop&q=80'
+      lastMonthPrice: priceNum > 50000 ? priceNum - 4000 : (priceNum > 20000 ? priceNum + 2000 : priceNum),
+      image: selectedImage || 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&auto=format&fit=crop&q=80'
     };
 
     playSuccessSound();
     if (onAddToCart) onAddToCart(newItem);
+    setItemName('');
+    setNormalPrice('');
+    setSelectedImage('');
+    setShowSuggestions(false);
   };
 
   return (
@@ -181,8 +283,8 @@ export default function CatalogInputScreen({
 
       {/* 2. FORM INPUT UTAMA */}
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3.5">
-        {/* Nama Barang with Barcode Scanner Icon inside */}
-        <div>
+        {/* Nama Barang with Barcode Scanner Icon inside & Autocomplete Dropdown */}
+        <div className="relative">
           <div className="flex items-center justify-between text-xs font-bold text-slate-800 mb-1">
             <span>Nama Barang *</span>
             <span className="text-[10px] text-slate-400 font-semibold">Sering Dibeli</span>
@@ -191,8 +293,15 @@ export default function CatalogInputScreen({
             <input
               type="text"
               value={itemName}
-              onChange={(e) => setItemName(e.target.value)}
-              placeholder="Contoh: Beras Rojolele 5kg"
+              onChange={(e) => {
+                setItemName(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => {
+                setTimeout(() => setShowSuggestions(false), 200);
+              }}
+              placeholder="Ketik nama barang (contoh: Minyak, Beras, Mie)"
               required
               className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-700 focus:bg-white"
             />
@@ -207,6 +316,44 @@ export default function CatalogInputScreen({
             >
               <Scan className="w-5 h-5" />
             </button>
+
+            {/* Dropdown Rekomendasi / Autocomplete */}
+            {showSuggestions && filteredSuggestions.length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 z-50 max-h-56 overflow-y-auto divide-y divide-slate-100">
+                <div className="px-3 py-1 text-[9.5px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50 flex items-center justify-between">
+                  <span>Rekomendasi Barang</span>
+                  <span>{filteredSuggestions.length} ditemukan</span>
+                </div>
+                {filteredSuggestions.map((sug, idx) => (
+                  <button
+                    key={sug.id || idx}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectSuggestion(sug);
+                    }}
+                    className="w-full px-3 py-2 text-left hover:bg-emerald-50/70 transition-colors flex items-center justify-between group cursor-pointer"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <div className="text-xs font-bold text-slate-800 group-hover:text-emerald-800 truncate">
+                        {sug.name}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-medium">
+                        {sug.unit || 'pcs'}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-xs font-black text-emerald-800">
+                        Rp {Number(sug.price || 0).toLocaleString('id-ID')}
+                      </div>
+                      <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded-md">
+                        {sug.category || 'Bahan Pokok'}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Quick chips below input */}

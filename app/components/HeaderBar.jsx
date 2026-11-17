@@ -80,10 +80,6 @@ export default function HeaderBar({
                 Ganti ⇄
               </button>
             </div>
-            <div className="flex items-center space-x-1 text-[9.5px] text-emerald-700 font-semibold mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-              <span className="truncate">{syncStatus}</span>
-            </div>
           </div>
         </div>
 

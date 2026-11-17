@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import SplashScreen from './components/SplashScreen';
-import TopStatusBar from './components/TopStatusBar';
 import HeaderBackgroundTrolley from './components/HeaderBackgroundTrolley';
 import HeaderBar from './components/HeaderBar';
 import BottomNav from './components/BottomNav';
@@ -15,6 +14,7 @@ import {
   StoreModal, 
   BarcodeScannerModal, 
   ReceiptDetailModal, 
+  OrderSummaryModal,
   CheckoutModal,
   UserProfileModal,
   DeleteConfirmationModal,
@@ -214,6 +214,7 @@ export default function Home() {
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
+  const [isOrderSummaryOpen, setIsOrderSummaryOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isEmptyCartModalOpen, setIsEmptyCartModalOpen] = useState(false);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
@@ -1251,11 +1252,8 @@ export default function Home() {
               {/* Background Animasi Troli & Garis Angin Kecepatan Tinggi (Continuous Loop) */}
               <HeaderBackgroundTrolley />
 
-              {/* Foreground UI Elements (z-10: Teks Jam, Nama Toko, Avatar Tetap Jelas) */}
+              {/* Foreground UI Elements (z-10: Nama Toko, Avatar, Tanggal Tetap Jelas) */}
               <div className="relative z-10">
-                {/* Top Status Bar: Jam WIB, Notch, Sinyal 5G */}
-                <TopStatusBar />
-
                 {/* Global Header Bar: Info Toko, Avatar, Tanggal, Limit Budget */}
                 {isAuthenticated && (
                   <HeaderBar
@@ -1308,7 +1306,7 @@ export default function Home() {
                           setIsEmptyCartModalOpen(true);
                           return;
                         }
-                        setIsCheckoutModalOpen(true);
+                        setIsOrderSummaryOpen(true);
                       }}
                       onOpenBarcodeModal={() => setIsBarcodeModalOpen(true)}
                       onCutSecondaryItems={handleCutSecondaryItems}
@@ -1325,6 +1323,7 @@ export default function Home() {
                       onAddToCart={handleAddToCart}
                       onOpenBarcodeModal={() => setIsBarcodeModalOpen(true)}
                       initialValues={inputInitialValues}
+                      historyList={historyList}
                     />
                   )}
 
@@ -1379,6 +1378,19 @@ export default function Home() {
                   isOpen={Boolean(selectedReceipt)}
                   onClose={() => setSelectedReceipt(null)}
                   session={selectedReceipt}
+                />
+
+                <OrderSummaryModal
+                  isOpen={isOrderSummaryOpen}
+                  onClose={() => setIsOrderSummaryOpen(false)}
+                  cartItems={cartItems}
+                  totalSpent={totalCartPrice}
+                  budgetLimit={budgetLimit}
+                  storeName={currentStore}
+                  onConfirmPay={() => {
+                    setIsOrderSummaryOpen(false);
+                    setIsCheckoutModalOpen(true);
+                  }}
                 />
 
                 <CheckoutModal
