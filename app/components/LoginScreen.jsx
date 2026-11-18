@@ -44,6 +44,7 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
   const [errorMsg, setErrorMsg] = useState(externalError || '');
   const [authError, setAuthError] = useState('');
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [showInstalledToast, setShowInstalledToast] = useState(false);
   const [infoMsg, setInfoMsg] = useState('');
   const [deviceAccounts, setDeviceAccounts] = useState([]);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -92,6 +93,7 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
   }, []);
 
   const handleInstallClick = async () => {
+    // Cek apakah browser mendukung prompt instalasi (belum diinstal)
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
@@ -101,6 +103,12 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
           window.__deferredPrompt = null;
         }
       }
+    } else {
+      // Jika deferredPrompt null (artinya aplikasi sudah terinstal di perangkat/browser ini)
+      setShowInstalledToast(true);
+      setTimeout(() => {
+        setShowInstalledToast(false);
+      }, 4000); // Hilang otomatis dalam 4 detik
     }
   };
 
@@ -394,6 +402,18 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
           Pendaftaran berhasil! Silakan login kembali.
         </span>
       </div>
+
+      {/* FLOATER APLIKASI SUDAH TERINSTAL */}
+      {showInstalledToast && (
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-white border border-teal-500/30 shadow-xl rounded-full transition-all duration-500 ease-out flex items-center gap-3 w-max max-w-[90vw]">
+          <div className="flex-shrink-0 w-6 h-6 bg-teal-100 rounded-full flex items-center justify-center">
+            <span className="text-teal-600 text-sm font-bold">✓</span>
+          </div>
+          <p className="text-sm font-medium text-slate-700">
+            Aplikasi Smart Grocery Sentinel sudah terinstal di perangkat ini.
+          </p>
+        </div>
+      )}
 
       {/* 1. TOP HEADER STATUS BADGES */}
       <div className="w-full flex items-center justify-between text-[11px] font-semibold text-slate-600 pt-1 px-0.5">
@@ -714,18 +734,16 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
             <span>{googleLoading ? 'Menghubungkan ke Google...' : 'Lanjutkan dengan Akun Google'}</span>
           </button>
 
-          {/* Tombol Install Aplikasi PWA (Muncul Eksklusif jika didukung browser & belum terinstall) */}
-          {deferredPrompt && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <button 
-                onClick={handleInstallClick}
-                type="button"
-                className="w-full py-2.5 rounded-lg border-2 border-teal-600 text-teal-700 bg-teal-50 hover:bg-teal-100 font-semibold transition-colors flex justify-center items-center gap-2 cursor-pointer"
-              >
-                ⬇️ Install Aplikasi di Perangkat Ini
-              </button>
-            </div>
-          )}
+          {/* Tombol Install Aplikasi PWA (Selalu Tampil Permanen di Bawah Tombol Google) */}
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <button 
+              onClick={handleInstallClick}
+              type="button"
+              className="w-full py-2.5 rounded-lg border-2 border-teal-600 text-teal-700 bg-teal-50 hover:bg-teal-100 font-semibold transition-colors flex justify-center items-center gap-2 cursor-pointer shadow-xs active:bg-teal-200/60"
+            >
+              ⬇️ Install Aplikasi di Perangkat Ini
+            </button>
+          </div>
         </div>
       </div>
 
