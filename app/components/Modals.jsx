@@ -126,6 +126,7 @@ export function StoreModal({
   const [isAddingStore, setIsAddingStore] = useState(false);
   const [newStoreName, setNewStoreName] = useState('');
   const [isSavingStore, setIsSavingStore] = useState(false);
+  const [deletingStoreId, setDeletingStoreId] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -134,6 +135,7 @@ export function StoreModal({
       setIsAddingStore(false);
       setNewStoreName('');
       setIsSavingStore(false);
+      setDeletingStoreId(null);
     }
   }, [isOpen, currentStore, currentDate]);
 
@@ -224,12 +226,23 @@ export function StoreModal({
 
   const handleDeleteStore = async (e, item) => {
     e.stopPropagation();
-    playTapSound();
+    if (deletingStoreId) return;
 
     const storeId = item.id;
-    const storeName = item.name || item.store_name;
+    const storeName = item.store_name || item.name;
 
-    // Logika Hapus: Eksekusi delete ke tabel custom_stores Supabase
+    // 1. Dialog Konfirmasi Peringatan Hapus Toko Kustom
+    const confirmed = window.confirm(
+      `Apakah Anda yakin ingin menghapus lokasi toko '${storeName}'? Riwayat transaksi di toko ini tidak akan terhapus, tetapi lokasi ini akan hilang dari pilihan. Tindakan ini tidak dapat dibatalkan.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingStoreId(storeId);
+    playTapSound();
+
+    // 2. Logika Hapus: Eksekusi delete ke tabel custom_stores Supabase
     try {
       if (storeId && !String(storeId).startsWith('custom-store-') && !String(storeId).startsWith('local-')) {
         await supabase.from('custom_stores').delete().eq('id', storeId);
@@ -238,16 +251,18 @@ export function StoreModal({
       console.warn('[deleteCustomStore error]:', err);
     }
 
-    // Panggil handler parent untuk update state lokal & LocalStorage
+    // 3. Panggil handler parent untuk update state lokal & LocalStorage
     if (onDeleteCustomStore) {
       await onDeleteCustomStore(item);
     }
 
-    // Fallback Aktif: Jika toko yang dihapus kebetulan sedang menjadi selectedSupermarket aktif,
+    // 4. Fallback Aktif: Jika toko yang dihapus kebetulan sedang menjadi selectedSupermarket aktif,
     // otomatis ubah selectedSupermarket kembali ke "Lotte Mart - Puri Indah" agar aplikasi tidak error
     if (store === storeName || currentStore === storeName) {
       setStore('Lotte Mart - Puri Indah');
     }
+
+    setDeletingStoreId(null);
   };
 
   return (
@@ -303,11 +318,20 @@ export function StoreModal({
                       {item.isCustom && (
                         <button
                           type="button"
+                          disabled={deletingStoreId === item.id}
                           onClick={(e) => handleDeleteStore(e, item)}
-                          className="p-1 rounded-md text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer"
+                          className={`p-1 rounded-md transition-colors cursor-pointer ${
+                            deletingStoreId === item.id 
+                              ? 'text-slate-400 cursor-not-allowed opacity-60' 
+                              : 'text-red-500 hover:text-red-700 hover:bg-red-50'
+                          }`}
                           title={`Hapus toko kustom ${item.name}`}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          {deletingStoreId === item.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-red-500" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
                         </button>
                       )}
                     </div>

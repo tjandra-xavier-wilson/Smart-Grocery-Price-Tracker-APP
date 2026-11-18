@@ -30,7 +30,8 @@ import {
   Coffee,
   Brush,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from 'lucide-react';
 import { playTapSound, playSuccessSound, playWarningBeep } from '../utils/sound';
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
@@ -61,6 +62,7 @@ export default function ActiveCartScreen({
   onRefreshCustomProducts
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
+  const [deletingItemId, setDeletingItemId] = useState(null);
 
   // Sinkronisasi otomatis saat komponen dimuat
   useEffect(() => {
@@ -654,11 +656,17 @@ export default function ActiveCartScreen({
     }
   };
 
-  // Handler Hapus Barang Kustom: konfirmasi -> delete ke Supabase -> update state
+  // Handler Hapus Barang Kustom: konfirmasi spesifik -> delete ke Supabase -> update state
   const handleDeleteProduct = async (prod) => {
-    if (!window.confirm('Hapus barang ini?')) {
+    if (deletingItemId) return;
+    const confirmed = window.confirm(
+      `Apakah Anda yakin ingin menghapus barang '${prod.name}' dari katalog? Barang ini akan hilang secara permanen dari daftar rekomendasi Anda.`
+    );
+    if (!confirmed) {
       return;
     }
+
+    setDeletingItemId(prod.id);
     playTapSound();
     const itemId = prod.id;
     try {
@@ -672,6 +680,8 @@ export default function ActiveCartScreen({
     if (onDeleteCustomProduct) {
       await onDeleteCustomProduct(itemId, prod.name);
     }
+
+    setDeletingItemId(null);
   };
 
   // Render Product Card (Horizontal List Layout with Full Emoji Box & Dynamic Store Pricing)
@@ -691,14 +701,23 @@ export default function ActiveCartScreen({
         {prod.isCustom && (
           <button
             type="button"
+            disabled={deletingItemId === prod.id}
             onClick={(e) => {
               e.stopPropagation();
               handleDeleteProduct(prod);
             }}
-            className="absolute top-2 right-2 p-1 rounded-md text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer z-10"
+            className={`absolute top-2 right-2 p-1 rounded-md transition-colors cursor-pointer z-10 ${
+              deletingItemId === prod.id 
+                ? 'text-slate-400 cursor-not-allowed opacity-60' 
+                : 'text-red-500 hover:text-red-700 hover:bg-red-50'
+            }`}
             title={`Hapus barang kustom ${prod.name}`}
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            {deletingItemId === prod.id ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-red-500" />
+            ) : (
+              <Trash2 className="w-3.5 h-3.5" />
+            )}
           </button>
         )}
 
