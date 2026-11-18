@@ -930,6 +930,10 @@ export async function signUpWithEmailPassword(email, password, fullName) {
   addRegisteredEmail(cleanEmail);
 
   try {
+    if (typeof window !== 'undefined') {
+      window.__isRegistering = true;
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email: cleanEmail,
       password: password,
@@ -949,7 +953,7 @@ export async function signUpWithEmailPassword(email, password, fullName) {
         return {
           success: true,
           rateLimited: true,
-          message: 'Registrasi berhasil tersimpan di sistem. Silakan login ulang dengan akun Anda.'
+          message: 'Pendaftaran berhasil! Silakan login kembali menggunakan email dan password yang baru saja Anda buat.'
         };
       }
 
@@ -966,22 +970,37 @@ export async function signUpWithEmailPassword(email, password, fullName) {
       return {
         success: true,
         fallback: true,
-        message: 'Registrasi berhasil tersimpan di sistem. Silakan login ulang dengan akun Anda.'
+        message: 'Pendaftaran berhasil! Silakan login kembali menggunakan email dan password yang baru saja Anda buat.'
       };
+    }
+
+    // WAJIB: Hancurkan sesi auto-login Supabase segera setelah pendaftaran sukses
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn('[Supabase signUp] signOut after register notice:', e);
     }
 
     return {
       success: true,
       data,
-      message: 'Registrasi berhasil, silakan login ulang dengan akun Anda.'
+      message: 'Pendaftaran berhasil! Silakan login kembali menggunakan email dan password yang baru saja Anda buat.'
     };
   } catch (err) {
     console.warn('[Supabase signUp catch]:', err.message);
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {}
     return {
-      success: true,
-      fallback: true,
-      message: 'Registrasi berhasil tersimpan di sistem. Silakan login ulang dengan akun Anda.'
+      success: false,
+      error: err.message
     };
+  } finally {
+    if (typeof window !== 'undefined') {
+      setTimeout(() => {
+        window.__isRegistering = false;
+      }, 600);
+    }
   }
 }
 

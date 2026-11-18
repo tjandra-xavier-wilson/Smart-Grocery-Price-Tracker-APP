@@ -43,8 +43,39 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
   const [errorMsg, setErrorMsg] = useState(externalError || '');
   const [infoMsg, setInfoMsg] = useState('');
   const [deviceAccounts, setDeviceAccounts] = useState([]);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
   const isAuthInitiatedRef = useRef(false);
   const isGooglePopupActiveRef = useRef(false);
+
+  // PWA Install Prompt Listener (Eksklusif di Layar Login)
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault(); // Mencegah browser menampilkan prompt otomatis
+      setDeferredPrompt(e); // Simpan event untuk dipicu lewat tombol
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    const handleAppInstalled = () => {
+      setDeferredPrompt(null);
+    };
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    playTapSound();
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    }
+  };
 
   // Listener onAuthStateChange & Event Reset untuk mengatasi infinite loading
   useEffect(() => {
@@ -54,6 +85,11 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
       // Setiap event auth selesai diproses atau gagal/batal tanpa sesi
       setLoading(false);
       setGoogleLoading(false);
+
+      // Jangan proses jika sedang dalam alur registrasi baru
+      if (typeof window !== 'undefined' && window.__isRegistering) {
+        return;
+      }
 
       // PENTING: Hanya panggil onLoginSuccess jika user secara aktif menginisiasi proses login (misal Google OAuth)
       // DILARANG memicu login otomatis saat user hanya melakukan Alt+Tab / pindah tab!
@@ -206,37 +242,62 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
 
       } else {
         // Mode Daftar: pendaftaran via Supabase Auth
-        const res = await signUpWithEmailPassword(email, pin, fullName);
-        
-        if (!res.success) {
-          setErrorMsg(res.error || 'Gagal melakukan pendaftaran akun baru.');
+        if (typeof window !== 'undefined') {
+          window.__isRegistering = true;
+        }
+
+        try {
+          const res = await signUpWithEmailPassword(email, pin, fullName);
+          
+          if (!res.success) {
+            setErrorMsg(res.error || 'Gagal melakukan pendaftaran akun baru.');
+            setLoading(false);
+            return;
+          }
+
+          // SETELAH signUp berhasil, JANGAN biarkan pengguna langsung masuk.
+          // Hancurkan sesi auto-login bawaan Supabase:
+          await supabase.auth.signOut();
+
+          // Bersihkan sisa flag login lokal jika ada
+          if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem('sakugrosir_is_logged_in');
+          }
+
+          // Simpan akun ke vault daftar perangkat agar mempermudah login nanti
+          const u = res.data?.user;
+          const profile = {
+            id: u?.id || 'user-' + Date.now(),
+            name: fullName || u?.user_metadata?.full_name || email.split('@')[0],
+            email: u?.email || email.trim(),
+            avatar_url: u?.user_metadata?.avatar_url || null,
+            provider: 'email_password',
+            role: 'user',
+            authenticated_at: new Date().toISOString()
+          };
+          saveDeviceAccount(profile);
+          setDeviceAccounts(getDeviceAccounts());
+
+          // Ubah state UI kembali ke mode "Login"
+          setAuthMode('login');
+          setPin(''); // Kosongkan PIN/kata sandi agar pengguna login kembali secara sadar
           setLoading(false);
-          return;
-        }
+          playSuccessSound();
 
-        const u = res.data?.user;
-        const profile = {
-          id: u?.id || 'user-' + Date.now(),
-          name: fullName || u?.user_metadata?.full_name || email.split('@')[0],
-          email: u?.email || email.trim(),
-          avatar_url: u?.user_metadata?.avatar_url || null,
-          provider: 'email_password',
-          role: 'user',
-          authenticated_at: new Date().toISOString()
-        };
-
-        // Simpan akun ke perangkat dan langsung masuki akun dengan transisi splash screen
-        saveDeviceAccount(profile);
-        setDeviceAccounts(getDeviceAccounts());
-        if (rememberMe && typeof localStorage !== 'undefined') {
-          localStorage.setItem(SINGLE_USER_STORAGE_KEY, JSON.stringify(profile));
-          localStorage.setItem('sakugrosir_is_logged_in', 'true');
+          // Tampilkan pop-up / alert sukses:
+          const successMessage = "Pendaftaran berhasil! Silakan login kembali menggunakan email dan password yang baru saja Anda buat.";
+          setInfoMsg(successMessage);
+          if (typeof window !== 'undefined') {
+            alert(successMessage);
+          }
+        } finally {
+          if (typeof window !== 'undefined') {
+            setTimeout(() => {
+              window.__isRegistering = false;
+            }, 600);
+          }
         }
-
-        playSuccessSound();
-        if (onLoginSuccess) {
-          onLoginSuccess(profile);
-        }
+        return;
       }
     } catch (err) {
       setErrorMsg(err.message || 'Terjadi gangguan koneksi pada modul autentikasi.');
@@ -572,6 +633,19 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
             )}
             <span>{googleLoading ? 'Menghubungkan ke Google...' : 'Lanjutkan dengan Akun Google'}</span>
           </button>
+
+          {/* Tombol Install Aplikasi PWA (Muncul Eksklusif jika didukung browser & belum terinstall) */}
+          {deferredPrompt && (
+            <div className="mt-3 pt-3 border-t border-slate-100 animate-fade-in">
+              <button
+                type="button"
+                onClick={handleInstallClick}
+                className="w-full py-2.5 px-3 border-2 border-teal-600 text-teal-700 bg-teal-50 hover:bg-teal-100/90 active:bg-teal-200/80 rounded-xl font-extrabold text-xs flex items-center justify-center space-x-2 transition-all cursor-pointer shadow-xs"
+              >
+                <span>⬇️ Install Aplikasi di Perangkat Ini</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

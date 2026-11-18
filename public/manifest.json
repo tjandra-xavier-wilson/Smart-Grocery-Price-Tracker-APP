@@ -1,23 +1,23 @@
 {
-  "name": "Smart Grocery Price Tracker & Budget Safety Cap",
-  "short_name": "SakuGrosir",
-  "description": "Aplikasi belanja grosir mobile satu-tangan untuk anak kos: kalkulator diskon bertingkat, komparator harga unit, detektor fluktuasi harga vs bulan lalu, dan budget safety cap anti-malu di kasir.",
-  "start_url": "./index.html",
-  "scope": "./",
+  "name": "Smart Grocery Sentinel",
+  "short_name": "SmartGrocery",
+  "description": "Asisten Belanja Hemat & Pelindung Anggaran Pintar",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#0b1120",
-  "theme_color": "#0b1120",
+  "background_color": "#ffffff",
+  "theme_color": "#065F46",
   "lang": "id-ID",
   "icons": [
     {
-      "src": "./icons/icon.svg",
+      "src": "/icons/icon.svg",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "./icons/icon.svg",
+      "src": "/icons/icon.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
@@ -25,22 +25,22 @@
   ],
   "shortcuts": [
     {
-      "name": "Belanja Sekarang",
-      "short_name": "Belanja",
+      "name": "Keranjang Aktif",
+      "short_name": "Keranjang",
       "description": "Buka keranjang belanja aktif",
-      "url": "./index.html?tab=belanja"
+      "url": "/?tab=cart"
     },
     {
-      "name": "Komparator Unit",
-      "short_name": "Komparator",
-      "description": "Bandingkan harga per liter/kg",
-      "url": "./index.html?tool=comparator"
+      "name": "Katalog & Input",
+      "short_name": "Katalog",
+      "description": "Cari katalog dan input barang",
+      "url": "/?tab=catalog"
     },
     {
-      "name": "Batas Anggaran",
-      "short_name": "Anggaran",
-      "description": "Pantau limit saku bulanan",
-      "url": "./index.html?tab=anggaran"
+      "name": "Riwayat Belanja",
+      "short_name": "Riwayat",
+      "description": "Lihat histori belanja",
+      "url": "/?tab=history"
     }
   ],
   "categories": ["finance", "shopping", "productivity"]

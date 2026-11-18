@@ -1635,6 +1635,12 @@ export default function Home() {
     const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('⚡ [Supabase onAuthStateChange Event]:', event);
 
+      // PENTING: Jika pengguna sedang dalam proses registrasi akun baru, DILARANG auto-login!
+      if (typeof window !== 'undefined' && window.__isRegistering) {
+        console.log('⚡ [Supabase onAuthStateChange]: Pendaftaran akun baru sedang berlangsung, abaikan event auto-login.');
+        return;
+      }
+
       if (session?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION')) {
         const u = session.user;
 
