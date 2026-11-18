@@ -77,12 +77,56 @@ export default function HistoryScreen({
   const [selectedTxA, setSelectedTxA] = useState(null);
   const [selectedTxB, setSelectedTxB] = useState(null);
 
+  // historyItems: Single source of truth untuk validasi riwayat belanja
+  const historyItems = uniqueHistoryList || historyList || [];
+
+  // Sinkronisasi & Reset Ghost Data: jika data transaksi A atau B sudah dihapus dari database, atau history < 2
+  useEffect(() => {
+    if (!historyItems || historyItems.length < 2) {
+      setSelectedTxA(null);
+      setSelectedTxB(null);
+      setIsSelectingFor('A');
+      return;
+    }
+    if (selectedTxA && !historyItems.some(item => String(item.id) === String(selectedTxA.id))) {
+      setSelectedTxA(null);
+      setIsSelectingFor('A');
+    }
+    if (selectedTxB && !historyItems.some(item => String(item.id) === String(selectedTxB.id))) {
+      setSelectedTxB(null);
+      setIsSelectingFor(selectedTxA ? 'B' : 'A');
+    }
+  }, [historyItems, selectedTxA, selectedTxB]);
+
   // Handler reset pilihan: mengosongkan pilihan dan mengembalikan isSelectingFor ke 'A'
   const handleResetComparison = () => {
     playTapSound();
     setSelectedTxA(null);
     setSelectedTxB(null);
     setIsSelectingFor('A');
+  };
+
+  // Handler penghapusan transaksi individu dengan State Reset pengaman
+  const handleDeleteTransaction = (session) => {
+    if ((selectedTxA && String(selectedTxA.id) === String(session?.id)) ||
+        (selectedTxB && String(selectedTxB.id) === String(session?.id))) {
+      setSelectedTxA(null);
+      setSelectedTxB(null);
+      setIsSelectingFor('A');
+    }
+    if (onRequestDeleteTrip) {
+      onRequestDeleteTrip(session);
+    }
+  };
+
+  // Handler penghapusan seluruh riwayat belanja dengan State Reset pengaman
+  const handleClearAllHistory = () => {
+    setSelectedTxA(null);
+    setSelectedTxB(null);
+    setIsSelectingFor('A');
+    if (onRequestClearAllHistory) {
+      onRequestClearAllHistory();
+    }
   };
 
   // Handler pemilihan kartu langsung dari daftar sesi belanja
@@ -305,8 +349,9 @@ export default function HistoryScreen({
       </div>
 
       {/* 2. FITUR PERBANDINGAN PENGELUARAN ANTAR TRANSAKSI (SISTEM DIRECT CARD SELECTION) */}
-      <div className="bg-white rounded-xl shadow-sm p-4 border border-slate-200/90 space-y-3">
-        {/* Header Card dengan Tombol Ulangi Pemilihan (Reset) & Badge Status */}
+      {historyItems.length >= 2 && (
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-slate-200/90 space-y-3 perbandingan-transaksi-container">
+          {/* Header Card dengan Tombol Ulangi Pemilihan (Reset) & Badge Status */}
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-extrabold text-slate-800 tracking-tight">
@@ -510,6 +555,7 @@ export default function HistoryScreen({
           </div>
         )}
       </div>
+      )}
 
       {/* Sub-row: Indikator Periode Aktif */}
       <div className="flex items-center justify-between text-[11px] px-1 font-semibold text-slate-600">
@@ -683,7 +729,7 @@ export default function HistoryScreen({
                       onClick={(e) => {
                         e.stopPropagation();
                         playTapSound();
-                        if (onRequestDeleteTrip) onRequestDeleteTrip(session);
+                        handleDeleteTransaction(session);
                       }}
                       className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                       title="Hapus Riwayat Belanja Ini"
@@ -705,7 +751,7 @@ export default function HistoryScreen({
               type="button"
               onClick={() => {
                 playTapSound();
-                if (onRequestClearAllHistory) onRequestClearAllHistory();
+                handleClearAllHistory();
               }}
               className="w-full py-2.5 px-3 rounded-xl border border-rose-200/90 bg-rose-50/70 hover:bg-rose-100 text-rose-700 text-xs font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-2xs"
             >
