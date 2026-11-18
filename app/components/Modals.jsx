@@ -257,20 +257,7 @@ export function StoreModal({
 
       const { error } = await query;
       if (error) {
-        const isMissingTable = String(error.message || '').includes('schema cache') || 
-                               String(error.message || '').includes('Could not find the table') ||
-                               error.code === 'PGRST205' || error.code === '42P01';
-        if (isMissingTable) {
-          console.warn('[Supabase Missing custom_stores Notice]:', error.message);
-          if (typeof window !== 'undefined') {
-            alert(`Pemberitahuan: Tabel 'custom_stores' belum ada di Supabase. Lokasi '${storeName}' dihapus dari memori lokal. Silakan jalankan skrip SQL di menu SQL Editor dasbor Supabase Anda.`);
-          }
-        } else {
-          console.error("Gagal menghapus lokasi dari Supabase:", error);
-          if (typeof window !== 'undefined') {
-            alert(`Pemberitahuan: ${error.message || 'Gagal menghapus dari cloud. Menghapus dari memori lokal...'}`);
-          }
-        }
+        console.warn('[Delete Store Notice]:', error.message);
       }
 
       // 2. Panggil handler parent untuk update state lokal & LocalStorage & Realtime Broadcast
@@ -291,11 +278,8 @@ export function StoreModal({
       if (store === storeName || currentStore === storeName) {
         setStore('Lotte Mart - Puri Indah');
       }
-      if (typeof window !== 'undefined') {
-        alert(`Pemberitahuan: Lokasi '${storeName}' telah dihapus dari memori lokal.`);
-      }
     } finally {
-      // Memastikan loading spinner SELALU berhenti
+      // 4. JAMINAN: Loading spinner SELALU berhenti (setIsDeleting(false)) & modal tertutup otomatis
       setDeletingStoreId(null);
       setStoreToDeletePrompt(null);
     }

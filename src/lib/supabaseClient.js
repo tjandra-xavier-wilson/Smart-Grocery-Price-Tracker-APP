@@ -1368,15 +1368,17 @@ export async function getCustomProducts(userId = null) {
   }
 
   const byName = new Map();
+  let isTableReachable = false;
 
-  // 1. Coba ambil dari tabel products Supabase
+  // 1. Coba ambil dari tabel products Supabase (Single Source of Truth)
   try {
     let query = supabase.from('products').select('*').order('created_at', { ascending: false });
     if (userId) {
       query = query.eq('user_id', userId);
     }
     const { data, error } = await query;
-    if (!error && data && data.length > 0) {
+    if (!error && data !== null) {
+      isTableReachable = true;
       data.forEach(item => {
         if (item && item.name) {
           byName.set(item.name.toLowerCase(), {
@@ -1390,37 +1392,38 @@ export async function getCustomProducts(userId = null) {
     }
   } catch (err) { }
 
-  // 2. Ambil dari Supabase Cloud Sync Hub jika tabel belum ada atau kosong
-  try {
-    const cloudConfig = await fetchCloudCustomConfig();
-    if (cloudConfig?.products && Array.isArray(cloudConfig.products)) {
-      cloudConfig.products.forEach(item => {
-        if (item && item.name && !byName.has(item.name.toLowerCase())) {
-          byName.set(item.name.toLowerCase(), {
-            ...item,
-            isCustom: true,
-            historyPrice: null,
-            lastMonthPrice: null
-          });
-        }
-      });
-    }
-  } catch (e) { }
+  // 2. Ambil dari fallback HANYA jika tabel database belum dapat diakses (offline/missing table)
+  if (!isTableReachable) {
+    try {
+      const cloudConfig = await fetchCloudCustomConfig();
+      if (cloudConfig?.products && Array.isArray(cloudConfig.products)) {
+        cloudConfig.products.forEach(item => {
+          if (item && item.name && !byName.has(item.name.toLowerCase())) {
+            byName.set(item.name.toLowerCase(), {
+              ...item,
+              isCustom: true,
+              historyPrice: null,
+              lastMonthPrice: null
+            });
+          }
+        });
+      }
+    } catch (e) { }
 
-  // 3. Merge dengan local fallback
-  localList.forEach(item => {
-    if (item && item.name && !byName.has(item.name.toLowerCase())) {
-      byName.set(item.name.toLowerCase(), {
-        ...item,
-        isCustom: true,
-        historyPrice: null,
-        lastMonthPrice: null
-      });
-    }
-  });
+    localList.forEach(item => {
+      if (item && item.name && !byName.has(item.name.toLowerCase())) {
+        byName.set(item.name.toLowerCase(), {
+          ...item,
+          isCustom: true,
+          historyPrice: null,
+          lastMonthPrice: null
+        });
+      }
+    });
+  }
 
   const merged = Array.from(byName.values());
-  if (typeof localStorage !== 'undefined' && merged.length > 0) {
+  if (typeof localStorage !== 'undefined') {
     try {
       localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(merged));
     } catch (e) { }
@@ -1688,8 +1691,9 @@ export async function getCustomStores(userId = null) {
   }
 
   const byName = new Map();
+  let isTableReachable = false;
 
-  // 1. Coba ambil dari tabel custom_stores Supabase
+  // 1. Coba ambil dari tabel custom_stores Supabase (Single Source of Truth)
   try {
     let targetUserId = userId;
     if (!targetUserId && typeof localStorage !== 'undefined') {
@@ -1713,7 +1717,8 @@ export async function getCustomStores(userId = null) {
       query = query.eq('user_id', targetUserId);
     }
     const { data, error } = await query;
-    if (!error && data && data.length > 0) {
+    if (!error && data !== null) {
+      isTableReachable = true;
       data.forEach(item => {
         if (item && item.store_name) {
           byName.set(item.store_name.toLowerCase(), {
@@ -1729,29 +1734,30 @@ export async function getCustomStores(userId = null) {
     }
   } catch (err) { }
 
-  // 2. Ambil dari Supabase Cloud Sync Hub jika tabel belum ada atau kosong
-  try {
-    const cloudConfig = await fetchCloudCustomConfig();
-    if (cloudConfig?.stores && Array.isArray(cloudConfig.stores)) {
-      cloudConfig.stores.forEach(item => {
-        const key = (typeof item === 'string' ? item : (item.store_name || item.name || '')).toLowerCase();
-        if (key && !byName.has(key)) {
-          byName.set(key, typeof item === 'string' ? { id: `cloud-store-${key}`, name: item, store_name: item, isCustom: true } : { ...item, isCustom: true });
-        }
-      });
-    }
-  } catch (e) { }
+  // 2. Ambil dari fallback HANYA jika tabel database belum dapat diakses (offline/missing table)
+  if (!isTableReachable) {
+    try {
+      const cloudConfig = await fetchCloudCustomConfig();
+      if (cloudConfig?.stores && Array.isArray(cloudConfig.stores)) {
+        cloudConfig.stores.forEach(item => {
+          const key = (typeof item === 'string' ? item : (item.store_name || item.name || '')).toLowerCase();
+          if (key && !byName.has(key)) {
+            byName.set(key, typeof item === 'string' ? { id: `cloud-store-${key}`, name: item, store_name: item, isCustom: true } : { ...item, isCustom: true });
+          }
+        });
+      }
+    } catch (e) { }
 
-  // 3. Merge offline local list if not already present from cloud
-  localList.forEach(item => {
-    const key = (item.store_name || item.name || '').toLowerCase();
-    if (key && !byName.has(key)) {
-      byName.set(key, item);
-    }
-  });
+    localList.forEach(item => {
+      const key = (item.store_name || item.name || '').toLowerCase();
+      if (key && !byName.has(key)) {
+        byName.set(key, item);
+      }
+    });
+  }
 
   const merged = Array.from(byName.values());
-  if (typeof localStorage !== 'undefined' && merged.length > 0) {
+  if (typeof localStorage !== 'undefined') {
     try {
       localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(merged));
     } catch (e) { }

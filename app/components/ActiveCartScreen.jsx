@@ -688,39 +688,20 @@ export default function ActiveCartScreen({
 
       const { error } = await query;
       if (error) {
-        const isMissingTable = String(error.message || '').includes('schema cache') || 
-                               String(error.message || '').includes('Could not find the table') ||
-                               error.code === 'PGRST205' || error.code === '42P01';
-        if (isMissingTable) {
-          console.warn('[Supabase Missing products table Notice]:', error.message);
-          if (typeof window !== 'undefined') {
-            alert(`Pemberitahuan: Tabel 'products' belum ada di Supabase. Barang '${itemName}' dihapus dari memori lokal. Silakan jalankan skrip SQL di menu SQL Editor dasbor Supabase Anda.`);
-          }
-        } else {
-          console.error("Gagal menghapus dari Supabase:", error);
-          if (typeof window !== 'undefined') {
-            alert(`Pemberitahuan: ${error.message || 'Gagal menghapus dari cloud. Menghapus dari memori lokal...'}`);
-          }
-        }
+        console.warn('[Delete Product Notice]:', error.message);
       }
 
       // 2. Selalu bersihkan dari state lokal (Optimistic UI), Autocomplete & LocalStorage
       if (onDeleteCustomProduct) {
         await onDeleteCustomProduct(itemId, itemName);
       }
-
-      // 3. Tutup modal konfirmasi
-      setCustomProductToDelete(null);
     } catch (err) {
-      console.error("Gagal menghapus:", err);
+      console.warn('[Delete Product Exception]:', err);
       if (onDeleteCustomProduct) {
         try { await onDeleteCustomProduct(itemId, itemName); } catch (e) {}
       }
-      if (typeof window !== 'undefined') {
-        alert(`Pemberitahuan: Barang '${itemName}' dihapus dari memori lokal.`);
-      }
     } finally {
-      // 4. Memastikan loading spinner SELALU berhenti (setIsDeleting(false)) & modal tertutup
+      // 3. JAMINAN: Loading spinner SELALU berhenti (setIsDeleting(false)) & modal tertutup otomatis
       setDeletingItemId(null);
       setCustomProductToDelete(null);
     }
