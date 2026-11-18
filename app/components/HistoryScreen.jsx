@@ -17,7 +17,11 @@ import {
   Sparkles,
   Trash2,
   Calendar,
-  Filter
+  Filter,
+  ArrowDown,
+  ArrowUp,
+  Equal,
+  Minus
 } from 'lucide-react';
 import { playTapSound, playSuccessSound } from '../utils/sound';
 import { 
@@ -26,6 +30,10 @@ import {
   formatMonthYearLabel, 
   MONTH_NAMES_ID 
 } from '../utils/date';
+import { 
+  formatTxOptionLabel, 
+  calculateTransactionComparison 
+} from '../utils/comparison';
 
 export default function HistoryScreen({
   historyList = [],
@@ -61,6 +69,89 @@ export default function HistoryScreen({
 
     return cleanList;
   }, [historyList]);
+
+  // 1b. State & Logika untuk Fitur Analitik "Perbandingan Pengeluaran Antar Transaksi"
+  // selectedTxA menyimpan ID transaksi terbaru (index 0) dan selectedTxB menyimpan transaksi sebelumnya (index 1)
+  const [selectedTxA, setSelectedTxA] = useState(() => 
+    uniqueHistoryList.length > 0 ? String(uniqueHistoryList[0].id) : ''
+  );
+  const [selectedTxB, setSelectedTxB] = useState(() => 
+    uniqueHistoryList.length > 1 ? String(uniqueHistoryList[1].id) : ''
+  );
+
+  // Sinkronisasi otomatis default pilihan saat daftar riwayat belanja dimuat atau berubah
+  // Jika hanya ada 1 transaksi atau 0 transaksi, perbandingan dinonaktifkan
+  useEffect(() => {
+    if (uniqueHistoryList.length >= 2) {
+      setSelectedTxA((prev) => {
+        const exists = uniqueHistoryList.some((item) => String(item.id) === String(prev));
+        return exists ? prev : String(uniqueHistoryList[0].id);
+      });
+      setSelectedTxB((prev) => {
+        const exists = uniqueHistoryList.some((item) => String(item.id) === String(prev));
+        return exists ? prev : String(uniqueHistoryList[1].id);
+      });
+    } else if (uniqueHistoryList.length === 1) {
+      setSelectedTxA(String(uniqueHistoryList[0].id));
+      setSelectedTxB('');
+    } else {
+      setSelectedTxA('');
+      setSelectedTxB('');
+    }
+  }, [uniqueHistoryList]);
+
+  // Transaksi terpilih A dan B
+  const txA = useMemo(() => {
+    return uniqueHistoryList.find((item) => String(item.id) === String(selectedTxA)) || null;
+  }, [uniqueHistoryList, selectedTxA]);
+
+  const txB = useMemo(() => {
+    return uniqueHistoryList.find((item) => String(item.id) === String(selectedTxB)) || null;
+  }, [uniqueHistoryList, selectedTxB]);
+
+  const totalA = useMemo(() => {
+    return txA ? Number(txA.totalSpent || txA.total_spent || 0) : 0;
+  }, [txA]);
+
+  const totalB = useMemo(() => {
+    return txB ? Number(txB.totalSpent || txB.total_spent || 0) : 0;
+  }, [txB]);
+
+  // Kalkulasi analitik perbandingan pengeluaran (reaktif terhadap dropdown A dan B)
+  const comparisonResult = useMemo(() => {
+    const isAvailable = uniqueHistoryList.length >= 2 && Boolean(txA) && Boolean(txB);
+    return calculateTransactionComparison(totalA, totalB, isAvailable);
+  }, [uniqueHistoryList.length, txA, txB, totalA, totalB]);
+
+  // Warna badge, lingkaran panah, dan ikon dinamis
+  const comparisonArrow = useMemo(() => {
+    if (comparisonResult.status === 'cheaper') {
+      return {
+        bg: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+        badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        icon: <ArrowDown className="w-5 h-5 text-emerald-700 stroke-[2.5]" />
+      };
+    }
+    if (comparisonResult.status === 'expensive') {
+      return {
+        bg: 'bg-rose-100 text-rose-700 border-rose-200',
+        badge: 'bg-rose-50 text-rose-700 border-rose-200',
+        icon: <ArrowUp className="w-5 h-5 text-rose-700 stroke-[2.5]" />
+      };
+    }
+    if (comparisonResult.status === 'equal') {
+      return {
+        bg: 'bg-slate-100 text-slate-600 border-slate-300',
+        badge: 'bg-slate-100 text-slate-700 border-slate-300',
+        icon: <Equal className="w-5 h-5 text-slate-600 stroke-[2.5]" />
+      };
+    }
+    return {
+      bg: 'bg-slate-100 text-slate-400 border-slate-200',
+      badge: 'bg-slate-100 text-slate-500 border-slate-200',
+      icon: <Minus className="w-5 h-5 text-slate-400 stroke-[2.5]" />
+    };
+  }, [comparisonResult.status]);
 
   // 2. Ekstraksi daftar bulan unik secara DINAMIS HANYA dari data riwayat belanja yang benar-benar ada
   // DILARANG menambahkan bulan hardcoded / dummy jika transaksi pada bulan tersebut tidak ada!
@@ -217,6 +308,138 @@ export default function HistoryScreen({
             >
               Reset
             </button>
+          )}
+        </div>
+      </div>
+
+      {/* 2. FITUR PERBANDINGAN PENGELUARAN ANTAR TRANSAKSI */}
+      <div className="bg-white rounded-xl shadow-sm p-4 border border-slate-200/90 space-y-3">
+        {/* Header Card */}
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-extrabold text-slate-800 tracking-tight">
+            Perbandingan Transaksi
+          </h3>
+          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border flex items-center space-x-1 ${comparisonArrow.badge}`}>
+            <span>{comparisonResult.badgeText}</span>
+          </span>
+        </div>
+
+        {/* Pemilih Transaksi (Dropdowns Sejajar Kiri & Kanan) */}
+        <div className="grid grid-cols-2 gap-2.5 pt-0.5">
+          {/* Dropdown Kiri: Transaksi A */}
+          <div className="space-y-1">
+            <label className="block text-[11px] font-bold text-slate-600">
+              Transaksi A
+            </label>
+            <select
+              value={selectedTxA}
+              onChange={(e) => {
+                playTapSound();
+                setSelectedTxA(e.target.value);
+              }}
+              disabled={uniqueHistoryList.length < 2}
+              className={`w-full text-xs font-bold py-2 px-2.5 rounded-xl border border-slate-200 outline-none transition-colors truncate ${
+                uniqueHistoryList.length < 2 
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-800 cursor-pointer'
+              }`}
+            >
+              {uniqueHistoryList.length === 0 ? (
+                <option value="">Belum Ada Riwayat</option>
+              ) : (
+                uniqueHistoryList.map((session, idx) => (
+                  <option key={`txA-${session.id || idx}`} value={session.id}>
+                    {formatTxOptionLabel(session, parseDateComponents)}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
+          {/* Dropdown Kanan: Transaksi B */}
+          <div className="space-y-1">
+            <label className="block text-[11px] font-bold text-slate-600">
+              Transaksi B
+            </label>
+            <select
+              value={selectedTxB}
+              onChange={(e) => {
+                playTapSound();
+                setSelectedTxB(e.target.value);
+              }}
+              disabled={uniqueHistoryList.length < 2}
+              className={`w-full text-xs font-bold py-2 px-2.5 rounded-xl border border-slate-200 outline-none transition-colors truncate ${
+                uniqueHistoryList.length < 2 
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-800 cursor-pointer'
+              }`}
+            >
+              {uniqueHistoryList.length < 2 ? (
+                <option value="">
+                  {uniqueHistoryList.length === 0 ? 'Belum Ada Riwayat' : 'Belum Ada Transaksi Lain'}
+                </option>
+              ) : (
+                uniqueHistoryList.map((session, idx) => (
+                  <option key={`txB-${session.id || idx}`} value={session.id}>
+                    {formatTxOptionLabel(session, parseDateComponents)}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+        </div>
+
+        {/* Tampilan Nominal (Visualisasi Utama) */}
+        <div className="bg-gray-50 rounded-lg p-4 border border-slate-100 flex justify-between items-center">
+          {/* Sisi Kiri: Transaksi A */}
+          <div className="flex-1 text-left min-w-0 pr-2">
+            <span className="block text-[11px] font-semibold text-slate-500 truncate">
+              Transaksi A
+            </span>
+            <span className="block text-base sm:text-lg font-black text-slate-900 mt-0.5 truncate tabular-nums">
+              Rp {totalA.toLocaleString('id-ID')}
+            </span>
+          </div>
+
+          {/* Tengah: Ikon Lingkaran Panah */}
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 mx-2 border shadow-2xs transition-all ${comparisonArrow.bg}`}>
+            {comparisonArrow.icon}
+          </div>
+
+          {/* Sisi Kanan: Transaksi B */}
+          <div className="flex-1 text-right min-w-0 pl-2">
+            <span className="block text-[11px] font-semibold text-slate-500 truncate">
+              Transaksi B
+            </span>
+            <span className="block text-base sm:text-lg font-black text-slate-900 mt-0.5 truncate tabular-nums">
+              Rp {totalB.toLocaleString('id-ID')}
+            </span>
+          </div>
+        </div>
+
+        {/* Teks Kesimpulan (Footer) */}
+        <div className="text-[11.5px] text-slate-600 leading-snug pt-0.5">
+          {comparisonResult.status === 'cheaper' && (
+            <span>
+              Hebat! Transaksi A lebih hemat <strong className="font-bold text-emerald-700">-Rp {comparisonResult.formattedAbsDiff}</strong> ({comparisonResult.percent.toFixed(1)}%) dibanding Transaksi B.
+            </span>
+          )}
+          {comparisonResult.status === 'expensive' && (
+            <span>
+              Perhatian! Transaksi A lebih boros <strong className="font-bold text-rose-700">+Rp {comparisonResult.formattedAbsDiff}</strong> (+{comparisonResult.percent.toFixed(1)}%) dibanding Transaksi B.
+            </span>
+          )}
+          {comparisonResult.status === 'equal' && (
+            <span>
+              Pengeluaran Transaksi A sama dengan Transaksi B (<strong className="font-bold text-slate-800">Rp {totalA.toLocaleString('id-ID')}</strong>).
+            </span>
+          )}
+          {comparisonResult.status === 'disabled' && (
+            <span className="text-slate-400 italic">
+              {uniqueHistoryList.length === 1 
+                ? 'Minimal butuh 2 transaksi untuk membandingkan pengeluaran.' 
+                : 'Belum ada riwayat transaksi belanja untuk dibandingkan.'}
+            </span>
           )}
         </div>
       </div>
