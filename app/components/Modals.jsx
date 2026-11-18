@@ -27,7 +27,7 @@ import {
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
 import { playTapSound, playSuccessSound, playWarningBeep, playBarcodeBeep } from '../utils/sound';
 import { getProductEmoji } from '../utils/emoji';
-import { supabase, generateDefaultPrices } from '../../src/lib/supabaseClient';
+import { supabase, generateDefaultPrices, insertCustomProduct } from '../../src/lib/supabaseClient';
 
 /**
  * 1. Modal Edit Batas Saldo Dompet
@@ -577,17 +577,75 @@ export function BarcodeScannerModal({ isOpen, onClose, onScannedItem, catalogIte
         setToastMessage(null);
       }, 700);
     } else {
-      // JIKA barang tidak ditemukan
+      // 3. Fitur "Unknown Item Estimation" (Fallback Logika AI)
+      playBarcodeBeep();
+
+      // Coba deteksi tipe barang berdasarkan prefix barcode
+      let estimatedName = "Barang Tidak Dikenal (" + cleanCode + ")";
+      let estimatedCategory = "Bahan Pokok"; // Kategori default
+      let estimatedPrice = 15000; // Harga default
+
+      if (cleanCode.startsWith('8993')) {
+        estimatedCategory = "Minuman";
+        estimatedPrice = 18000;
+        estimatedName = `Minuman Kemasan (${cleanCode})`;
+      } else if (cleanCode.startsWith('8994')) {
+        estimatedCategory = "Peralatan Kebersihan";
+        estimatedPrice = 22000;
+        estimatedName = `Peralatan Kebersihan (${cleanCode})`;
+      } else if (cleanCode.startsWith('899')) {
+        estimatedCategory = "Bahan Pokok";
+        estimatedPrice = 15000;
+        estimatedName = `Barang Indonesia (${cleanCode})`;
+      }
+
+      const generateUUID = () => {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+          return crypto.randomUUID();
+        }
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = Math.random() * 16 | 0;
+          const v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      };
+
+      const estimatedItem = {
+        id: generateUUID(),
+        name: estimatedName,
+        category: estimatedCategory,
+        unit: 'pcs',
+        price: estimatedPrice,
+        base_price: estimatedPrice,
+        isCustom: true,
+        barcode: cleanCode,
+        prices: generateDefaultPrices(estimatedPrice),
+        quantity: 1
+      };
+
+      // Masukkan ke Keranjang
+      if (onAddToCart) {
+        onAddToCart(estimatedItem);
+      } else if (onScannedItem) {
+        onScannedItem(estimatedItem);
+      }
+
+      // Simpan ke database Supabase tabel products sebagai barang kustom
+      try {
+        insertCustomProduct(estimatedItem);
+      } catch (err) {}
+
       setToastMessage({
-        type: 'warning',
-        text: `Barcode [${cleanCode}] tidak dikenali. Silakan input manual sebagai barang kustom.`
+        type: 'success',
+        text: `✨ AI Estimasi: ${estimatedName} (Rp ${estimatedPrice.toLocaleString('id-ID')}) otomatis masuk ke keranjang!`
       });
 
-      // Beri jeda 2 detik sebelum scanner bisa memindai barcode lain
+      // Tutup Modal Scanner secara otomatis
       setTimeout(() => {
+        onClose();
         isDebouncingRef.current = false;
         setToastMessage(null);
-      }, 2000);
+      }, 900);
     }
   }, [catalogItems, onAddToCart, onScannedItem, onClose]);
 
@@ -705,20 +763,20 @@ export function BarcodeScannerModal({ isOpen, onClose, onScannedItem, catalogIte
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 animate-fade-in">
       <div 
-        className="w-full max-w-[390px] bg-slate-900 text-white rounded-3xl p-5 shadow-2xl border border-slate-700 flex flex-col items-center animate-slide-up"
+        className="w-full max-w-[390px] bg-white text-gray-800 rounded-3xl p-5 shadow-2xl border border-slate-100 flex flex-col items-center animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="w-full flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="w-full flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center space-x-2">
-            <Scan className="w-5 h-5 text-emerald-400" />
-            <h3 className="font-extrabold text-sm text-white">Scanner Barcode Supermarket</h3>
+            <Scan className="w-5 h-5 text-emerald-600" />
+            <h3 className="font-extrabold text-sm text-gray-800">Scanner Barcode Supermarket</h3>
           </div>
           <button 
             type="button"
             onClick={() => { playTapSound(); onClose(); }}
-            className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
+            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 flex items-center justify-center cursor-pointer transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -728,25 +786,25 @@ export function BarcodeScannerModal({ isOpen, onClose, onScannedItem, catalogIte
         {toastMessage && (
           <div className={`w-full mt-3 p-2.5 rounded-xl text-xs font-bold text-center animate-fade-in ${
             toastMessage.type === 'success'
-              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-              : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs'
+              : 'bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs'
           }`}>
             {toastMessage.text}
           </div>
         )}
 
         {/* Live Camera Viewfinder Feed */}
-        <div className="w-full my-3 relative bg-slate-950 rounded-2xl h-48 sm:h-52 overflow-hidden border border-slate-800 flex items-center justify-center">
+        <div className="w-full my-3 relative bg-slate-950 rounded-2xl h-48 sm:h-52 overflow-hidden border border-slate-200 shadow-inner flex items-center justify-center">
           <div id="barcode-live-camera-feed" className="w-full h-full object-cover [&_video]:w-full [&_video]:h-full [&_video]:object-cover" />
 
           {/* Scanner Overlay Box & Red Laser (aktif saat kamera hidup) */}
           {!cameraError && (
             <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
-              <div className="w-48 h-28 border-2 border-emerald-400/80 rounded-xl relative flex items-center justify-center shadow-[0_0_12px_rgba(52,211,153,0.3)]">
+              <div className="w-48 h-28 border-2 border-emerald-400/90 rounded-xl relative flex items-center justify-center shadow-[0_0_12px_rgba(52,211,153,0.4)]">
                 {/* Red Laser Scanning Line */}
                 <div className="w-full h-0.5 bg-red-500 shadow-[0_0_8px_#ef4444] animate-pulse" />
               </div>
-              <span className="mt-2 text-[10px] text-slate-300 font-mono bg-slate-900/80 px-2.5 py-0.5 rounded-full border border-slate-700">
+              <span className="mt-2 text-[10px] text-white font-mono bg-black/60 px-2.5 py-0.5 rounded-full border border-white/20 backdrop-blur-xs">
                 Arahkan kamera ke barcode kemasan barang
               </span>
             </div>
@@ -754,12 +812,12 @@ export function BarcodeScannerModal({ isOpen, onClose, onScannedItem, catalogIte
 
           {/* Camera Permission Denied / Error State */}
           {cameraError && (
-            <div className="absolute inset-0 p-4 bg-slate-950/95 flex flex-col items-center justify-center text-center z-10">
-              <AlertTriangle className="w-7 h-7 text-amber-400 mb-2" />
-              <p className="text-xs text-amber-200 font-semibold px-2 mb-2 leading-relaxed">
+            <div className="absolute inset-0 p-4 bg-white/95 flex flex-col items-center justify-center text-center z-10">
+              <AlertTriangle className="w-7 h-7 text-amber-500 mb-2" />
+              <p className="text-xs text-amber-900 font-semibold px-2 mb-2 leading-relaxed">
                 {cameraError}
               </p>
-              <span className="text-[10px] text-slate-400">
+              <span className="text-[10px] text-slate-500">
                 Gunakan "Mode Simulasi (Developer)" di bawah untuk memindai tanpa kamera.
               </span>
             </div>
@@ -769,7 +827,7 @@ export function BarcodeScannerModal({ isOpen, onClose, onScannedItem, catalogIte
           {!isScannerReady && !cameraError && (
             <div className="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center space-y-2 z-10">
               <Loader2 className="w-7 h-7 text-emerald-400 animate-spin" />
-              <span className="text-xs text-slate-400 font-medium">Menghubungkan live camera...</span>
+              <span className="text-xs text-slate-300 font-medium">Menghubungkan live camera...</span>
             </div>
           )}
         </div>
@@ -777,21 +835,21 @@ export function BarcodeScannerModal({ isOpen, onClose, onScannedItem, catalogIte
         {/* Barcode Fallback: Mode Simulasi (Developer) */}
         <div className="w-full space-y-1.5">
           <div className="flex items-center justify-between pb-0.5">
-            <span className="text-[11px] font-bold text-slate-300">Mode Simulasi (Developer)</span>
-            <span className="text-[9px] text-emerald-400/90 font-mono">Klik manual untuk tes</span>
+            <span className="text-[11px] font-bold text-gray-800">Mode Simulasi (Developer)</span>
+            <span className="text-[9px] text-emerald-700 font-medium">Klik manual untuk tes</span>
           </div>
           {sampleBarcodes.map((item) => (
             <button
               key={item.code}
               type="button"
               onClick={() => handleScanSuccess(item.code)}
-              className="w-full p-2.5 bg-slate-800/90 hover:bg-slate-700/90 rounded-xl text-left flex items-center justify-between border border-slate-700 transition-colors cursor-pointer"
+              className="w-full p-2.5 bg-slate-50 hover:bg-emerald-50/70 active:bg-emerald-100/70 rounded-xl text-left flex items-center justify-between border border-slate-200/90 hover:border-emerald-300 transition-all cursor-pointer shadow-2xs"
             >
               <div>
-                <span className="text-xs font-bold text-white block">{item.name}</span>
-                <span className="text-[10px] text-slate-400 font-mono">[{item.code}] • {item.unit}</span>
+                <span className="text-xs font-bold text-slate-800 block">{item.name}</span>
+                <span className="text-[10px] text-slate-500 font-mono">[{item.code}] • {item.unit}</span>
               </div>
-              <span className="text-xs font-extrabold text-emerald-400">
+              <span className="text-xs font-black text-emerald-700">
                 Rp {item.price.toLocaleString('id-ID')}
               </span>
             </button>

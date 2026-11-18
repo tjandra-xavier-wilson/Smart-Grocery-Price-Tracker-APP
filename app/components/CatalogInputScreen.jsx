@@ -14,7 +14,9 @@ import {
   Clock, 
   ArrowRight,
   Sparkles,
-  Search
+  Search,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { playTapSound, playSuccessSound } from '../utils/sound';
 import { GROCERY_PRODUCTS } from '../data/groceryData';
@@ -569,9 +571,21 @@ export default function CatalogInputScreen({
             ))}
           </div>
 
-          {/* Visual Scroll Indicator untuk Tag Barang Sering Dibeli (Tanpa Tombol) */}
-          <div className="w-full flex justify-center mt-1.5 mb-3">
-            <div className="w-28 sm:w-32 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          {/* Layout Scroll: [Tombol < Geser Kiri] --- [Progress Bar Hijau] --- [Tombol Geser Kanan >] */}
+          <div className="w-full flex items-center justify-between gap-2.5 mt-2 mb-3.5 px-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                playTapSound();
+                frequentItemsRef.current?.scrollBy({ left: -200, behavior: 'smooth' });
+              }}
+              className="flex items-center space-x-1 px-3 py-1 bg-white hover:bg-slate-50 active:scale-95 border border-slate-200 rounded-full text-xs font-semibold text-slate-400 hover:text-slate-600 shadow-2xs transition-all cursor-pointer flex-shrink-0"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <span>Geser Kiri</span>
+            </button>
+
+            <div className="flex-1 max-w-[150px] sm:max-w-[190px] h-1.5 bg-gray-200 rounded-full overflow-hidden mx-1">
               <div 
                 className="h-full bg-teal-600 rounded-full transition-all duration-150 ease-out"
                 style={{ 
@@ -580,6 +594,18 @@ export default function CatalogInputScreen({
                 }} 
               />
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                playTapSound();
+                frequentItemsRef.current?.scrollBy({ left: 200, behavior: 'smooth' });
+              }}
+              className="flex items-center space-x-1 px-3 py-1 bg-white hover:bg-slate-50 active:scale-95 border border-slate-200 rounded-full text-xs font-bold text-sky-800 hover:text-sky-900 shadow-2xs transition-all cursor-pointer flex-shrink-0"
+            >
+              <span>Geser Kanan</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
@@ -626,9 +652,21 @@ export default function CatalogInputScreen({
             })}
           </div>
 
-          {/* Visual Scroll Indicator untuk Kategori Barang (Tanpa Tombol) */}
-          <div className="w-full flex justify-center mt-1.5 mb-3">
-            <div className="w-28 sm:w-32 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          {/* Layout Scroll Kategori: [Tombol < Geser Kiri] --- [Progress Bar Hijau] --- [Tombol Geser Kanan >] */}
+          <div className="w-full flex items-center justify-between gap-2.5 mt-2 mb-3.5 px-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                playTapSound();
+                categoryItemsRef.current?.scrollBy({ left: -200, behavior: 'smooth' });
+              }}
+              className="flex items-center space-x-1 px-3 py-1 bg-white hover:bg-slate-50 active:scale-95 border border-slate-200 rounded-full text-xs font-semibold text-slate-400 hover:text-slate-600 shadow-2xs transition-all cursor-pointer flex-shrink-0"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <span>Geser Kiri</span>
+            </button>
+
+            <div className="flex-1 max-w-[150px] sm:max-w-[190px] h-1.5 bg-gray-200 rounded-full overflow-hidden mx-1">
               <div 
                 className="h-full bg-teal-600 rounded-full transition-all duration-150 ease-out"
                 style={{ 
@@ -637,6 +675,18 @@ export default function CatalogInputScreen({
                 }} 
               />
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                playTapSound();
+                categoryItemsRef.current?.scrollBy({ left: 200, behavior: 'smooth' });
+              }}
+              className="flex items-center space-x-1 px-3 py-1 bg-white hover:bg-slate-50 active:scale-95 border border-slate-200 rounded-full text-xs font-bold text-sky-800 hover:text-sky-900 shadow-2xs transition-all cursor-pointer flex-shrink-0"
+            >
+              <span>Geser Kanan</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 

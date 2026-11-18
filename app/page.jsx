@@ -2092,7 +2092,54 @@ export default function Home() {
       };
       handleAddToCart(itemToAdd);
     } else {
-      alert(`Barcode [${barcodeCode}] tidak dikenali. Silakan input manual sebagai barang kustom.`);
+      // AI Item Estimation Fallback
+      playBarcodeBeep();
+      let estimatedName = "Barang Tidak Dikenal (" + barcodeCode + ")";
+      let estimatedCategory = "Bahan Pokok";
+      let estimatedPrice = 15000;
+
+      if (barcodeCode.startsWith('8993')) {
+        estimatedCategory = "Minuman";
+        estimatedPrice = 18000;
+        estimatedName = `Minuman Kemasan (${barcodeCode})`;
+      } else if (barcodeCode.startsWith('8994')) {
+        estimatedCategory = "Peralatan Kebersihan";
+        estimatedPrice = 22000;
+        estimatedName = `Peralatan Kebersihan (${barcodeCode})`;
+      } else if (barcodeCode.startsWith('899')) {
+        estimatedCategory = "Bahan Pokok";
+        estimatedPrice = 15000;
+        estimatedName = `Barang Indonesia (${barcodeCode})`;
+      }
+
+      const generateUUID = () => {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+          return crypto.randomUUID();
+        }
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = Math.random() * 16 | 0;
+          const v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      };
+
+      const estimatedItem = {
+        id: generateUUID(),
+        name: estimatedName,
+        category: estimatedCategory,
+        unit: 'pcs',
+        price: estimatedPrice,
+        base_price: estimatedPrice,
+        isCustom: true,
+        barcode: barcodeCode,
+        prices: generateDefaultPrices(estimatedPrice),
+        quantity: 1
+      };
+
+      handleAddToCart(estimatedItem);
+      try {
+        insertCustomProduct(estimatedItem);
+      } catch (err) {}
     }
   };
 
