@@ -235,13 +235,22 @@ export default function CatalogInputScreen({
     const priceAfterD2Calc = priceAfterD1Calc * (1 - d2 / 100);
     const calculatedUnitPrice = (d1 > 0 || d2 > 0) ? Math.round(priceAfterD2Calc) : rawPrice;
 
-    // 2. Buat objek lokal dengan ID sementara (UUID/Date) agar langsung bisa dirender
-    const tempId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
-      ? crypto.randomUUID() 
-      : ('item-' + Date.now());
+    // 1. Generate UUID Resmi dari Frontend HANYA SEKALI via Web Crypto API (Client-Side UUID Generation)
+    const generateUUID = () => {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+      }
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    };
+    const generatedId = (matched && matched.isCustom && matched.id) ? matched.id : generateUUID();
 
+    // 2. Samakan ID untuk Optimistic UI dan Database (Zero Mismatch)
     const newItem = {
-      id: tempId,
+      id: generatedId,
       name: cleanName,
       category: category,
       unit: unit,
@@ -265,10 +274,10 @@ export default function CatalogInputScreen({
     setNormalPrice('');
     setShowSuggestions(false);
 
-    // 5. BACKGROUND SYNC: Kirim ke database tanpa menggunakan await yang memblokir fungsi UI
+    // 5. BACKGROUND SYNC: Kirim ke database dengan generatedId yang SAMA PERSIS
     if (isCustomItem && onAddCustomProduct) {
       onAddCustomProduct({
-        id: newItem.id,
+        id: generatedId, // ID INI HARUS SAMA DENGAN STATE LOKAL & KERANJANG
         name: cleanName,
         category: category,
         unit: unit,

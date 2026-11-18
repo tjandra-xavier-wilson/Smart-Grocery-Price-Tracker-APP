@@ -1297,10 +1297,21 @@ export async function insertCustomProduct(productData) {
   }
 
   const pricesObj = productData.prices || generateDefaultPrices(productData.price);
-  const tempId = productData.id || ('prod-' + Date.now());
+  const generateUUID = () => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+  const isUuid = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id));
+  const generatedId = (productData.id && isUuid(productData.id)) ? productData.id : generateUUID();
 
   const payload = {
-    id: tempId,
+    id: generatedId,
     name: productData.name.trim(),
     category: productData.category || 'Bahan Pokok',
     unit: productData.unit || 'pcs',
@@ -1308,6 +1319,7 @@ export async function insertCustomProduct(productData) {
     is_custom: true,
     isCustom: true,
     price: productData.price,
+    base_price: productData.base_price ?? productData.price,
     user_id: targetUserId || null
   };
 
@@ -1316,7 +1328,7 @@ export async function insertCustomProduct(productData) {
     try {
       const stored = localStorage.getItem('sakugrosir_custom_products_v1');
       const list = stored ? JSON.parse(stored) : [];
-      const filtered = list.filter(p => p.name.toLowerCase() !== payload.name.toLowerCase());
+      const filtered = list.filter(p => p.id !== generatedId && p.name.toLowerCase() !== payload.name.toLowerCase());
       filtered.unshift(payload);
       localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(filtered));
     } catch (e) { }
@@ -1326,6 +1338,7 @@ export async function insertCustomProduct(productData) {
   try {
     const rawPrice = Number(String(payload.base_price ?? payload.price ?? 0).replace(/[^0-9]/g, ''));
     const insertPayload = {
+      id: generatedId,
       name: payload.name,
       category: payload.category || 'Bahan Pokok',
       is_custom: true,

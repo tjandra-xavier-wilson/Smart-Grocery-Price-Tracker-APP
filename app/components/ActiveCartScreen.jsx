@@ -41,6 +41,7 @@ import { supabase } from '../../src/lib/supabaseClient';
 
 export default function ActiveCartScreen({
   cartItems = [],
+  setCartItems,
   budgetLimit = 350000,
   currentStore = 'Lotte Mart Grocery - Puri Indah',
   transactionDate = '24 Mei 2025',
@@ -57,6 +58,7 @@ export default function ActiveCartScreen({
   onLoadMockupNormal,
   onAddToCart,
   recommendedItems = [],
+  setRecommendedItems,
   customProducts = [],
   onDeleteCustomProduct,
   onRefreshCustomProducts,
@@ -674,45 +676,41 @@ export default function ActiveCartScreen({
   };
 
   // Handler Hapus Barang Kustom Sekali Klik: 1-Click Instant Permanent Delete dari Supabase & Keranjang
-  const handleDeleteCustomItemFromDB = async (prod) => {
-    if (!prod || deletingItemId) return;
-    setDeletingItemId(prod.id);
+  const handleDeleteCustomItemFromDB = async (prodOrId, nameFallback = null) => {
+    const prod = (typeof prodOrId === 'object' && prodOrId !== null) ? prodOrId : { id: prodOrId, name: nameFallback };
+    const itemId = prod?.id;
+    const itemName = prod?.name;
+    if (!itemId) return;
+
+    if (deletingItemId) return;
+    setDeletingItemId(itemId);
     playTapSound();
-    const itemId = prod.id;
-    const itemName = prod.name;
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(itemId));
 
     try {
-      // 1. Eksekusi Delete ke Supabase tabel products:
-      let query = supabase.from('products').delete();
-      if (isUuid) {
-        query = query.eq('id', itemId);
-      } else if (itemName) {
-        query = query.eq('name', itemName);
-      }
-      if (currentUser?.id) {
-        query = query.eq('user_id', currentUser.id);
-      }
-
-      const { error } = await query;
-      if (error) {
-        console.warn('[Delete Product Notice]:', error.message);
-      }
-
-      // 2. Selalu bersihkan dari state lokal (Optimistic UI), Autocomplete, LocalStorage & cartItems
-      if (onDeleteCustomProduct) {
-        await onDeleteCustomProduct(itemId, itemName);
-      }
+      // 1. Eksekusi hapus di database
+      await supabase.from('products').delete().eq('id', itemId).eq('user_id', currentUser?.id);
     } catch (err) {
-      console.warn('[Delete Product Exception]:', err);
-      if (onDeleteCustomProduct) {
-        try { await onDeleteCustomProduct(itemId, itemName); } catch (e) {}
-      }
-    } finally {
-      // 3. JAMINAN: Loading spinner SELALU berhenti & modal tertutup otomatis
-      setDeletingItemId(null);
-      setCustomProductToDelete(null);
+      console.warn('[Delete Product Notice]:', err);
     }
+
+    // 2. Langsung hapus dari layar
+    if (typeof setRecommendedItems === 'function') {
+      setRecommendedItems(prev => prev.filter(item => item.id !== itemId && item.name?.toLowerCase() !== (itemName || '').toLowerCase()));
+    }
+    if (typeof setCartItems === 'function') {
+      setCartItems(prev => prev.filter(item => item.id !== itemId && item.name?.toLowerCase() !== (itemName || '').toLowerCase()));
+    }
+    if (onDeleteCustomProduct) {
+      try {
+        await onDeleteCustomProduct(itemId, itemName);
+      } catch (e) {
+        console.warn('[onDeleteCustomProduct Exception]:', e);
+      }
+    }
+
+    // 3. JAMINAN: Loading spinner SELALU berhenti & modal tertutup otomatis
+    setDeletingItemId(null);
+    setCustomProductToDelete(null);
   };
 
   const handleDeleteProduct = handleDeleteCustomItemFromDB;

@@ -683,10 +683,23 @@ export default function Home() {
     const defaultPrices = productData.prices || generateDefaultPrices(rawPrice);
     const activeUserId = currentUser?.id || currentUserRef.current?.id;
 
-    // 2. Buat objek lokal dengan ID sementara (UUID/Date) agar langsung bisa dirender (0 Detik Delay)
-    const tempId = productData.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : ('prod-' + Date.now()));
+    // 1. Generate UUID Resmi dari Frontend HANYA SEKALI via Web Crypto API (Client-Side UUID Generation)
+    const generateUUID = () => {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+      }
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    };
+    const isUuid = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id));
+    const generatedId = (productData.id && isUuid(productData.id)) ? productData.id : generateUUID();
+
+    // 2. Samakan ID untuk Optimistic UI dan Database (Zero Mismatch)
     const newProductObj = {
-      id: tempId,
+      id: generatedId,
       name: cleanName,
       category: productData.category || 'Bahan Pokok',
       unit: productData.unit || 'pcs',
@@ -697,19 +710,20 @@ export default function Home() {
       isCustom: true,
       lastMonthPrice: null,
       historyPrice: null,
-      user_id: activeUserId
+      user_id: activeUserId,
+      base_price: rawPrice
     };
 
     // 3. OPTIMISTIC UPDATE: Langsung suntik ke Rekomendasi Belanja & LocalStorage (0 Detik Delay)
     let nextProducts = [];
     setCustomProducts(prev => {
-      nextProducts = [newProductObj, ...(prev || []).filter(p => p.name.toLowerCase() !== cleanName.toLowerCase())];
+      nextProducts = [newProductObj, ...(prev || []).filter(p => p.id !== generatedId && p.name.toLowerCase() !== cleanName.toLowerCase())];
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(nextProducts));
       }
       return nextProducts;
     });
-    setRecommendedItems(prev => [newProductObj, ...(prev || []).filter(p => p.name.toLowerCase() !== cleanName.toLowerCase())]);
+    setRecommendedItems(prev => [newProductObj, ...(prev || []).filter(p => p.id !== generatedId && p.name.toLowerCase() !== cleanName.toLowerCase())]);
 
     // 4. Multi-device Broadcast Instan via Supabase Realtime WebSocket (0 DELAY)
     try {
@@ -724,50 +738,63 @@ export default function Home() {
       });
     } catch (e) {}
 
-    // 5. BACKGROUND SYNC: Kirim ke database tanpa menggunakan await yang memblokir fungsi UI
+    // 5. BACKGROUND SYNC: WAJIB masukkan generatedId ini ke dalam payload saat operasi INSERT ke Supabase
     supabase
       .from('products')
       .insert([{
+        id: generatedId, // ID INI HARUS SAMA DENGAN STATE LOKAL
         name: newProductObj.name,
         category: newProductObj.category,
         is_custom: true,
         user_id: newProductObj.user_id,
         base_price: rawPrice
       }])
-      .select()
-      .maybeSingle()
-      .then(({ data, error }) => {
+      .then(({ error }) => {
         if (error) {
           console.warn('[Background sync notice]:', error.message);
-        } else if (data && data.id) {
-          // Ganti tempId dengan UUID resmi dari database
-          setCustomProducts(prev => prev.map(p => p.name.toLowerCase() === cleanName.toLowerCase() ? { ...p, id: data.id, base_price: rawPrice } : p));
-          setRecommendedItems(prev => prev.map(p => p.name.toLowerCase() === cleanName.toLowerCase() ? { ...p, id: data.id, base_price: rawPrice } : p));
         }
         // Simpan juga ke cloud config & fallback
-        insertCustomProduct({ ...newProductObj, base_price: rawPrice }).catch(() => {});
+        insertCustomProduct({ ...newProductObj, id: generatedId, base_price: rawPrice }).catch(() => {});
       })
       .catch((err) => {
         console.warn('[Background sync exception]:', err);
       });
   };
 
-  // Handler hapus barang kustom: Supabase + LocalStorage + Realtime Broadcast + Cart Filter
+  // Handler hapus barang kustom: Supabase + LocalStorage + Realtime Broadcast + Cart Filter (Single-Click Delete)
   const handleDeleteCustomProduct = async (itemId, itemName) => {
     const activeUserId = currentUser?.id || currentUserRef.current?.id;
+
+    // 1. Eksekusi hapus di database
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(itemId));
+      let query = supabase.from('products').delete();
+      if (isUuid) {
+        query = query.eq('id', itemId);
+      } else if (itemName) {
+        query = query.eq('name', itemName);
+      }
+      if (activeUserId) {
+        query = query.eq('user_id', activeUserId);
+      }
+      await query;
+      await deleteCustomProduct(itemId, itemName, activeUserId);
+    } catch (e) {
+      console.warn('[Delete Custom Product DB Error]:', e);
+    }
+
+    // 2. Langsung hapus dari layar secara bersamaan tanpa delay
     let remainingProducts = [];
     setCustomProducts(prev => {
-      remainingProducts = (prev || []).filter(p => p.id !== itemId && p.name !== itemName);
+      remainingProducts = (prev || []).filter(p => p.id !== itemId && p.name?.toLowerCase() !== (itemName || '').toLowerCase());
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(remainingProducts));
       }
       return remainingProducts;
     });
-    setRecommendedItems(prev => (prev || []).filter(p => p.id !== itemId && p.name !== itemName));
-
-    // Bersihkan juga dari cartItems seketika (Hapus Sekali Klik dari database & keranjang)
+    setRecommendedItems(prev => (prev || []).filter(item => item.id !== itemId && item.name?.toLowerCase() !== (itemName || '').toLowerCase()));
     setCartItems(prev => {
-      const remainingCart = (prev || []).filter(c => c.id !== itemId && c.name?.toLowerCase() !== (itemName || '').toLowerCase());
+      const remainingCart = (prev || []).filter(item => item.id !== itemId && item.name?.toLowerCase() !== (itemName || '').toLowerCase());
       persistState(remainingCart);
       return remainingCart;
     });
@@ -786,14 +813,9 @@ export default function Home() {
       });
     } catch (e) {}
 
-    // Delete dari Supabase Cloud
     try {
-      await deleteCustomProduct(itemId, itemName, activeUserId);
       await fetchRecommendedItems(activeUserId);
-    } catch (e) {
-      console.warn('[Delete Custom Product Error]:', e);
-      await fetchRecommendedItems(activeUserId);
-    }
+    } catch (e) {}
   };
 
   // Alias refreshCustomData ke fetchRecommendedItems untuk kompatibilitas props
@@ -2255,6 +2277,8 @@ export default function Home() {
                       onLoadMockupNormal={handleLoadMockupNormal}
                       onAddToCart={handleAddToCart}
                       recommendedItems={recommendedItems}
+                      setRecommendedItems={setRecommendedItems}
+                      setCartItems={setCartItems}
                       customProducts={customProducts}
                       onDeleteCustomProduct={handleDeleteCustomProduct}
                       onRefreshCustomProducts={refreshCustomData}
