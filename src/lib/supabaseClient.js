@@ -1201,7 +1201,8 @@ export function verifySingleUserPolicy(email) {
  * Mengacu pada 4 supermarket utama dengan history: null untuk barang custom baru
  */
 export function generateDefaultPrices(basePrice = 10000) {
-  const price = Math.max(0, Number(basePrice) || 10000);
+  const cleanStr = String(basePrice ?? '').replace(/[^0-9]/g, '');
+  const price = cleanStr ? Number(cleanStr) : 10000;
   return {
     'Lotte Mart - Puri Indah': { current: price, history: null },
     'Super Indo - Pesanggrahan': { current: price, history: null },

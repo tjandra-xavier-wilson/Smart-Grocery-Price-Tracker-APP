@@ -663,19 +663,24 @@ export default function Home() {
     }
   };
 
-  // Handler simpan barang kustom baru: Supabase Cloud sebagai Single Source of Truth
-  const handleAddCustomProduct = async (productData) => {
+  // Handler simpan barang kustom baru: True Optimistic Update + Non-Blocking Background Sync
+  const handleAddCustomProduct = (productData) => {
     if (!productData || !productData.name) return;
     const cleanName = productData.name.trim();
-    const defaultPrices = productData.prices || generateDefaultPrices(productData.price);
+    // 1. Sanitasi Data (Solusi Bug Harga): Ambil murni integer angka
+    const rawPrice = Number(String(productData.price ?? productData.originalPrice ?? 0).replace(/[^0-9]/g, ''));
+    const defaultPrices = productData.prices || generateDefaultPrices(rawPrice);
     const activeUserId = currentUser?.id || currentUserRef.current?.id;
 
+    // 2. Buat objek lokal dengan ID sementara (UUID/Date) agar langsung bisa dirender (0 Detik Delay)
+    const tempId = productData.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : ('prod-' + Date.now()));
     const newProductObj = {
-      id: productData.id || ('prod-' + Date.now()),
+      id: tempId,
       name: cleanName,
       category: productData.category || 'Bahan Pokok',
       unit: productData.unit || 'pcs',
-      price: productData.price,
+      price: rawPrice,
+      originalPrice: rawPrice,
       description: `Barang kustom: ${cleanName}`,
       prices: defaultPrices,
       isCustom: true,
@@ -684,37 +689,58 @@ export default function Home() {
       user_id: activeUserId
     };
 
-    // CATATAN (SRS Fix): HAPUS update state optimis manual (setRecommendedItems / setCustomProducts)
-    // untuk mencegah race condition / data hilang-timbul.
-    // Supabase Realtime adalah Single Source of Truth yang akan memicu listener postgres_changes
-    // untuk memanggil fetchRecommendedItems() secara otomatis HANYA SATU KALI.
+    // 3. OPTIMISTIC UPDATE: Langsung suntik ke Rekomendasi Belanja & LocalStorage (0 Detik Delay)
+    let nextProducts = [];
+    setCustomProducts(prev => {
+      nextProducts = [newProductObj, ...(prev || []).filter(p => p.name.toLowerCase() !== cleanName.toLowerCase())];
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(nextProducts));
+      }
+      return nextProducts;
+    });
+    setRecommendedItems(prev => [newProductObj, ...(prev || []).filter(p => p.name.toLowerCase() !== cleanName.toLowerCase())]);
 
-    // Multi-device Broadcast Instan via Supabase Realtime WebSocket (0 DELAY)
+    // 4. Multi-device Broadcast Instan via Supabase Realtime WebSocket (0 DELAY)
     try {
       supabaseSyncChannelRef.current?.send({
         type: 'broadcast',
         event: 'REALTIME_PRODUCT_CHANGE',
         payload: {
           action: 'ADD_PRODUCT',
-          product: newProductObj
+          product: newProductObj,
+          allProducts: nextProducts
         }
       });
     } catch (e) {}
 
-    // Simpan ke Supabase Cloud (tabel products & Cloud Sync Hub)
-    try {
-      const res = await insertCustomProduct(newProductObj);
-      // Fallback: Jika pengguna guest / belum terhubung realtime socket, panggil fetchRecommendedItems secara langsung
-      if (!activeUserId || res?.data) {
-        await fetchRecommendedItems(activeUserId);
-      }
-    } catch (e) {
-      console.warn('[Sync Custom Product Error]:', e);
-      await fetchRecommendedItems(activeUserId);
-    }
+    // 5. BACKGROUND SYNC: Kirim ke database tanpa menggunakan await yang memblokir fungsi UI
+    supabase
+      .from('products')
+      .insert([{
+        name: newProductObj.name,
+        category: newProductObj.category,
+        is_custom: true,
+        user_id: newProductObj.user_id
+      }])
+      .select()
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn('[Background sync notice]:', error.message);
+        } else if (data && data.id) {
+          // Ganti tempId dengan UUID resmi dari database
+          setCustomProducts(prev => prev.map(p => p.name.toLowerCase() === cleanName.toLowerCase() ? { ...p, id: data.id } : p));
+          setRecommendedItems(prev => prev.map(p => p.name.toLowerCase() === cleanName.toLowerCase() ? { ...p, id: data.id } : p));
+        }
+        // Simpan juga ke cloud config & fallback
+        insertCustomProduct(newProductObj).catch(() => {});
+      })
+      .catch((err) => {
+        console.warn('[Background sync exception]:', err);
+      });
   };
 
-  // Handler hapus barang kustom: Supabase + LocalStorage + Realtime Broadcast
+  // Handler hapus barang kustom: Supabase + LocalStorage + Realtime Broadcast + Cart Filter
   const handleDeleteCustomProduct = async (itemId, itemName) => {
     const activeUserId = currentUser?.id || currentUserRef.current?.id;
     let remainingProducts = [];
@@ -726,6 +752,13 @@ export default function Home() {
       return remainingProducts;
     });
     setRecommendedItems(prev => (prev || []).filter(p => p.id !== itemId && p.name !== itemName));
+
+    // Bersihkan juga dari cartItems seketika (Hapus Sekali Klik dari database & keranjang)
+    setCartItems(prev => {
+      const remainingCart = (prev || []).filter(c => c.id !== itemId && c.name?.toLowerCase() !== (itemName || '').toLowerCase());
+      persistState(remainingCart);
+      return remainingCart;
+    });
 
     // Multi-device Broadcast Instan via Supabase Realtime WebSocket (0 DELAY)
     try {

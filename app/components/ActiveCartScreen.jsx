@@ -660,13 +660,8 @@ export default function ActiveCartScreen({
     }
   };
 
-  // Handler Hapus Barang Kustom: Peringatan Konfirmasi -> Delete Supabase -> Realtime Multi-Device Sync
-  const handleDeleteProduct = (prod) => {
-    if (deletingItemId) return;
-    setCustomProductToDelete(prod);
-  };
-
-  const executeDeleteProduct = async (prod) => {
+  // Handler Hapus Barang Kustom Sekali Klik: 1-Click Instant Permanent Delete dari Supabase & Keranjang
+  const handleDeleteCustomItemFromDB = async (prod) => {
     if (!prod || deletingItemId) return;
     setDeletingItemId(prod.id);
     playTapSound();
@@ -676,7 +671,6 @@ export default function ActiveCartScreen({
 
     try {
       // 1. Eksekusi Delete ke Supabase tabel products:
-      // await supabase.from('products').delete().eq('id', itemId).eq('user_id', user.id)
       let query = supabase.from('products').delete();
       if (isUuid) {
         query = query.eq('id', itemId);
@@ -692,7 +686,7 @@ export default function ActiveCartScreen({
         console.warn('[Delete Product Notice]:', error.message);
       }
 
-      // 2. Selalu bersihkan dari state lokal (Optimistic UI), Autocomplete & LocalStorage
+      // 2. Selalu bersihkan dari state lokal (Optimistic UI), Autocomplete, LocalStorage & cartItems
       if (onDeleteCustomProduct) {
         await onDeleteCustomProduct(itemId, itemName);
       }
@@ -702,11 +696,14 @@ export default function ActiveCartScreen({
         try { await onDeleteCustomProduct(itemId, itemName); } catch (e) {}
       }
     } finally {
-      // 3. JAMINAN: Loading spinner SELALU berhenti (setIsDeleting(false)) & modal tertutup otomatis
+      // 3. JAMINAN: Loading spinner SELALU berhenti & modal tertutup otomatis
       setDeletingItemId(null);
       setCustomProductToDelete(null);
     }
   };
+
+  const handleDeleteProduct = handleDeleteCustomItemFromDB;
+  const executeDeleteProduct = handleDeleteCustomItemFromDB;
 
   // Render Product Card (Horizontal List Layout with Full Emoji Box & Dynamic Store Pricing)
   const renderProductCard = (prod) => {
@@ -728,14 +725,14 @@ export default function ActiveCartScreen({
             disabled={deletingItemId === prod.id}
             onClick={(e) => {
               e.stopPropagation();
-              handleDeleteProduct(prod);
+              handleDeleteCustomItemFromDB(prod);
             }}
             className={`absolute top-2 right-2 p-1 rounded-md transition-colors cursor-pointer z-10 ${
               deletingItemId === prod.id 
                 ? 'text-slate-400 cursor-not-allowed opacity-60' 
                 : 'text-red-500 hover:text-red-700 hover:bg-red-50'
             }`}
-            title={`Hapus barang kustom ${prod.name}`}
+            title={`Hapus barang kustom ${prod.name} (1 Kali Klik)`}
           >
             {deletingItemId === prod.id ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-red-500" />

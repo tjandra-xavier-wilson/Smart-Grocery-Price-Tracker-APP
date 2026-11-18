@@ -165,7 +165,7 @@ export default function CatalogInputScreen({
   }
 
   // Calculate Transparency Pricing (SRS F-03)
-  const priceNum = Math.max(0, Number(normalPrice.replace(/\D/g, '')) || 0);
+  const priceNum = Math.max(0, Number(normalPrice.toString().replace(/[^0-9]/g, '')) || 0);
   const priceAfterD1 = priceNum * (1 - d1 / 100);
   const priceAfterD2 = priceAfterD1 * (1 - d2 / 100);
   const finalUnitPrice = Math.round(priceAfterD2);
@@ -192,15 +192,19 @@ export default function CatalogInputScreen({
     setUnit(item.unit);
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     playTapSound();
 
-    if (!itemName.trim()) {
+    const cleanName = itemName.trim();
+    if (!cleanName) {
       setErrorMessage('Nama barang belanja wajib diisi');
       return;
     }
-    if (priceNum <= 0) {
+
+    // 1. Sanitasi Data (Solusi Bug Harga): pastikan murni angka integer
+    const rawPrice = Number(normalPrice.toString().replace(/[^0-9]/g, ''));
+    if (rawPrice <= 0) {
       setErrorMessage('Harga satuan normal harus valid dan lebih dari Rp 0');
       return;
     }
@@ -216,7 +220,7 @@ export default function CatalogInputScreen({
       ? recommendedItems
       : allMasterItems;
 
-    const matched = sourceList.find(p => p.name.toLowerCase() === itemName.trim().toLowerCase());
+    const matched = sourceList.find(p => p.name.toLowerCase() === cleanName.toLowerCase());
     const isCustomItem = !matched || matched.isCustom === true;
 
     // Untuk barang baru / custom, historyPrice dan lastMonthPrice WAJIB null (tanpa simulasi palsu)
@@ -224,15 +228,25 @@ export default function CatalogInputScreen({
       ? matched.lastMonthPrice
       : null;
 
-    const defaultPrices = generateDefaultPrices(priceNum);
+    const defaultPrices = generateDefaultPrices(rawPrice);
+
+    // Hitung harga satuan akhir setelah diskon bertingkat jika ada formula
+    const priceAfterD1Calc = rawPrice * (1 - d1 / 100);
+    const priceAfterD2Calc = priceAfterD1Calc * (1 - d2 / 100);
+    const calculatedUnitPrice = (d1 > 0 || d2 > 0) ? Math.round(priceAfterD2Calc) : rawPrice;
+
+    // 2. Buat objek lokal dengan ID sementara (UUID/Date) agar langsung bisa dirender
+    const tempId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+      ? crypto.randomUUID() 
+      : ('item-' + Date.now());
 
     const newItem = {
-      id: 'item-' + Date.now(),
-      name: itemName.trim(),
+      id: tempId,
+      name: cleanName,
       category: category,
       unit: unit,
-      price: finalUnitPrice,
-      originalPrice: priceNum,
+      price: calculatedUnitPrice,
+      originalPrice: rawPrice,
       quantity: quantity,
       isSecondary: category === 'Lainnya' || category === 'Minuman & Camilan',
       discountLabel: (d1 > 0 || d2 > 0) ? `${d1}%${d2 > 0 ? ` + ${d2}%` : ''}` : null,
@@ -242,24 +256,28 @@ export default function CatalogInputScreen({
       prices: defaultPrices
     };
 
-    // Sinkronkan ke database Supabase dan state global jika ini adalah barang kustom baru
+    // 3. OPTIMISTIC UPDATE: Langsung suntik ke Keranjang (0 Detik Delay)
+    playSuccessSound();
+    if (onAddToCart) onAddToCart(newItem);
+
+    // 4. Bersihkan Form UI seketika agar user merasa instan
+    setItemName('');
+    setNormalPrice('');
+    setShowSuggestions(false);
+
+    // 5. BACKGROUND SYNC: Kirim ke database tanpa menggunakan await yang memblokir fungsi UI
     if (isCustomItem && onAddCustomProduct) {
-      await onAddCustomProduct({
+      onAddCustomProduct({
         id: newItem.id,
-        name: itemName.trim(),
+        name: cleanName,
         category: category,
         unit: unit,
-        price: priceNum,
+        price: rawPrice,
+        originalPrice: rawPrice,
         prices: defaultPrices,
         isCustom: true
       });
     }
-
-    playSuccessSound();
-    if (onAddToCart) onAddToCart(newItem);
-    setItemName('');
-    setNormalPrice('');
-    setShowSuggestions(false);
   };
 
   return (
@@ -508,13 +526,13 @@ export default function CatalogInputScreen({
             Harga Satuan Normal (Rp) *
           </label>
           <input
-            type="number"
+            type="text"
             inputMode="numeric"
             value={normalPrice}
             onChange={(e) => {
               setNormalPrice(e.target.value);
             }}
-            placeholder="Ketik harga, contoh: 5000"
+            placeholder="Ketik harga, contoh: 100.000"
             required
             className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white"
           />
