@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import SplashScreen from './components/SplashScreen';
 import HeaderBackgroundTrolley from './components/HeaderBackgroundTrolley';
 import HeaderBar from './components/HeaderBar';
@@ -33,7 +33,10 @@ import {
   updateBudgetSettings,
   saveDeviceAccount,
   isEmailRegistered,
-  SINGLE_USER_STORAGE_KEY
+  SINGLE_USER_STORAGE_KEY,
+  insertCustomProduct,
+  getCustomProducts,
+  generateDefaultPrices
 } from '../src/lib/supabaseClient';
 import { toIndoDisplayDate, toISODateString } from './utils/date';
 import { playTapSound, playSuccessSound } from './utils/sound';
@@ -275,6 +278,72 @@ export default function Home() {
   const [historyList, setHistoryList] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [syncStatus, setSyncStatus] = useState('Online Sync Live');
+
+  // State Global untuk Master Produk & Barang Kustom (Terintegrasi Supabase)
+  const [customProducts, setCustomProducts] = useState([]);
+
+  // Muat custom products dari Supabase / LocalStorage saat akun aktif
+  useEffect(() => {
+    let isMounted = true;
+    getCustomProducts(currentUser?.id).then(prods => {
+      if (isMounted && prods && Array.isArray(prods)) {
+        setCustomProducts(prods);
+      }
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, [currentUser?.id]);
+
+  // Handler simpan barang kustom baru: Optimistic UI + Insert Supabase
+  const handleAddCustomProduct = async (productData) => {
+    const defaultPrices = productData.prices || generateDefaultPrices(productData.price);
+    const newProductObj = {
+      id: productData.id || ('prod-' + Date.now()),
+      name: productData.name.trim(),
+      category: productData.category || 'Bahan Pokok',
+      unit: productData.unit || 'pcs',
+      price: productData.price,
+      description: `Barang kustom: ${productData.name.trim()}`,
+      prices: defaultPrices,
+      isCustom: true,
+      lastMonthPrice: null,
+      historyPrice: null
+    };
+
+    // Optimistic UI: langsung tampil di Rekomendasi Belanja & Autocomplete seketika
+    setCustomProducts(prev => [newProductObj, ...(prev || []).filter(p => p.name.toLowerCase() !== newProductObj.name.toLowerCase())]);
+
+    // Insert ke tabel products Supabase di latar belakang
+    try {
+      await insertCustomProduct({
+        ...newProductObj,
+        user_id: currentUser?.id
+      });
+    } catch (e) {
+      console.warn('[Sync Custom Product]:', e);
+    }
+  };
+
+  // State global recommendedItems menggabungkan master bawaan + custom products
+  const recommendedItems = useMemo(() => {
+    const baseItems = [
+      { id: 'base-1', name: 'Beras 5kg', price: 74000, lastMonthPrice: 68000, category: 'Bahan Pokok', unit: '5kg' },
+      { id: 'base-2', name: 'Telur Ayam Ras 1kg', price: 28000, lastMonthPrice: 32000, category: 'Bahan Pokok', unit: '1 kg' },
+      { id: 'base-3', name: 'Garam 500g', price: 5000, lastMonthPrice: 5000, category: 'Bahan Pokok', unit: '500g' },
+      { id: 'base-4', name: 'Minyak Goreng Sawit Murni 2L', price: 38500, lastMonthPrice: 35000, category: 'Bahan Pokok', unit: '2L' },
+      { id: 'base-5', name: 'Gula Pasir Kristal Putih 1kg', price: 17500, lastMonthPrice: 17500, category: 'Bahan Pokok', unit: '1 kg' },
+      { id: 'base-6', name: 'Indomie Goreng (5 pcs)', price: 15500, lastMonthPrice: 15500, category: 'Bahan Pokok', unit: '5 pcs' },
+      { id: 'base-7', name: 'Susu UHT Ultra Milk 1L', price: 19500, lastMonthPrice: 21000, category: 'Bahan Pokok', unit: '1L' },
+      { id: 'base-8', name: 'Kecap Manis Bango 550ml', price: 24500, lastMonthPrice: 22000, category: 'Bumbu Dapur', unit: '550ml' },
+      { id: 'base-9', name: 'Bawang Merah Brebes 500g', price: 19000, lastMonthPrice: 22000, category: 'Bumbu Dapur', unit: '500g' },
+      { id: 'base-10', name: 'Bawang Putih Kating 500g', price: 22000, lastMonthPrice: 21000, category: 'Bumbu Dapur', unit: '500g' },
+      { id: 'base-11', name: 'Cabe Rawit Merah 250g', price: 18000, lastMonthPrice: 16000, category: 'Sayuran Segar', unit: '250g' },
+      { id: 'base-12', name: 'Sabun Mandi Dettol 400ml', price: 26500, lastMonthPrice: 29000, category: 'Peralatan Kebersihan', unit: '400ml' },
+      { id: 'base-13', name: 'Deterjen Rinso Cair 750ml', price: 21500, lastMonthPrice: 20000, category: 'Peralatan Kebersihan', unit: '750ml' }
+    ];
+
+    const combined = [...customProducts, ...baseItems];
+    return Array.from(new Map(combined.map(item => [item.name.toLowerCase(), item])).values());
+  }, [customProducts]);
 
   // Splash Screen State
   const [showSplash, setShowSplash] = useState(false);
@@ -1549,6 +1618,8 @@ export default function Home() {
                       onLoadMockupOverbudget={handleLoadMockupOverbudget}
                       onLoadMockupNormal={handleLoadMockupNormal}
                       onAddToCart={handleAddToCart}
+                      recommendedItems={recommendedItems}
+                      customProducts={customProducts}
                     />
                   )}
 
@@ -1560,6 +1631,8 @@ export default function Home() {
                       onOpenBarcodeModal={() => setIsBarcodeModalOpen(true)}
                       initialValues={inputInitialValues}
                       historyList={historyList}
+                      recommendedItems={recommendedItems}
+                      onAddCustomProduct={handleAddCustomProduct}
                     />
                   )}
 

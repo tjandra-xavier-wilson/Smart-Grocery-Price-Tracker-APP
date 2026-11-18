@@ -53,7 +53,9 @@ export default function ActiveCartScreen({
   onCutSecondaryItems,
   onLoadMockupOverbudget,
   onLoadMockupNormal,
-  onAddToCart
+  onAddToCart,
+  recommendedItems = [],
+  customProducts = []
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
 
@@ -510,8 +512,33 @@ export default function ActiveCartScreen({
 
   // Daftar seluruh barang yang dinormalisasi dengan info grup kategori
   const currentCategoryItems = useMemo(() => {
+    const normalizeCatKey = (raw) => {
+      const s = String(raw || '').toLowerCase();
+      if (s.includes('pokok') || s.includes('sembako')) return 'sembako';
+      if (s.includes('sayur')) return 'sayur';
+      if (s.includes('buah')) return 'buah';
+      if (s.includes('daging') || s.includes('ikan') || s.includes('lauk')) return 'daging';
+      if (s.includes('camilan') || s.includes('snack')) return 'camilan';
+      if (s.includes('minum')) return 'minuman';
+      if (s.includes('bersih') || s.includes('mandi') || s.includes('perawatan') || s.includes('kebersihan')) return 'kebersihan';
+      return 'sembako';
+    };
+
+    // Normalisasi custom products dari state global / Supabase
+    const normalizedCustom = (customProducts || []).map(p => ({
+      ...p,
+      categoryKey: normalizeCatKey(p.category),
+      categoryName: p.category || 'Bahan Pokok',
+      categoryEmoji: getProductEmoji(p.name, p.category),
+      description: p.description || `Barang kustom: ${p.name}`,
+      isCustom: true,
+      lastMonthPrice: null,
+      historyPrice: null
+    }));
+
+    let baseItems = [];
     if (activeCategory === 'all') {
-      return Object.entries(RECOMMENDED_PRODUCTS_BY_CATEGORY).flatMap(([catKey, catGroup]) => 
+      baseItems = Object.entries(RECOMMENDED_PRODUCTS_BY_CATEGORY).flatMap(([catKey, catGroup]) => 
         catGroup.items.map(item => ({
           ...item,
           categoryKey: catKey,
@@ -520,17 +547,26 @@ export default function ActiveCartScreen({
           categoryTotalCount: catGroup.items.length
         }))
       );
+    } else {
+      const group = RECOMMENDED_PRODUCTS_BY_CATEGORY[activeCategory];
+      baseItems = group ? group.items.map(item => ({
+        ...item,
+        categoryKey: activeCategory,
+        categoryName: group.categoryName,
+        categoryEmoji: group.iconEmoji,
+        categoryTotalCount: group.items.length
+      })) : [];
     }
-    const group = RECOMMENDED_PRODUCTS_BY_CATEGORY[activeCategory];
-    if (!group) return [];
-    return group.items.map(item => ({
-      ...item,
-      categoryKey: activeCategory,
-      categoryName: group.categoryName,
-      categoryEmoji: group.iconEmoji,
-      categoryTotalCount: group.items.length
-    }));
-  }, [activeCategory]);
+
+    // Filter custom items yang cocok dengan kategori aktif
+    const matchingCustom = activeCategory === 'all'
+      ? normalizedCustom
+      : normalizedCustom.filter(p => p.categoryKey === activeCategory || normalizeCatKey(p.category) === activeCategory);
+
+    // Letakkan custom products di paling atas rekomendasi
+    const combined = [...matchingCustom, ...baseItems];
+    return Array.from(new Map(combined.map(item => [item.name.toLowerCase(), item])).values());
+  }, [activeCategory, customProducts]);
 
   // Kalkulasi Total Halaman Dinamis mengikuti jumlah item pada kategori aktif
   const totalPages = Math.max(1, Math.ceil(currentCategoryItems.length / itemsPerPage));
@@ -624,13 +660,16 @@ export default function ActiveCartScreen({
             </span>
           </div>
           {/* Indikator Fluktuasi Harga Skenario Uji 4 */}
-          <div className="mt-1">
-            <PriceFluctuationBadge 
-              currentPrice={storePrice.current} 
-              historyPrice={storePrice.history} 
-              showOldPrice={true} 
-            />
-          </div>
+          {!prod.isCustom && storePrice.history !== null && storePrice.history !== undefined && !isNaN(Number(storePrice.history)) && (
+            <div className="mt-1">
+              <PriceFluctuationBadge 
+                currentPrice={storePrice.current} 
+                historyPrice={storePrice.history} 
+                showOldPrice={true} 
+                isCustom={prod.isCustom}
+              />
+            </div>
+          )}
         </div>
 
         {/* Bagian Kanan: Nominal harga & Tombol Tambah Hijau */}
@@ -1147,7 +1186,9 @@ export default function ActiveCartScreen({
             {cartItems.map((item) => {
               const storePrice = getItemStorePrice(item, currentStore);
               const currentItemPrice = storePrice.current || item.price || 0;
-              const currentHistoryPrice = storePrice.history ?? item.lastMonthPrice ?? currentItemPrice;
+              const rawHistory = item.isCustom ? null : (storePrice.history ?? item.lastMonthPrice ?? null);
+              const currentHistoryPrice = (rawHistory !== null && rawHistory !== undefined && !isNaN(Number(rawHistory))) ? Number(rawHistory) : null;
+              const hasValidHistory = !item.isCustom && currentHistoryPrice !== null;
               const itemTotal = currentItemPrice * (item.quantity || 1);
               const hasDiscount = item.originalPrice && item.originalPrice > currentItemPrice;
               const isItemSecondary = item.isSecondary;
@@ -1216,13 +1257,16 @@ export default function ActiveCartScreen({
                       )}
 
                       {/* Price Fluctuation Trend (Universal Skenario Uji 4 Dinamis) */}
-                      <div className="mt-1">
-                        <PriceFluctuationBadge 
-                          currentPrice={currentItemPrice} 
-                          historyPrice={currentHistoryPrice} 
-                          showOldPrice={true} 
-                        />
-                      </div>
+                      {hasValidHistory && (
+                        <div className="mt-1">
+                          <PriceFluctuationBadge 
+                            currentPrice={currentItemPrice} 
+                            historyPrice={currentHistoryPrice} 
+                            showOldPrice={true} 
+                            isCustom={item.isCustom}
+                          />
+                        </div>
+                      )}
 
                       {/* Price & Stepper Row */}
                       <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-50">

@@ -1192,3 +1192,123 @@ export function verifySingleUserPolicy(email) {
   const designated = DESIGNATED_OWNER_EMAIL.toLowerCase().trim();
   return clean === designated;
 }
+
+/**
+ * Helper untuk men-generate objek prices default untuk 4 supermarket utama
+ * Mengacu pada 4 supermarket utama dengan history: null untuk barang custom baru
+ */
+export function generateDefaultPrices(basePrice = 10000) {
+  const price = Math.max(0, Number(basePrice) || 10000);
+  return {
+    'Lotte Mart - Puri Indah': { current: price, history: null },
+    'Super Indo - Pesanggrahan': { current: price, history: null },
+    'Hypermart - Puri Mall': { current: price, history: null },
+    'Indogrosir Daan Mogot': { current: price, history: null }
+  };
+}
+
+/**
+ * Simpan barang custom baru ke tabel products Supabase dengan fallback LocalStorage
+ */
+export async function insertCustomProduct(productData) {
+  if (!productData || !productData.name) {
+    return { success: false, error: 'Nama produk kosong' };
+  }
+
+  let targetUserId = productData.user_id;
+  if (!targetUserId && typeof localStorage !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('sakugrosir_single_user_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        targetUserId = parsed?.id;
+      }
+    } catch (e) {}
+  }
+  if (!targetUserId) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      targetUserId = session?.user?.id;
+    } catch (e) {}
+  }
+
+  const pricesObj = productData.prices || generateDefaultPrices(productData.price);
+
+  const payload = {
+    name: productData.name.trim(),
+    category: productData.category || 'Bahan Pokok',
+    unit: productData.unit || 'pcs',
+    prices: pricesObj,
+    is_custom: true,
+    user_id: targetUserId || null
+  };
+
+  // Simpan ke offline fallback LocalStorage
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('sakugrosir_custom_products_v1');
+      const list = stored ? JSON.parse(stored) : [];
+      const itemWithId = { ...payload, id: productData.id || ('prod-' + Date.now()) };
+      list.unshift(itemWithId);
+      localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(list));
+    } catch (e) {}
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .insert([payload])
+      .select();
+
+    if (error) {
+      console.warn('[Supabase insertCustomProduct] Table insert error (fallback used):', error.message);
+      return { success: true, fallback: true, data: payload };
+    }
+
+    return { success: true, data: data?.[0] || payload };
+  } catch (err) {
+    console.warn('[Supabase insertCustomProduct] Network error (fallback used):', err.message);
+    return { success: true, fallback: true, data: payload };
+  }
+}
+
+/**
+ * Mengambil daftar barang custom / produk dari tabel products Supabase & LocalStorage
+ */
+export async function getCustomProducts(userId = null) {
+  let localList = [];
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('sakugrosir_custom_products_v1');
+      if (stored) localList = JSON.parse(stored);
+    } catch (e) {}
+  }
+
+  try {
+    let query = supabase.from('products').select('*').order('created_at', { ascending: false });
+    if (userId) {
+      query = query.or(`user_id.eq.${userId},user_id.is.null`);
+    }
+    const { data, error } = await query;
+    if (error || !data || data.length === 0) {
+      return localList;
+    }
+
+    // Merge data dari cloud dengan lokal
+    const byName = new Map();
+    [...data, ...localList].forEach(item => {
+      if (item && item.name && !byName.has(item.name.toLowerCase())) {
+        byName.set(item.name.toLowerCase(), {
+          ...item,
+          isCustom: true,
+          historyPrice: null,
+          lastMonthPrice: null
+        });
+      }
+    });
+
+    return Array.from(byName.values());
+  } catch (err) {
+    return localList;
+  }
+}

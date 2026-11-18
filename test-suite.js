@@ -155,6 +155,33 @@ const labelOption = formatTxOptionLabel({
 }, parseDateComponents);
 assert(labelOption === '17 Nov - Lotte Mart', `Label opsi dropdown menampilkan format "17 Nov - Lotte Mart" (Actual: "${labelOption}")`);
 
+console.log('\n--- TEST GROUP 8: Custom Product, Supabase Prices & Fluctuation Suppression ---');
+const { generateDefaultPrices } = require('./src/lib/supabaseClient.js');
+const { getItemStorePrice, shouldRenderFluctuationBadge } = require('./app/utils/storePrices.js');
+
+// Uji Kasus 1: generateDefaultPrices menghasilkan 4 supermarket dengan history null
+const defPrices = generateDefaultPrices(40000);
+assert(defPrices['Lotte Mart - Puri Indah']?.current === 40000, 'Harga Lotte Mart default = Rp 40.000');
+assert(defPrices['Lotte Mart - Puri Indah']?.history === null, 'Harga riwayat Lotte Mart barang custom harus null');
+assert(defPrices['Super Indo - Pesanggrahan']?.history === null, 'Harga riwayat Super Indo barang custom harus null');
+assert(defPrices['Hypermart - Puri Mall']?.history === null, 'Harga riwayat Hypermart barang custom harus null');
+assert(defPrices['Indogrosir Daan Mogot']?.history === null, 'Harga riwayat Indogrosir barang custom harus null');
+
+// Uji Kasus 2: getItemStorePrice untuk custom item tidak boleh merekayasa harga riwayat
+const customStorePrice = getItemStorePrice({ name: 'nasi biru', price: 40000, isCustom: true }, 'Lotte Mart - Puri Indah');
+assert(customStorePrice.current === 40000, 'Harga berjalan custom item sesuai input');
+assert(customStorePrice.history === null, 'Harga riwayat custom item wajib null (tanpa rekayasa)');
+
+// Uji Kasus 3: shouldRenderFluctuationBadge mengembalikan false jika isCustom === true atau historyPrice null
+const shouldRenderCustom = shouldRenderFluctuationBadge({ currentPrice: 40000, historyPrice: null, isCustom: true });
+assert(shouldRenderCustom === false, 'Badge fluktuasi untuk barang custom (isCustom: true) DILARANG dirender');
+
+const shouldRenderNullHistory = shouldRenderFluctuationBadge({ currentPrice: 40000, historyPrice: null, isCustom: false });
+assert(shouldRenderNullHistory === false, 'Badge fluktuasi untuk barang tanpa harga riwayat sah DILARANG dirender');
+
+const shouldRenderValid = shouldRenderFluctuationBadge({ currentPrice: 40000, historyPrice: 35000, isCustom: false });
+assert(shouldRenderValid === true, 'Badge fluktuasi untuk barang dengan riwayat sah diizinkan dirender');
+
 console.log(`\n========================================================`);
 console.log(`🏁 HASIL PENGUJIAN: ${passedTests} / ${totalTests} TEST BERHASIL LULUS 100%!`);
 console.log(`========================================================`);

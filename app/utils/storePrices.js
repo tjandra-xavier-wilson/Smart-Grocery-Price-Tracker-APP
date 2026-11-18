@@ -37,25 +37,40 @@ export function normalizeSupermarketName(storeName = '') {
  * @returns {{ current: number, history: number }}
  */
 export function getItemStorePrice(item, supermarket = DEFAULT_SUPERMARKET) {
-  if (!item) return { current: 0, history: 0 };
+  if (!item) return { current: 0, history: null };
   const targetStore = normalizeSupermarketName(supermarket);
+
+  // Jika item adalah custom product, tidak memiliki harga riwayat sah
+  if (item.isCustom) {
+    const base = Number(item.price || item.currentPrice || 0);
+    return { current: base, history: null };
+  }
 
   // 1. Cek kecocokan langsung di objek item.prices
   if (item.prices && typeof item.prices === 'object') {
-    if (item.prices[targetStore]) {
-      return {
-        current: Number(item.prices[targetStore].current || 0),
-        history: Number(item.prices[targetStore].history ?? item.prices[targetStore].current ?? 0)
-      };
-    }
-    for (const [key, val] of Object.entries(item.prices)) {
-      if (normalizeSupermarketName(key) === targetStore && val) {
-        return {
-          current: Number(val.current || 0),
-          history: Number(val.history ?? val.current ?? 0)
-        };
+    let matchedStore = item.prices[targetStore];
+    if (!matchedStore) {
+      for (const [key, val] of Object.entries(item.prices)) {
+        if (normalizeSupermarketName(key) === targetStore && val) {
+          matchedStore = val;
+          break;
+        }
       }
     }
+    if (matchedStore) {
+      return {
+        current: Number(matchedStore.current || 0),
+        history: (matchedStore.history !== null && matchedStore.history !== undefined && matchedStore.history !== '')
+          ? Number(matchedStore.history)
+          : null
+      };
+    }
+  }
+
+  // Jika harga riwayat eksplisit null / tidak ada
+  if (item.lastMonthPrice === null || item.historyPrice === null) {
+    const basePrice = Number(item.price || item.currentPrice || 0);
+    return { current: basePrice, history: null };
   }
 
   // 2. Fallback cerdas berdasarkan aturan spesifik 4 toko jika item belum memiliki properti prices lengkap
@@ -97,4 +112,20 @@ export function buildStorePrices(lotteCurrent, lotteHistory, superIndoCurrent, s
     'Hypermart - Puri Mall': { current: hypermartPrice, history: hypermartPrice },
     'Indogrosir Daan Mogot': { current: indogrosirCurrent, history: indogrosirHistory }
   };
+}
+
+/**
+ * Validasi apakah badge fluktuasi harga sah untuk ditampilkan.
+ * Mengembalikan false jika item adalah barang kustom (isCustom === true)
+ * atau jika tidak memiliki harga riwayat numerik yang sah.
+ */
+export function shouldRenderFluctuationBadge({ isCustom, historyPrice, lastMonthPrice } = {}) {
+  if (isCustom) return false;
+  const rawHistory = historyPrice !== undefined 
+    ? historyPrice 
+    : (lastMonthPrice !== undefined ? lastMonthPrice : null);
+  if (rawHistory === null || rawHistory === undefined || rawHistory === '' || isNaN(Number(rawHistory))) {
+    return false;
+  }
+  return true;
 }

@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { shouldRenderFluctuationBadge } from './storePrices';
 
 /**
  * Smart Emoji Mapping for Grocery Products
@@ -185,11 +186,25 @@ export function ProductImageThumbnail({ name = '', category = '', className = ''
  * - Harga Turun: Badge hijau muda [↓ -Rp [Selisih] Hemat] + Strikethrough old price next to it
  * - Harga Stabil: Badge abu-abu [= Harga Stabil]
  */
-export function PriceFluctuationBadge({ currentPrice, historyPrice, price, lastMonthPrice, showOldPrice = true }) {
+export function PriceFluctuationBadge({ 
+  currentPrice, 
+  historyPrice, 
+  price, 
+  lastMonthPrice, 
+  showOldPrice = true, 
+  isCustom = false 
+}) {
+  // Evaluasi kondisional: jika barang kustom atau riwayat tidak sah, jangan render
+  if (!shouldRenderFluctuationBadge({ isCustom, historyPrice, lastMonthPrice })) {
+    return null;
+  }
+
   const current = currentPrice !== undefined ? Number(currentPrice) : Number(price || 0);
-  const history = historyPrice !== undefined 
-    ? Number(historyPrice) 
-    : (lastMonthPrice !== undefined && lastMonthPrice !== null ? Number(lastMonthPrice) : current);
+  const rawHistory = historyPrice !== undefined 
+    ? historyPrice 
+    : (lastMonthPrice !== undefined ? lastMonthPrice : null);
+
+  const history = Number(rawHistory);
   const diff = current - history;
 
   if (diff > 0) {

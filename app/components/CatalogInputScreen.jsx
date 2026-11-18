@@ -19,6 +19,8 @@ import {
 import { playTapSound, playSuccessSound } from '../utils/sound';
 import { GROCERY_PRODUCTS } from '../data/groceryData';
 import { getProductEmoji, ProductEmojiBox, PriceFluctuationBadge } from '../utils/emoji';
+import { generateDefaultPrices } from '../../src/lib/supabaseClient';
+import { getItemStorePrice } from '../utils/storePrices';
 
 export default function CatalogInputScreen({
   currentStore = 'Lotte Mart Grocery - Puri Indah',
@@ -26,7 +28,9 @@ export default function CatalogInputScreen({
   onAddToCart,
   onOpenBarcodeModal,
   initialValues = null,
-  historyList = []
+  historyList = [],
+  recommendedItems = [],
+  onAddCustomProduct = null
 }) {
   const [itemName, setItemName] = useState(initialValues?.name || '');
   const [category, setCategory] = useState(initialValues?.category || 'Bahan Pokok');
@@ -100,14 +104,21 @@ export default function CatalogInputScreen({
     return list;
   }, [historyList]);
 
-  // Autocomplete Filter
+  // Autocomplete Filter: Memfilter dari state recommendedItems yang terhubung ke database Supabase
   const filteredSuggestions = useMemo(() => {
-    const q = itemName.trim().toLowerCase();
-    if (!q || q.length < 1) return [];
-    return allMasterItems.filter(p => 
-      p.name.toLowerCase().includes(q)
-    ).slice(0, 6);
-  }, [itemName, allMasterItems]);
+    const searchInput = itemName.trim().toLowerCase();
+    if (!searchInput || searchInput.length < 1) return [];
+
+    // Gabungkan master catalog dengan state recommendedItems yang terhubung ke Supabase
+    const sourceList = (recommendedItems && recommendedItems.length > 0)
+      ? recommendedItems
+      : allMasterItems;
+
+    // Logika filter sesuai SRS: recommendedItems.filter(item => item.name.toLowerCase().includes(searchInput.toLowerCase()))
+    return sourceList.filter(item => 
+      item.name.toLowerCase().includes(searchInput)
+    ).slice(0, 8);
+  }, [itemName, recommendedItems, allMasterItems]);
 
   const mapCategory = (rawCat) => {
     if (!rawCat) return 'Bahan Pokok';
@@ -124,7 +135,9 @@ export default function CatalogInputScreen({
   const handleSelectSuggestion = (product) => {
     playTapSound();
     setItemName(product.name);
-    if (product.price) setNormalPrice(String(product.price));
+    const storeP = getItemStorePrice(product, currentStore);
+    const resolvedPrice = storeP.current || product.price;
+    if (resolvedPrice) setNormalPrice(String(resolvedPrice));
     if (product.unit) setUnit(product.unit);
     if (product.category) setCategory(mapCategory(product.category));
     setShowSuggestions(false);
@@ -213,11 +226,20 @@ export default function CatalogInputScreen({
 
     setErrorMessage('');
 
-    // Check if matched in master for exact lastMonthPrice
-    const matched = allMasterItems.find(p => p.name.toLowerCase() === itemName.trim().toLowerCase());
-    const effectiveLastMonth = (matched && matched.lastMonthPrice !== undefined)
+    // Cek kecocokan di master katalog / recommendedItems
+    const sourceList = (recommendedItems && recommendedItems.length > 0)
+      ? recommendedItems
+      : allMasterItems;
+
+    const matched = sourceList.find(p => p.name.toLowerCase() === itemName.trim().toLowerCase());
+    const isCustomItem = !matched || matched.isCustom === true;
+
+    // Untuk barang baru / custom, historyPrice dan lastMonthPrice WAJIB null (tanpa simulasi palsu)
+    const effectiveLastMonth = (!isCustomItem && matched && matched.lastMonthPrice !== undefined && matched.lastMonthPrice !== null)
       ? matched.lastMonthPrice
-      : (priceNum > 50000 ? priceNum - 4000 : (priceNum > 20000 ? priceNum + 2000 : priceNum));
+      : null;
+
+    const defaultPrices = generateDefaultPrices(priceNum);
 
     const newItem = {
       id: 'item-' + Date.now(),
@@ -229,8 +251,24 @@ export default function CatalogInputScreen({
       quantity: quantity,
       isSecondary: category === 'Lainnya' || category === 'Minuman & Camilan',
       discountLabel: (d1 > 0 || d2 > 0) ? `${d1}%${d2 > 0 ? ` + ${d2}%` : ''}` : null,
-      lastMonthPrice: effectiveLastMonth
+      lastMonthPrice: effectiveLastMonth,
+      historyPrice: effectiveLastMonth,
+      isCustom: isCustomItem,
+      prices: defaultPrices
     };
+
+    // Sinkronkan ke database Supabase dan state global jika ini adalah barang kustom baru
+    if (isCustomItem && onAddCustomProduct) {
+      onAddCustomProduct({
+        id: newItem.id,
+        name: itemName.trim(),
+        category: category,
+        unit: unit,
+        price: priceNum,
+        prices: defaultPrices,
+        isCustom: true
+      });
+    }
 
     playSuccessSound();
     if (onAddToCart) onAddToCart(newItem);
@@ -345,8 +383,17 @@ export default function CatalogInputScreen({
                           <span className="text-[10px] text-slate-400 font-medium">
                             {sug.unit || 'pcs'}
                           </span>
-                          <span>•</span>
-                          <PriceFluctuationBadge price={sug.price} lastMonthPrice={sug.lastMonthPrice} showOldPrice={false} />
+                          {!sug.isCustom && sug.lastMonthPrice !== null && sug.lastMonthPrice !== undefined && (
+                            <>
+                              <span>•</span>
+                              <PriceFluctuationBadge 
+                                price={sug.price} 
+                                lastMonthPrice={sug.lastMonthPrice} 
+                                showOldPrice={false} 
+                                isCustom={sug.isCustom}
+                              />
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>

@@ -70,58 +70,50 @@ export default function HistoryScreen({
     return cleanList;
   }, [historyList]);
 
-  // 1b. State & Logika untuk Fitur Analitik "Perbandingan Pengeluaran Antar Transaksi"
-  // selectedTxA menyimpan ID transaksi terbaru (index 0) dan selectedTxB menyimpan transaksi sebelumnya (index 1)
-  const [selectedTxA, setSelectedTxA] = useState(() => 
-    uniqueHistoryList.length > 0 ? String(uniqueHistoryList[0].id) : ''
-  );
-  const [selectedTxB, setSelectedTxB] = useState(() => 
-    uniqueHistoryList.length > 1 ? String(uniqueHistoryList[1].id) : ''
-  );
+  // 1b. State & Logika untuk Fitur Analitik "Perbandingan Pengeluaran Antar Transaksi" (Sistem Direct Card Selection)
+  // isSelectingFor: melacak slot mana yang sedang menunggu input ('A' | 'B' | null, default 'A')
+  const [isSelectingFor, setIsSelectingFor] = useState('A');
+  // selectedTxA dan selectedTxB menyimpan seluruh objek transaksi yang dipilih
+  const [selectedTxA, setSelectedTxA] = useState(null);
+  const [selectedTxB, setSelectedTxB] = useState(null);
 
-  // Sinkronisasi otomatis default pilihan saat daftar riwayat belanja dimuat atau berubah
-  // Jika hanya ada 1 transaksi atau 0 transaksi, perbandingan dinonaktifkan
-  useEffect(() => {
-    if (uniqueHistoryList.length >= 2) {
-      setSelectedTxA((prev) => {
-        const exists = uniqueHistoryList.some((item) => String(item.id) === String(prev));
-        return exists ? prev : String(uniqueHistoryList[0].id);
-      });
-      setSelectedTxB((prev) => {
-        const exists = uniqueHistoryList.some((item) => String(item.id) === String(prev));
-        return exists ? prev : String(uniqueHistoryList[1].id);
-      });
-    } else if (uniqueHistoryList.length === 1) {
-      setSelectedTxA(String(uniqueHistoryList[0].id));
-      setSelectedTxB('');
+  // Handler reset pilihan: mengosongkan pilihan dan mengembalikan isSelectingFor ke 'A'
+  const handleResetComparison = () => {
+    playTapSound();
+    setSelectedTxA(null);
+    setSelectedTxB(null);
+    setIsSelectingFor('A');
+  };
+
+  // Handler pemilihan kartu langsung dari daftar sesi belanja
+  const handleSelectSession = (session) => {
+    playTapSound();
+    if (isSelectingFor === 'A') {
+      setSelectedTxA(session);
+      setIsSelectingFor('B');
+    } else if (isSelectingFor === 'B') {
+      setSelectedTxB(session);
+      setIsSelectingFor(null);
     } else {
-      setSelectedTxA('');
-      setSelectedTxB('');
+      // Jika mode pemilihan sedang nonaktif, klik kartu membuka detail struk
+      if (onOpenReceiptDetail) onOpenReceiptDetail(session);
     }
-  }, [uniqueHistoryList]);
-
-  // Transaksi terpilih A dan B
-  const txA = useMemo(() => {
-    return uniqueHistoryList.find((item) => String(item.id) === String(selectedTxA)) || null;
-  }, [uniqueHistoryList, selectedTxA]);
-
-  const txB = useMemo(() => {
-    return uniqueHistoryList.find((item) => String(item.id) === String(selectedTxB)) || null;
-  }, [uniqueHistoryList, selectedTxB]);
+  };
 
   const totalA = useMemo(() => {
-    return txA ? Number(txA.totalSpent || txA.total_spent || 0) : 0;
-  }, [txA]);
+    return selectedTxA ? Number(selectedTxA.totalSpent || selectedTxA.total_spent || 0) : 0;
+  }, [selectedTxA]);
 
   const totalB = useMemo(() => {
-    return txB ? Number(txB.totalSpent || txB.total_spent || 0) : 0;
-  }, [txB]);
+    return selectedTxB ? Number(selectedTxB.totalSpent || selectedTxB.total_spent || 0) : 0;
+  }, [selectedTxB]);
 
-  // Kalkulasi analitik perbandingan pengeluaran (reaktif terhadap dropdown A dan B)
+  const hasBothSelected = Boolean(selectedTxA && selectedTxB);
+
+  // Kalkulasi analitik perbandingan pengeluaran (reaktif terhadap perubahan kartu A dan B)
   const comparisonResult = useMemo(() => {
-    const isAvailable = uniqueHistoryList.length >= 2 && Boolean(txA) && Boolean(txB);
-    return calculateTransactionComparison(totalA, totalB, isAvailable);
-  }, [uniqueHistoryList.length, txA, txB, totalA, totalB]);
+    return calculateTransactionComparison(totalA, totalB, hasBothSelected);
+  }, [totalA, totalB, hasBothSelected]);
 
   // Warna badge, lingkaran panah, dan ikon dinamis
   const comparisonArrow = useMemo(() => {
@@ -312,136 +304,211 @@ export default function HistoryScreen({
         </div>
       </div>
 
-      {/* 2. FITUR PERBANDINGAN PENGELUARAN ANTAR TRANSAKSI */}
+      {/* 2. FITUR PERBANDINGAN PENGELUARAN ANTAR TRANSAKSI (SISTEM DIRECT CARD SELECTION) */}
       <div className="bg-white rounded-xl shadow-sm p-4 border border-slate-200/90 space-y-3">
-        {/* Header Card */}
+        {/* Header Card dengan Tombol Ulangi Pemilihan (Reset) & Badge Status */}
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-extrabold text-slate-800 tracking-tight">
-            Perbandingan Transaksi
-          </h3>
-          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border flex items-center space-x-1 ${comparisonArrow.badge}`}>
-            <span>{comparisonResult.badgeText}</span>
-          </span>
+          <div>
+            <h3 className="text-sm font-extrabold text-slate-800 tracking-tight">
+              Perbandingan Transaksi
+            </h3>
+            <p className="text-[10.5px] text-slate-500 font-medium mt-0.5">
+              {isSelectingFor === 'A' && '👉 Klik kartu pada daftar di bawah untuk memilih Transaksi A'}
+              {isSelectingFor === 'B' && '👉 Transaksi A terpilih! Sekarang klik kartu untuk Transaksi B'}
+              {!isSelectingFor && hasBothSelected && 'Hasil perbandingan 2 sesi belanja'}
+              {!isSelectingFor && !hasBothSelected && 'Klik slot di bawah untuk memilih transaksi'}
+            </p>
+          </div>
+
+          <div className="flex items-center space-x-1.5 shrink-0">
+            {(selectedTxA || selectedTxB || isSelectingFor !== 'A') && (
+              <button
+                type="button"
+                onClick={handleResetComparison}
+                className="px-2.5 py-1 text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center space-x-1 transition-colors cursor-pointer border border-slate-200"
+                title="Ulangi Pemilihan"
+              >
+                <RotateCcw className="w-3 h-3 text-slate-500" />
+                <span>Ulangi Pemilihan</span>
+              </button>
+            )}
+
+            {hasBothSelected && (
+              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border flex items-center space-x-1 ${comparisonArrow.badge}`}>
+                <span>{comparisonResult.badgeText}</span>
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Pemilih Transaksi (Dropdowns Sejajar Kiri & Kanan) */}
+        {/* Area Seleksi Kartu Langsung (Menggantikan Dropdown Select) */}
         <div className="grid grid-cols-2 gap-2.5 pt-0.5">
-          {/* Dropdown Kiri: Transaksi A */}
-          <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-slate-600">
-              Transaksi A
-            </label>
-            <select
-              value={selectedTxA}
-              onChange={(e) => {
+          {/* Slot Transaksi A */}
+          {selectedTxA ? (
+            <div
+              onClick={() => {
                 playTapSound();
-                setSelectedTxA(e.target.value);
+                setIsSelectingFor('A');
               }}
-              disabled={uniqueHistoryList.length < 2}
-              className={`w-full text-xs font-bold py-2 px-2.5 rounded-xl border border-slate-200 outline-none transition-colors truncate ${
-                uniqueHistoryList.length < 2 
-                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-                  : 'bg-slate-50 hover:bg-slate-100 text-slate-800 cursor-pointer'
+              className={`rounded-xl border p-2.5 text-left cursor-pointer transition-all relative ${
+                isSelectingFor === 'A'
+                  ? 'border-2 border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-200/80 shadow-xs'
+                  : 'border-emerald-300 bg-emerald-50/20 hover:border-emerald-400'
               }`}
             >
-              {uniqueHistoryList.length === 0 ? (
-                <option value="">Belum Ada Riwayat</option>
-              ) : (
-                uniqueHistoryList.map((session, idx) => (
-                  <option key={`txA-${session.id || idx}`} value={session.id}>
-                    {formatTxOptionLabel(session, parseDateComponents)}
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
-
-          {/* Dropdown Kanan: Transaksi B */}
-          <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-slate-600">
-              Transaksi B
-            </label>
-            <select
-              value={selectedTxB}
-              onChange={(e) => {
+              <div className="flex items-center justify-between">
+                <span className="px-1.5 py-0.2 bg-emerald-600 text-white rounded text-[9px] font-extrabold uppercase tracking-wide">
+                  Transaksi A
+                </span>
+                <span className="text-[10px] text-emerald-700 font-bold">
+                  {isSelectingFor === 'A' ? 'Memilih...' : 'Ubah ↺'}
+                </span>
+              </div>
+              <h4 className="text-xs font-bold text-slate-900 mt-1 truncate">
+                {selectedTxA.storeName || selectedTxA.store_name || 'Toko'}
+              </h4>
+              <p className="text-[10px] text-slate-500 truncate">
+                {selectedTxA.date || selectedTxA.shopping_date || 'Tanggal'}
+              </p>
+              <p className="text-xs font-black text-emerald-800 mt-0.5 tabular-nums">
+                Rp {Number(selectedTxA.totalSpent || selectedTxA.total_spent || 0).toLocaleString('id-ID')}
+              </p>
+            </div>
+          ) : (
+            <div
+              onClick={() => {
                 playTapSound();
-                setSelectedTxB(e.target.value);
+                setIsSelectingFor('A');
               }}
-              disabled={uniqueHistoryList.length < 2}
-              className={`w-full text-xs font-bold py-2 px-2.5 rounded-xl border border-slate-200 outline-none transition-colors truncate ${
-                uniqueHistoryList.length < 2 
-                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-                  : 'bg-slate-50 hover:bg-slate-100 text-slate-800 cursor-pointer'
+              className={`rounded-xl border-2 border-dashed p-3 text-center cursor-pointer transition-all ${
+                isSelectingFor === 'A'
+                  ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-200 shadow-xs'
+                  : 'border-slate-300 bg-slate-50 hover:border-slate-400'
               }`}
             >
-              {uniqueHistoryList.length < 2 ? (
-                <option value="">
-                  {uniqueHistoryList.length === 0 ? 'Belum Ada Riwayat' : 'Belum Ada Transaksi Lain'}
-                </option>
-              ) : (
-                uniqueHistoryList.map((session, idx) => (
-                  <option key={`txB-${session.id || idx}`} value={session.id}>
-                    {formatTxOptionLabel(session, parseDateComponents)}
-                  </option>
-                ))
+              <div className="flex items-center justify-center space-x-1 mb-1">
+                <span className={`w-2 h-2 rounded-full ${isSelectingFor === 'A' ? 'bg-emerald-600 animate-ping' : 'bg-slate-400'}`} />
+                <span className="text-[11px] font-bold text-slate-700">Transaksi A</span>
+              </div>
+              <p className={`text-[11px] leading-snug ${isSelectingFor === 'A' ? 'text-emerald-700 font-bold' : 'text-slate-500 font-medium'}`}>
+                {isSelectingFor === 'A' ? '👇 Klik kartu di bawah' : 'Pilih Transaksi A di bawah'}
+              </p>
+            </div>
+          )}
+
+          {/* Slot Transaksi B */}
+          {selectedTxB ? (
+            <div
+              onClick={() => {
+                playTapSound();
+                setIsSelectingFor('B');
+              }}
+              className={`rounded-xl border p-2.5 text-left cursor-pointer transition-all relative ${
+                isSelectingFor === 'B'
+                  ? 'border-2 border-blue-500 bg-blue-50/50 ring-2 ring-blue-200/80 shadow-xs'
+                  : 'border-blue-300 bg-blue-50/20 hover:border-blue-400'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="px-1.5 py-0.2 bg-blue-600 text-white rounded text-[9px] font-extrabold uppercase tracking-wide">
+                  Transaksi B
+                </span>
+                <span className="text-[10px] text-blue-700 font-bold">
+                  {isSelectingFor === 'B' ? 'Memilih...' : 'Ubah ↺'}
+                </span>
+              </div>
+              <h4 className="text-xs font-bold text-slate-900 mt-1 truncate">
+                {selectedTxB.storeName || selectedTxB.store_name || 'Toko'}
+              </h4>
+              <p className="text-[10px] text-slate-500 truncate">
+                {selectedTxB.date || selectedTxB.shopping_date || 'Tanggal'}
+              </p>
+              <p className="text-xs font-black text-blue-800 mt-0.5 tabular-nums">
+                Rp {Number(selectedTxB.totalSpent || selectedTxB.total_spent || 0).toLocaleString('id-ID')}
+              </p>
+            </div>
+          ) : (
+            <div
+              onClick={() => {
+                playTapSound();
+                setIsSelectingFor('B');
+              }}
+              className={`rounded-xl border-2 border-dashed p-3 text-center cursor-pointer transition-all ${
+                isSelectingFor === 'B'
+                  ? 'border-blue-500 bg-blue-50/70 ring-2 ring-blue-200 shadow-xs'
+                  : 'border-slate-300 bg-slate-50 hover:border-slate-400'
+              }`}
+            >
+              <div className="flex items-center justify-center space-x-1 mb-1">
+                <span className={`w-2 h-2 rounded-full ${isSelectingFor === 'B' ? 'bg-blue-600 animate-ping' : 'bg-slate-400'}`} />
+                <span className="text-[11px] font-bold text-slate-700">Transaksi B</span>
+              </div>
+              <p className={`text-[11px] leading-snug ${isSelectingFor === 'B' ? 'text-blue-700 font-bold' : 'text-slate-500 font-medium'}`}>
+                {isSelectingFor === 'B' ? '👇 Klik kartu di bawah' : 'Pilih Transaksi B di bawah'}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Tampilan Hasil Perbandingan (Hanya muncul jika Transaksi A & B sudah terpilih) */}
+        {hasBothSelected ? (
+          <>
+            {/* Tampilan Nominal (Visualisasi Utama) */}
+            <div className="bg-gray-50 rounded-lg p-4 border border-slate-100 flex justify-between items-center">
+              {/* Sisi Kiri: Transaksi A */}
+              <div className="flex-1 text-left min-w-0 pr-2">
+                <span className="block text-[11px] font-semibold text-slate-500 truncate">
+                  Transaksi A
+                </span>
+                <span className="block text-base sm:text-lg font-black text-slate-900 mt-0.5 truncate tabular-nums">
+                  Rp {totalA.toLocaleString('id-ID')}
+                </span>
+              </div>
+
+              {/* Tengah: Ikon Lingkaran Panah */}
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 mx-2 border shadow-2xs transition-all ${comparisonArrow.bg}`}>
+                {comparisonArrow.icon}
+              </div>
+
+              {/* Sisi Kanan: Transaksi B */}
+              <div className="flex-1 text-right min-w-0 pl-2">
+                <span className="block text-[11px] font-semibold text-slate-500 truncate">
+                  Transaksi B
+                </span>
+                <span className="block text-base sm:text-lg font-black text-slate-900 mt-0.5 truncate tabular-nums">
+                  Rp {totalB.toLocaleString('id-ID')}
+                </span>
+              </div>
+            </div>
+
+            {/* Teks Kesimpulan (Footer) */}
+            <div className="text-[11.5px] text-slate-600 leading-snug pt-0.5">
+              {comparisonResult.status === 'cheaper' && (
+                <span>
+                  Hebat! Transaksi A lebih hemat <strong className="font-bold text-emerald-700">-Rp {comparisonResult.formattedAbsDiff}</strong> ({comparisonResult.percent.toFixed(1)}%) dibanding Transaksi B.
+                </span>
               )}
-            </select>
+              {comparisonResult.status === 'expensive' && (
+                <span>
+                  Perhatian! Transaksi A lebih boros <strong className="font-bold text-rose-700">+Rp {comparisonResult.formattedAbsDiff}</strong> (+{comparisonResult.percent.toFixed(1)}%) dibanding Transaksi B.
+                </span>
+              )}
+              {comparisonResult.status === 'equal' && (
+                <span>
+                  Pengeluaran Transaksi A sama dengan Transaksi B (<strong className="font-bold text-slate-800">Rp {totalA.toLocaleString('id-ID')}</strong>).
+                </span>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/70 text-center">
+            <p className="text-[11.5px] text-slate-500">
+              {isSelectingFor === 'A' && 'Silakan pilih sesi belanja pertama sebagai Transaksi A dari daftar di bawah.'}
+              {isSelectingFor === 'B' && 'Transaksi A berhasil dipilih! Silakan klik sesi belanja kedua sebagai Transaksi B.'}
+              {!isSelectingFor && 'Pilih 2 transaksi untuk melihat analisis perbandingan nominal.'}
+            </p>
           </div>
-        </div>
-
-        {/* Tampilan Nominal (Visualisasi Utama) */}
-        <div className="bg-gray-50 rounded-lg p-4 border border-slate-100 flex justify-between items-center">
-          {/* Sisi Kiri: Transaksi A */}
-          <div className="flex-1 text-left min-w-0 pr-2">
-            <span className="block text-[11px] font-semibold text-slate-500 truncate">
-              Transaksi A
-            </span>
-            <span className="block text-base sm:text-lg font-black text-slate-900 mt-0.5 truncate tabular-nums">
-              Rp {totalA.toLocaleString('id-ID')}
-            </span>
-          </div>
-
-          {/* Tengah: Ikon Lingkaran Panah */}
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 mx-2 border shadow-2xs transition-all ${comparisonArrow.bg}`}>
-            {comparisonArrow.icon}
-          </div>
-
-          {/* Sisi Kanan: Transaksi B */}
-          <div className="flex-1 text-right min-w-0 pl-2">
-            <span className="block text-[11px] font-semibold text-slate-500 truncate">
-              Transaksi B
-            </span>
-            <span className="block text-base sm:text-lg font-black text-slate-900 mt-0.5 truncate tabular-nums">
-              Rp {totalB.toLocaleString('id-ID')}
-            </span>
-          </div>
-        </div>
-
-        {/* Teks Kesimpulan (Footer) */}
-        <div className="text-[11.5px] text-slate-600 leading-snug pt-0.5">
-          {comparisonResult.status === 'cheaper' && (
-            <span>
-              Hebat! Transaksi A lebih hemat <strong className="font-bold text-emerald-700">-Rp {comparisonResult.formattedAbsDiff}</strong> ({comparisonResult.percent.toFixed(1)}%) dibanding Transaksi B.
-            </span>
-          )}
-          {comparisonResult.status === 'expensive' && (
-            <span>
-              Perhatian! Transaksi A lebih boros <strong className="font-bold text-rose-700">+Rp {comparisonResult.formattedAbsDiff}</strong> (+{comparisonResult.percent.toFixed(1)}%) dibanding Transaksi B.
-            </span>
-          )}
-          {comparisonResult.status === 'equal' && (
-            <span>
-              Pengeluaran Transaksi A sama dengan Transaksi B (<strong className="font-bold text-slate-800">Rp {totalA.toLocaleString('id-ID')}</strong>).
-            </span>
-          )}
-          {comparisonResult.status === 'disabled' && (
-            <span className="text-slate-400 italic">
-              {uniqueHistoryList.length === 1 
-                ? 'Minimal butuh 2 transaksi untuk membandingkan pengeluaran.' 
-                : 'Belum ada riwayat transaksi belanja untuk dibandingkan.'}
-            </span>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Sub-row: Indikator Periode Aktif */}
@@ -519,38 +586,65 @@ export default function HistoryScreen({
           </div>
         ) : (
           <div className="space-y-2.5">
-            {displayList.map((session) => (
-              <div
-                key={session.id}
-                onClick={() => {
-                  playTapSound();
-                  if (onOpenReceiptDetail) onOpenReceiptDetail(session);
-                }}
-                className="bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-2xs hover:border-emerald-300 transition-all cursor-pointer group"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-2.5">
-                    {/* Store Icon */}
-                    <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
-                      <ShoppingBag className="w-5 h-5" />
+            {displayList.map((session) => {
+              const isSelectedA = selectedTxA && String(selectedTxA.id) === String(session.id);
+              const isSelectedB = selectedTxB && String(selectedTxB.id) === String(session.id);
+
+              return (
+                <div
+                  key={session.id}
+                  onClick={() => handleSelectSession(session)}
+                  className={`bg-white rounded-2xl p-3.5 border transition-all cursor-pointer hover:bg-gray-50 relative group ${
+                    isSelectedA
+                      ? 'border-2 border-emerald-500 ring-2 ring-emerald-200 shadow-sm bg-emerald-50/15'
+                      : isSelectedB
+                      ? 'border-2 border-blue-500 ring-2 ring-blue-200 shadow-sm bg-blue-50/15'
+                      : 'border-slate-200/90 shadow-2xs hover:border-emerald-300'
+                  }`}
+                >
+                  {/* Badge Indikator Terpilih di Sudut Kiri Atas (Sesuai Lingkaran Merah User di Gambar 2) */}
+                  {isSelectedA && (
+                    <div className="absolute -top-2.5 left-3 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white shadow-xs flex items-center space-x-1 z-10">
+                      <span>✓</span>
+                      <span>Terpilih sebagai A</span>
+                    </div>
+                  )}
+                  {isSelectedB && (
+                    <div className="absolute -top-2.5 left-3 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-600 text-white shadow-xs flex items-center space-x-1 z-10">
+                      <span>✓</span>
+                      <span>Terpilih sebagai B</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-2.5">
+                      {/* Store Icon */}
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 border ${
+                        isSelectedA 
+                          ? 'bg-emerald-100 border-emerald-200 text-emerald-700' 
+                          : isSelectedB 
+                          ? 'bg-blue-100 border-blue-200 text-blue-700' 
+                          : 'bg-blue-50 border-blue-100 text-blue-600'
+                      }`}>
+                        <ShoppingBag className="w-5 h-5" />
+                      </div>
+
+                      <div>
+                        <h4 className="text-xs font-extrabold text-slate-900 leading-snug">
+                          {session.storeName || session.store_name}
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                          {session.date || session.shopping_date} • {session.time || '10:00 WIB'} • {session.itemCount || session.items_count || 1} Item
+                        </p>
+                      </div>
                     </div>
 
-                    <div>
-                      <h4 className="text-xs font-extrabold text-slate-900 leading-snug">
-                        {session.storeName || session.store_name}
-                      </h4>
-                      <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                        {session.date || session.shopping_date} • {session.time || '10:00 WIB'} • {session.itemCount || session.items_count || 1} Item
-                      </p>
+                    <div className="text-right">
+                      <span className="text-xs font-extrabold text-slate-900">
+                        Rp {Number(session.totalSpent || session.total_spent || 0).toLocaleString('id-ID')}
+                      </span>
                     </div>
                   </div>
-
-                  <div className="text-right">
-                    <span className="text-xs font-extrabold text-slate-900">
-                      Rp {Number(session.totalSpent || session.total_spent || 0).toLocaleString('id-ID')}
-                    </span>
-                  </div>
-                </div>
 
                 {/* Status Badge & Action Group (Lihat Struk & Hapus Riwayat) */}
                 <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-100">
@@ -599,8 +693,9 @@ export default function HistoryScreen({
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
+        </div>
         )}
 
         {/* Tombol Hapus Seluruh Riwayat Belanja */}

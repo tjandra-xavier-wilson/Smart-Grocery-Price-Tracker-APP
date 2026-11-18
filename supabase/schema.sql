@@ -57,6 +57,23 @@ CREATE TABLE IF NOT EXISTS public.carts (
 );
 
 -- ==============================================================================
+-- 3D. TABEL: products (Master Katalog Barang & Barang Custom Pengguna)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.products (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID, -- Terikat dengan auth.users(id) untuk barang kustom per-user (null jika barang umum)
+  name TEXT NOT NULL,
+  category TEXT DEFAULT 'Bahan Pokok',
+  unit TEXT DEFAULT 'pcs',
+  prices JSONB DEFAULT '{}'::jsonb,
+  is_custom BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_products_name ON public.products (lower(name));
+CREATE INDEX IF NOT EXISTS idx_products_user_id ON public.products (user_id);
+
+-- ==============================================================================
 -- 4. TABEL: grocery_items
 -- Menyimpan detail baris item belanjaan dengan formula diskon & harga riwayat
 -- ==============================================================================
@@ -106,8 +123,27 @@ ALTER TABLE public.grocery_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.grocery_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.carts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 
--- A. Kebijakan Akses: grocery_history & history (SELECT, INSERT, UPDATE, DELETE hanya milik user_id = auth.uid())
+-- A. Kebijakan Akses: products (Barang Custom & Publik)
+DROP POLICY IF EXISTS "Users can only access their own products and public products" ON public.products;
+CREATE POLICY "Users can only access their own products and public products" 
+  ON public.products FOR ALL 
+  TO authenticated 
+  USING (user_id IS NULL OR auth.uid() = user_id) 
+  WITH CHECK (user_id IS NULL OR auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Public select products" ON public.products;
+CREATE POLICY "Public select products" 
+  ON public.products FOR SELECT 
+  USING (true);
+
+DROP POLICY IF EXISTS "Public insert products" ON public.products;
+CREATE POLICY "Public insert products" 
+  ON public.products FOR INSERT 
+  WITH CHECK (true);
+
+-- A2. Kebijakan Akses: grocery_history & history (SELECT, INSERT, UPDATE, DELETE hanya milik user_id = auth.uid())
 DROP POLICY IF EXISTS "Users can only access their own grocery_history" ON public.grocery_history;
 CREATE POLICY "Users can only access their own grocery_history" 
   ON public.grocery_history FOR ALL 
