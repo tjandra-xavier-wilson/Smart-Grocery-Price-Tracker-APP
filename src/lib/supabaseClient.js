@@ -1323,16 +1323,15 @@ export async function insertCustomProduct(productData) {
 
   // 2. Simpan ke Supabase tabel products jika tabel sudah ada di PostgreSQL
   try {
+    const insertPayload = {
+      name: payload.name,
+      category: payload.category || 'Bahan Pokok',
+      is_custom: true,
+      user_id: payload.user_id
+    };
     const { data, error } = await supabase
       .from('products')
-      .insert([{
-        name: payload.name,
-        category: payload.category,
-        unit: payload.unit,
-        prices: payload.prices,
-        is_custom: true,
-        user_id: payload.user_id
-      }])
+      .insert([insertPayload])
       .select();
 
     if (!error && data?.[0]) {
@@ -1372,17 +1371,43 @@ export async function getCustomProducts(userId = null) {
 
   // 1. Coba ambil dari tabel products Supabase (Single Source of Truth)
   try {
+    let targetUserId = userId;
+    if (!targetUserId && typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('sakugrosir_single_user_v1') || localStorage.getItem('sakugrosir_auth_user_v1');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          targetUserId = parsed?.id;
+        }
+      } catch (e) {}
+    }
+    if (!targetUserId) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        targetUserId = session?.user?.id;
+      } catch (e) {}
+    }
+
     let query = supabase.from('products').select('*').order('created_at', { ascending: false });
-    if (userId) {
-      query = query.eq('user_id', userId);
+    if (targetUserId) {
+      query = query.eq('user_id', targetUserId);
     }
     const { data, error } = await query;
     if (!error && data !== null) {
       isTableReachable = true;
       data.forEach(item => {
         if (item && item.name) {
-          byName.set(item.name.toLowerCase(), {
+          const key = item.name.toLowerCase();
+          const localItem = localList.find(l => l && l.name && l.name.toLowerCase() === key);
+          const unit = item.unit || localItem?.unit || 'pcs';
+          const price = item.price || localItem?.price || 0;
+          const prices = item.prices || localItem?.prices || generateDefaultPrices(price);
+          byName.set(key, {
+            ...localItem,
             ...item,
+            unit,
+            price,
+            prices,
             isCustom: true,
             historyPrice: null,
             lastMonthPrice: null

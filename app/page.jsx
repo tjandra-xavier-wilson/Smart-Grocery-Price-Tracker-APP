@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import SplashScreen from './components/SplashScreen';
 import HeaderBackgroundTrolley from './components/HeaderBackgroundTrolley';
 import HeaderBar from './components/HeaderBar';
@@ -493,32 +493,54 @@ export default function Home() {
   // State global recommendedItems (menggabungkan master bawaan + custom products)
   const [recommendedItems, setRecommendedItems] = useState(baseDefaultItems);
 
-  // Muat custom products dari Supabase / LocalStorage saat komponen dimuat atau user aktif
-  useEffect(() => {
-    let isMounted = true;
-    getCustomProducts(currentUser?.id).then(prods => {
-      if (isMounted && prods && Array.isArray(prods)) {
+  // 1. Fetch data barang rekomendasi menggunakan useCallback (Single Source of Truth)
+  const fetchRecommendedItems = useCallback(async (userId = null) => {
+    try {
+      const activeUserId = userId || currentUserRef.current?.id || currentUser?.id;
+      const prods = await getCustomProducts(activeUserId);
+      if (prods && Array.isArray(prods)) {
         setCustomProducts(prods);
         setRecommendedItems(prev => {
-          const baseList = prev.filter(item => !item.isCustom);
-          const combined = [...prods.map(p => ({ ...p, isCustom: true })), ...baseList];
+          // baseDefaultItems adalah daftar master barang bawaan sistem
+          const baseList = baseDefaultItems.filter(item => !item.isCustom);
+          const customList = prods.map(p => ({
+            ...p,
+            isCustom: true,
+            description: p.description || `Barang kustom: ${p.name}`
+          }));
+          // PENTING (SRS Fix): Barang kustom TETAP ADA di daftar rekomendasi meskipun sudah dimasukkan ke keranjang (No Cart Exclusion)
+          const combined = [...customList, ...baseList];
           return Array.from(new Map(combined.map(item => [item.name.toLowerCase(), item])).values());
         });
       }
-    }).catch(() => {});
-    return () => { isMounted = false; };
+    } catch (e) {
+      console.warn('[fetchRecommendedItems Error]:', e);
+    }
+  }, [currentUser?.id, baseDefaultItems]);
+
+  // 2. Fetch data toko kustom menggunakan useCallback
+  const fetchCustomStores = useCallback(async (userId = null) => {
+    try {
+      const targetUid = userId || currentUserRef.current?.id || currentUser?.id;
+      const stores = await getCustomStores(targetUid);
+      if (stores && Array.isArray(stores)) {
+        setCustomSupermarkets(stores);
+        setCustomStores(stores);
+      }
+    } catch (e) {
+      console.warn('[fetchCustomStores Error]:', e);
+    }
   }, [currentUser?.id]);
 
-  // Muat custom stores dari Supabase / LocalStorage saat komponen dimuat atau user aktif
+  // Muat data awal saat komponen pertama kali dimuat atau currentUser berganti
   useEffect(() => {
-    let isSubscribed = true;
-    getCustomStores(currentUser?.id).then(stores => {
-      if (isSubscribed && stores && Array.isArray(stores)) {
-        setCustomSupermarkets(stores);
-      }
-    }).catch(() => {});
-    return () => { isSubscribed = false; };
-  }, [currentUser?.id]);
+    let isMounted = true;
+    if (isMounted) {
+      fetchRecommendedItems(currentUser?.id);
+      fetchCustomStores(currentUser?.id);
+    }
+    return () => { isMounted = false; };
+  }, [currentUser?.id, fetchRecommendedItems, fetchCustomStores]);
 
   // Handler simpan lokasi supermarket baru ke Supabase & state lokal
   const handleAddNewStore = async (newStoreName) => {
@@ -641,32 +663,31 @@ export default function Home() {
     }
   };
 
-  // Handler simpan barang kustom baru: Optimistic UI + Realtime Broadcast + Supabase Cloud
+  // Handler simpan barang kustom baru: Supabase Cloud sebagai Single Source of Truth
   const handleAddCustomProduct = async (productData) => {
+    if (!productData || !productData.name) return;
+    const cleanName = productData.name.trim();
     const defaultPrices = productData.prices || generateDefaultPrices(productData.price);
+    const activeUserId = currentUser?.id || currentUserRef.current?.id;
+
     const newProductObj = {
       id: productData.id || ('prod-' + Date.now()),
-      name: productData.name.trim(),
+      name: cleanName,
       category: productData.category || 'Bahan Pokok',
       unit: productData.unit || 'pcs',
       price: productData.price,
-      description: `Barang kustom: ${productData.name.trim()}`,
+      description: `Barang kustom: ${cleanName}`,
       prices: defaultPrices,
       isCustom: true,
       lastMonthPrice: null,
-      historyPrice: null
+      historyPrice: null,
+      user_id: activeUserId
     };
 
-    // Optimistic UI: langsung tampil di Rekomendasi Belanja & Autocomplete seketika
-    let nextProducts = [];
-    setCustomProducts(prev => {
-      nextProducts = [newProductObj, ...(prev || []).filter(p => p.name.toLowerCase() !== newProductObj.name.toLowerCase())];
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(nextProducts));
-      }
-      return nextProducts;
-    });
-    setRecommendedItems(prev => [newProductObj, ...(prev || []).filter(p => p.name.toLowerCase() !== newProductObj.name.toLowerCase())]);
+    // CATATAN (SRS Fix): HAPUS update state optimis manual (setRecommendedItems / setCustomProducts)
+    // untuk mencegah race condition / data hilang-timbul.
+    // Supabase Realtime adalah Single Source of Truth yang akan memicu listener postgres_changes
+    // untuk memanggil fetchRecommendedItems() secara otomatis HANYA SATU KALI.
 
     // Multi-device Broadcast Instan via Supabase Realtime WebSocket (0 DELAY)
     try {
@@ -675,30 +696,27 @@ export default function Home() {
         event: 'REALTIME_PRODUCT_CHANGE',
         payload: {
           action: 'ADD_PRODUCT',
-          product: newProductObj,
-          allProducts: nextProducts
+          product: newProductObj
         }
       });
     } catch (e) {}
 
-    // Insert ke Supabase Cloud
+    // Simpan ke Supabase Cloud (tabel products & Cloud Sync Hub)
     try {
-      const res = await insertCustomProduct({
-        ...newProductObj,
-        user_id: currentUser?.id
-      });
-      if (res && res.data && res.data.id) {
-        const realId = res.data.id;
-        setCustomProducts(prev => prev.map(p => p.id === newProductObj.id ? { ...p, id: realId } : p));
-        setRecommendedItems(prev => prev.map(p => p.id === newProductObj.id ? { ...p, id: realId } : p));
+      const res = await insertCustomProduct(newProductObj);
+      // Fallback: Jika pengguna guest / belum terhubung realtime socket, panggil fetchRecommendedItems secara langsung
+      if (!activeUserId || res?.data) {
+        await fetchRecommendedItems(activeUserId);
       }
     } catch (e) {
-      console.warn('[Sync Custom Product]:', e);
+      console.warn('[Sync Custom Product Error]:', e);
+      await fetchRecommendedItems(activeUserId);
     }
   };
 
-  // Handler hapus barang kustom: Supabase + LocalStorage + Realtime Broadcast + State recommendedItems & customProducts
+  // Handler hapus barang kustom: Supabase + LocalStorage + Realtime Broadcast
   const handleDeleteCustomProduct = async (itemId, itemName) => {
+    const activeUserId = currentUser?.id || currentUserRef.current?.id;
     let remainingProducts = [];
     setCustomProducts(prev => {
       remainingProducts = (prev || []).filter(p => p.id !== itemId && p.name !== itemName);
@@ -725,98 +743,54 @@ export default function Home() {
 
     // Delete dari Supabase Cloud
     try {
-      await deleteCustomProduct(itemId, itemName, currentUser?.id);
+      await deleteCustomProduct(itemId, itemName, activeUserId);
+      await fetchRecommendedItems(activeUserId);
     } catch (e) {
       console.warn('[Delete Custom Product Error]:', e);
+      await fetchRecommendedItems(activeUserId);
     }
   };
 
-  // Refresh / Fetch Ulang Data Custom Products & Stores saat dibutuhkan
-  const refreshCustomData = async () => {
-    try {
-      const prods = await getCustomProducts(currentUser?.id);
-      if (prods && Array.isArray(prods)) {
-        setCustomProducts(prods);
-        setRecommendedItems(prev => {
-          const baseList = prev.filter(item => !item.isCustom);
-          const combined = [...prods.map(p => ({ ...p, isCustom: true })), ...baseList];
-          return Array.from(new Map(combined.map(item => [item.name.toLowerCase(), item])).values());
-        });
-      }
-      const stores = await getCustomStores(currentUser?.id);
-      if (stores && Array.isArray(stores)) {
-        setCustomSupermarkets(stores);
-      }
-    } catch (e) {
-      console.warn('[Refresh Custom Data Error]:', e);
-    }
-  };
+  // Alias refreshCustomData ke fetchRecommendedItems untuk kompatibilitas props
+  const refreshCustomData = fetchRecommendedItems;
 
-  // Supabase Realtime Subscriptions (Cross-Device Sync) untuk tabel custom_stores & products
+  // =========================================================================
+  // SUPABASE REALTIME SUBSCRIPTIONS (Cross-Device Sync & Zero Flickering)
+  // Kunci useEffect Realtime: Menggunakan cleanup supabase.removeChannel & callback stabil
+  // =========================================================================
   useEffect(() => {
-    if (!currentUser?.id) return;
+    const targetUserId = currentUser?.id || currentUserRef.current?.id;
+    if (!targetUserId) return;
 
-    const channelName = `realtime-custom-sync-${currentUser.id}`;
-    const realtimeCustomChannel = supabase.channel(channelName)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'custom_stores',
-        filter: `user_id=eq.${currentUser.id}`
-      }, () => {
-        refreshCustomData();
-      })
+    const channelName = `realtime-custom-sync-${targetUserId}`;
+    const customChannel = supabase
+      .channel(channelName)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'products',
-        filter: `user_id=eq.${currentUser.id}`
-      }, () => {
-        refreshCustomData();
+        filter: `user_id=eq.${targetUserId}`
+      }, (payload) => {
+        console.log('⚡ [Realtime products change]:', payload);
+        // Single Source of Truth: Panggil fetchRecommendedItems secara otomatis HANYA SATU KALI
+        fetchRecommendedItems(targetUserId);
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'custom_stores',
+        filter: `user_id=eq.${targetUserId}`
+      }, (payload) => {
+        console.log('⚡ [Realtime custom_stores change]:', payload);
+        fetchCustomStores(targetUserId);
       })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(realtimeCustomChannel);
+      // WAJIB removeChannel untuk mencegah memory leak, duplicate listeners & flickering loop
+      supabase.removeChannel(customChannel);
     };
-  }, [currentUser?.id]);
-
-  // Fetch daftar toko kustom pengguna
-  const fetchCustomStores = async (userId = null) => {
-    try {
-      const targetUid = userId || currentUser?.id || currentUserRef.current?.id;
-      const stores = await getCustomStoresFromSupabase(targetUid);
-      setCustomStores(stores || []);
-    } catch (e) {
-      console.warn('Error fetching custom stores:', e);
-    }
-  };
-
-  // 1. Listener Realtime untuk Lokasi Toko (custom_stores)
-  useEffect(() => {
-    // Tarik data awal
-    fetchCustomStores();
-
-    const targetUserId = currentUser?.id;
-    if (!targetUserId) return;
-
-    // Subscribe ke perubahan Realtime
-    const storeSubscription = supabase
-      .channel('custom-stores-sync')
-      .on(
-        'postgres_changes', 
-        { event: '*', schema: 'public', table: 'custom_stores', filter: `user_id=eq.${targetUserId}` }, 
-        (payload) => {
-          console.log('⚡ [Realtime custom_stores event]:', payload);
-          fetchCustomStores(targetUserId); // Re-fetch saat ada data masuk/dihapus dari device lain
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(storeSubscription);
-    };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, fetchRecommendedItems, fetchCustomStores]);
 
   const handleAddCustomStore = async (storeName) => {
     if (!storeName || !storeName.trim()) return;
@@ -1311,15 +1285,8 @@ export default function Home() {
             localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(data.customStores));
           }
         }
-        if (data.customProducts && Array.isArray(data.customProducts)) {
-          setCustomProducts(data.customProducts);
-          setRecommendedItems(prev => {
-            const baseItems = prev.filter(i => !i.isCustom);
-            return [...data.customProducts.map(p => ({ ...p, isCustom: true })), ...baseItems];
-          });
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(data.customProducts));
-          }
+        if (data.customProducts && Array.isArray(data.customProducts) && data.customProducts.length > 0) {
+          fetchRecommendedItems();
         }
         if (data.date) {
           setTransactionDate(data.date);
@@ -1393,47 +1360,8 @@ export default function Home() {
         if (!data || isLocalMutatingRef.current) return;
         console.log('⚡ [Realtime Product Change Event]:', data);
 
-        if (data.action === 'ADD_PRODUCT') {
-          if (data.allProducts && Array.isArray(data.allProducts)) {
-            setCustomProducts(data.allProducts);
-            setRecommendedItems(prev => {
-              const baseItems = prev.filter(i => !i.isCustom);
-              return [...data.allProducts.map(p => ({ ...p, isCustom: true })), ...baseItems];
-            });
-            if (typeof localStorage !== 'undefined') {
-              localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(data.allProducts));
-            }
-          } else if (data.product) {
-            setCustomProducts(prev => {
-              const updated = [data.product, ...(prev || []).filter(p => p.name.toLowerCase() !== data.product.name.toLowerCase())];
-              if (typeof localStorage !== 'undefined') {
-                localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(updated));
-              }
-              return updated;
-            });
-            setRecommendedItems(prev => [data.product, ...(prev || []).filter(p => p.name.toLowerCase() !== data.product.name.toLowerCase())]);
-          }
-        } else if (data.action === 'DELETE_PRODUCT') {
-          if (data.allProducts && Array.isArray(data.allProducts)) {
-            setCustomProducts(data.allProducts);
-            setRecommendedItems(prev => {
-              const baseItems = prev.filter(i => !i.isCustom);
-              return [...data.allProducts.map(p => ({ ...p, isCustom: true })), ...baseItems];
-            });
-            if (typeof localStorage !== 'undefined') {
-              localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(data.allProducts));
-            }
-          } else {
-            setCustomProducts(prev => {
-              const updated = (prev || []).filter(p => p.id !== data.itemId && p.name !== data.itemName);
-              if (typeof localStorage !== 'undefined') {
-                localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(updated));
-              }
-              return updated;
-            });
-            setRecommendedItems(prev => (prev || []).filter(p => p.id !== data.itemId && p.name !== data.itemName));
-          }
-        }
+        // Panggil fetchRecommendedItems untuk sinkronisasi tanpa race condition
+        fetchRecommendedItems();
       })
       .on('broadcast', { event: 'REALTIME_CHECKOUT_EVENT' }, () => {
         // Multi-device: Ambil history terupdate dari cloud dan kosongkan keranjang aktif

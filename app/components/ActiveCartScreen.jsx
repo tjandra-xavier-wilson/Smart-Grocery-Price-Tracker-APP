@@ -590,6 +590,7 @@ export default function ActiveCartScreen({
       : normalizedCustom.filter(p => p.categoryKey === activeCategory || normalizeCatKey(p.category) === activeCategory);
 
     // Letakkan custom products di paling atas rekomendasi
+    // CATATAN (SRS No Cart Exclusion): Barang kustom TETAP ADA di daftar rekomendasi belanja meskipun sudah dimasukkan ke keranjang aktif
     const combined = [...matchingCustom, ...baseItems];
     return Array.from(new Map(combined.map(item => [item.name.toLowerCase(), item])).values());
   }, [activeCategory, customProducts, recommendedItems]);

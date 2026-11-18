@@ -192,7 +192,7 @@ export default function CatalogInputScreen({
     setUnit(item.unit);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     playTapSound();
 
@@ -244,7 +244,7 @@ export default function CatalogInputScreen({
 
     // Sinkronkan ke database Supabase dan state global jika ini adalah barang kustom baru
     if (isCustomItem && onAddCustomProduct) {
-      onAddCustomProduct({
+      await onAddCustomProduct({
         id: newItem.id,
         name: itemName.trim(),
         category: category,
