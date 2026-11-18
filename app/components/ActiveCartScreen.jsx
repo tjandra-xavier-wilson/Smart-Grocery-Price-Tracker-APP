@@ -674,7 +674,8 @@ export default function ActiveCartScreen({
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(itemId));
 
     try {
-      // 1. Eksekusi Delete ke Supabase tabel products dengan validasi primary key & keamanan ganda (user_id)
+      // 1. Eksekusi Delete ke Supabase tabel products:
+      // await supabase.from('products').delete().eq('id', itemId).eq('user_id', user.id)
       let query = supabase.from('products').delete();
       if (isUuid) {
         query = query.eq('id', itemId);
@@ -687,11 +688,23 @@ export default function ActiveCartScreen({
 
       const { error } = await query;
       if (error) {
-        console.error("Gagal menghapus dari Supabase:", error);
-        throw error;
+        const isMissingTable = String(error.message || '').includes('schema cache') || 
+                               String(error.message || '').includes('Could not find the table') ||
+                               error.code === 'PGRST205' || error.code === '42P01';
+        if (isMissingTable) {
+          console.warn('[Supabase Missing products table Notice]:', error.message);
+          if (typeof window !== 'undefined') {
+            alert(`Pemberitahuan: Tabel 'products' belum ada di Supabase. Barang '${itemName}' dihapus dari memori lokal. Silakan jalankan skrip SQL di menu SQL Editor dasbor Supabase Anda.`);
+          }
+        } else {
+          console.error("Gagal menghapus dari Supabase:", error);
+          if (typeof window !== 'undefined') {
+            alert(`Pemberitahuan: ${error.message || 'Gagal menghapus dari cloud. Menghapus dari memori lokal...'}`);
+          }
+        }
       }
 
-      // 2. Jika sukses, baru hapus dari state lokal (Optimistic UI) & broadcast multi-device
+      // 2. Selalu bersihkan dari state lokal (Optimistic UI), Autocomplete & LocalStorage
       if (onDeleteCustomProduct) {
         await onDeleteCustomProduct(itemId, itemName);
       }
@@ -700,11 +713,14 @@ export default function ActiveCartScreen({
       setCustomProductToDelete(null);
     } catch (err) {
       console.error("Gagal menghapus:", err);
+      if (onDeleteCustomProduct) {
+        try { await onDeleteCustomProduct(itemId, itemName); } catch (e) {}
+      }
       if (typeof window !== 'undefined') {
-        alert(`Gagal menghapus barang: ${err.message || 'Terjadi gangguan'}. Periksa koneksi atau izin database Anda.`);
+        alert(`Pemberitahuan: Barang '${itemName}' dihapus dari memori lokal.`);
       }
     } finally {
-      // 4. Memastikan loading spinner SELALU berhenti & modal tertutup (Mencegah Infinite Loading)
+      // 4. Memastikan loading spinner SELALU berhenti (setIsDeleting(false)) & modal tertutup
       setDeletingItemId(null);
       setCustomProductToDelete(null);
     }

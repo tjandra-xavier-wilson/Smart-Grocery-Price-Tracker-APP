@@ -309,11 +309,10 @@ END $$;
 -- 9. TABEL: custom_stores (Toko Kustom Milik Pengguna)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.custom_stores (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID, -- Terikat dengan auth.users(id) untuk isolasi antar pengguna
-  name TEXT NOT NULL,
-  address TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    store_name TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_custom_stores_user_id ON public.custom_stores (user_id);
@@ -321,12 +320,8 @@ CREATE INDEX IF NOT EXISTS idx_custom_stores_created_at ON public.custom_stores 
 
 ALTER TABLE public.custom_stores ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Users can only access their own custom_stores" ON public.custom_stores;
-CREATE POLICY "Users can only access their own custom_stores" 
-  ON public.custom_stores FOR ALL 
-  TO authenticated 
-  USING (auth.uid() = user_id) 
-  WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "User can manage their own stores" ON public.custom_stores;
+CREATE POLICY "User can manage their own stores" ON public.custom_stores FOR ALL USING (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Public select custom_stores" ON public.custom_stores;
 CREATE POLICY "Public select custom_stores" 
@@ -347,22 +342,21 @@ CREATE POLICY "Public delete custom_stores"
 -- 10. TABEL: products (Katalog Rekomendasi / Barang Kustom)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.products (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID, -- Terikat dengan auth.users(id)
-  name TEXT NOT NULL,
-  category TEXT,
-  unit TEXT,
-  price NUMERIC DEFAULT 0,
-  last_month_price NUMERIC DEFAULT 0,
-  description TEXT,
-  prices JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    is_custom BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_products_user_id ON public.products (user_id);
 CREATE INDEX IF NOT EXISTS idx_products_created_at ON public.products (created_at DESC);
 
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "User can manage their own products" ON public.products;
+CREATE POLICY "User can manage their own products" ON public.products FOR ALL USING (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can only access their own products" ON public.products;
 CREATE POLICY "Users can only access their own products" 

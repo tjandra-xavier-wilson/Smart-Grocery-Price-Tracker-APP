@@ -21,7 +21,8 @@ import {
   ArrowRight,
   Printer,
   Download,
-  Share2
+  Share2,
+  Database
 } from 'lucide-react';
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
 import { playTapSound, playSuccessSound, playWarningBeep } from '../utils/sound';
@@ -203,16 +204,6 @@ export function StoreModal({
     }
   });
 
-  // Pastikan currentStore jika kustom tetap muncul di daftar pilihan HP & Laptop
-  if (currentStore && !isDefaultStore(currentStore) && !allStoreMap.has(currentStore.toLowerCase())) {
-    allStoreMap.set(currentStore.toLowerCase(), {
-      id: `custom-${currentStore}`,
-      name: currentStore,
-      store_name: currentStore,
-      isCustom: true
-    });
-  }
-
   const allStores = Array.from(allStoreMap.values());
 
   const handleSaveNewStore = async () => {
@@ -246,14 +237,40 @@ export function StoreModal({
     if (!item || deletingStoreId) return;
     const storeId = item.id;
     const storeName = item.store_name || item.name;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(storeId));
 
     setDeletingStoreId(storeId);
     playTapSound();
 
     try {
-      // 1. Logika Hapus: Eksekusi delete ke tabel custom_stores Supabase
-      if (storeId && !String(storeId).startsWith('custom-store-') && !String(storeId).startsWith('local-')) {
-        await supabase.from('custom_stores').delete().eq('id', storeId);
+      // 1. Logika Hapus: Eksekusi delete ke tabel custom_stores Supabase:
+      // await supabase.from('custom_stores').delete().eq('id', storeId).eq('user_id', user.id)
+      let query = supabase.from('custom_stores').delete();
+      if (isUuid) {
+        query = query.eq('id', storeId);
+      } else if (storeName) {
+        query = query.eq('store_name', storeName);
+      }
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+
+      const { error } = await query;
+      if (error) {
+        const isMissingTable = String(error.message || '').includes('schema cache') || 
+                               String(error.message || '').includes('Could not find the table') ||
+                               error.code === 'PGRST205' || error.code === '42P01';
+        if (isMissingTable) {
+          console.warn('[Supabase Missing custom_stores Notice]:', error.message);
+          if (typeof window !== 'undefined') {
+            alert(`Pemberitahuan: Tabel 'custom_stores' belum ada di Supabase. Lokasi '${storeName}' dihapus dari memori lokal. Silakan jalankan skrip SQL di menu SQL Editor dasbor Supabase Anda.`);
+          }
+        } else {
+          console.error("Gagal menghapus lokasi dari Supabase:", error);
+          if (typeof window !== 'undefined') {
+            alert(`Pemberitahuan: ${error.message || 'Gagal menghapus dari cloud. Menghapus dari memori lokal...'}`);
+          }
+        }
       }
 
       // 2. Panggil handler parent untuk update state lokal & LocalStorage & Realtime Broadcast
@@ -262,13 +279,23 @@ export function StoreModal({
       }
 
       // 3. Fallback Aktif: Jika toko yang dihapus kebetulan sedang menjadi selectedSupermarket aktif,
-      // otomatis ubah selectedSupermarket kembali ke "Lotte Mart - Puri Indah" agar aplikasi tidak error
+      // otomatis ubah selectedSupermarket kembali ke "Lotte Mart - Puri Indah"
       if (store === storeName || currentStore === storeName) {
         setStore('Lotte Mart - Puri Indah');
       }
     } catch (err) {
       console.warn('[deleteCustomStore error]:', err);
+      if (onDeleteCustomStore) {
+        try { await onDeleteCustomStore(item); } catch (e) {}
+      }
+      if (store === storeName || currentStore === storeName) {
+        setStore('Lotte Mart - Puri Indah');
+      }
+      if (typeof window !== 'undefined') {
+        alert(`Pemberitahuan: Lokasi '${storeName}' telah dihapus dari memori lokal.`);
+      }
     } finally {
+      // Memastikan loading spinner SELALU berhenti
       setDeletingStoreId(null);
       setStoreToDeletePrompt(null);
     }
@@ -1657,6 +1684,32 @@ export function UserProfileModal({ isOpen, onClose, currentUser, onLogout }) {
         <div className="mt-3 inline-flex items-center space-x-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 rounded-full text-[11px] font-bold border border-emerald-200">
           <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
           <span>Single-User Dedicated Owner</span>
+        </div>
+
+        {/* Komponen Setup Database Supabase SQL */}
+        <div className="mt-4 pt-3 border-t border-slate-100 text-left">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+              <Database className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Skrip SQL Setup Supabase</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                const sql = `-- Buat tabel untuk lokasi toko kustom\nCREATE TABLE IF NOT EXISTS public.custom_stores (\n    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,\n    store_name TEXT NOT NULL,\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Buat tabel untuk barang kustom\nCREATE TABLE IF NOT EXISTS public.products (\n    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,\n    name TEXT NOT NULL,\n    category TEXT NOT NULL,\n    is_custom BOOLEAN DEFAULT true,\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Aktifkan Row Level Security (RLS)\nALTER TABLE public.custom_stores ENABLE ROW LEVEL SECURITY;\nALTER TABLE public.products ENABLE ROW LEVEL SECURITY;\n\n-- Buat Policy agar pengguna hanya bisa akses datanya sendiri\nCREATE POLICY "User can manage their own stores" ON public.custom_stores FOR ALL USING (auth.uid() = user_id);\nCREATE POLICY "User can manage their own products" ON public.products FOR ALL USING (auth.uid() = user_id);\n\n-- Aktifkan Realtime\nalter publication supabase_realtime add table public.custom_stores;\nalter publication supabase_realtime add table public.products;`;
+                if (navigator?.clipboard?.writeText) {
+                  navigator.clipboard.writeText(sql);
+                  alert('Skrip SQL berhasil disalin! Buka dasbor Supabase -> SQL Editor -> Tempel & Jalankan.');
+                }
+              }}
+              className="text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-md border border-emerald-300 transition-colors cursor-pointer"
+            >
+              📋 Salin Skrip SQL
+            </button>
+          </div>
+          <p className="text-[10px] text-slate-500 leading-relaxed">
+            Salin skrip ini dan jalankan di menu <strong>SQL Editor</strong> dasbor Supabase Anda untuk membuat tabel <code className="text-emerald-700 font-mono font-bold">custom_stores</code> &amp; <code className="text-emerald-700 font-mono font-bold">products</code> jika belum ada.
+          </p>
         </div>
 
         <div className="mt-6 pt-4 border-t border-slate-100 space-y-2">

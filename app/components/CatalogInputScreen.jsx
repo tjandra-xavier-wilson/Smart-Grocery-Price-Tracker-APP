@@ -82,41 +82,22 @@ export default function CatalogInputScreen({
       }
     });
 
-    if (historyList && Array.isArray(historyList)) {
-      historyList.forEach(trip => {
-        if (trip.items && Array.isArray(trip.items)) {
-          trip.items.forEach(hItem => {
-            if (hItem.name && !list.some(p => p.name.toLowerCase() === hItem.name.toLowerCase())) {
-              list.push({
-                id: 'hist-' + (hItem.id || Math.random()),
-                name: hItem.name,
-                category: hItem.category || 'Bahan Pokok',
-                price: hItem.price || 0,
-                lastMonthPrice: hItem.lastMonthPrice !== undefined ? hItem.lastMonthPrice : hItem.price,
-                unit: hItem.unit || 'pcs'
-              });
-            }
-          });
-        }
-      });
-    }
-
     return list;
-  }, [historyList]);
+  }, []);
 
-  // Autocomplete Filter: Memfilter dari state recommendedItems yang terhubung ke database Supabase
+  // Autocomplete Filter: HANYA memfilter data dari state recommendedItems yang terhubung ke database Supabase
   const filteredSuggestions = useMemo(() => {
     const searchInput = itemName.trim().toLowerCase();
     if (!searchInput || searchInput.length < 1) return [];
 
-    // Gabungkan master catalog dengan state recommendedItems yang terhubung ke Supabase
+    // HANYA memfilter data dari state recommendedItems (yang berasal langsung dari Supabase)
     const sourceList = (recommendedItems && recommendedItems.length > 0)
       ? recommendedItems
       : allMasterItems;
 
     // Logika filter sesuai SRS: recommendedItems.filter(item => item.name.toLowerCase().includes(searchInput.toLowerCase()))
     return sourceList.filter(item => 
-      item.name.toLowerCase().includes(searchInput)
+      item && item.name && item.name.toLowerCase().includes(searchInput)
     ).slice(0, 8);
   }, [itemName, recommendedItems, allMasterItems]);
 
