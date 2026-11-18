@@ -52,30 +52,54 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
 
   // PWA Install Prompt Listener (Eksklusif di Layar Login)
   useEffect(() => {
+    // 1. Tangkap prompt jika sudah pernah dicatat di level window sebelum komponen LoginScreen mount
+    if (typeof window !== 'undefined' && window.__deferredPrompt) {
+      setDeferredPrompt(window.__deferredPrompt);
+    }
+
     const handleBeforeInstallPrompt = (e) => {
-      e.preventDefault(); // Mencegah browser menampilkan prompt otomatis
-      setDeferredPrompt(e); // Simpan event untuk dipicu lewat tombol
+      e.preventDefault();
+      if (typeof window !== 'undefined') {
+        window.__deferredPrompt = e;
+      }
+      setDeferredPrompt(e);
     };
+
+    const handlePromptReady = (e) => {
+      if (e?.detail) {
+        setDeferredPrompt(e.detail);
+      } else if (typeof window !== 'undefined' && window.__deferredPrompt) {
+        setDeferredPrompt(window.__deferredPrompt);
+      }
+    };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('pwa_prompt_ready', handlePromptReady);
 
     const handleAppInstalled = () => {
       setDeferredPrompt(null);
+      if (typeof window !== 'undefined') {
+        window.__deferredPrompt = null;
+      }
     };
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('pwa_prompt_ready', handlePromptReady);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
   const handleInstallClick = async () => {
-    playTapSound();
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') {
         setDeferredPrompt(null);
+        if (typeof window !== 'undefined') {
+          window.__deferredPrompt = null;
+        }
       }
     }
   };
@@ -692,13 +716,13 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
 
           {/* Tombol Install Aplikasi PWA (Muncul Eksklusif jika didukung browser & belum terinstall) */}
           {deferredPrompt && (
-            <div className="mt-3 pt-3 border-t border-slate-100 animate-fade-in">
-              <button
-                type="button"
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <button 
                 onClick={handleInstallClick}
-                className="w-full py-2.5 px-3 border-2 border-teal-600 text-teal-700 bg-teal-50 hover:bg-teal-100/90 active:bg-teal-200/80 rounded-xl font-extrabold text-xs flex items-center justify-center space-x-2 transition-all cursor-pointer shadow-xs"
+                type="button"
+                className="w-full py-2.5 rounded-lg border-2 border-teal-600 text-teal-700 bg-teal-50 hover:bg-teal-100 font-semibold transition-colors flex justify-center items-center gap-2 cursor-pointer"
               >
-                <span>⬇️ Install Aplikasi di Perangkat Ini</span>
+                ⬇️ Install Aplikasi di Perangkat Ini
               </button>
             </div>
           )}

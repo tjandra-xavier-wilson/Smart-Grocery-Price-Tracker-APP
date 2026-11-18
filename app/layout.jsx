@@ -42,12 +42,19 @@ export default function RootLayout({ children }) {
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').catch(function(err) {
-                    console.warn('[SW Register] Non-fatal:', err);
-                  });
+              if (typeof window !== 'undefined') {
+                window.addEventListener('beforeinstallprompt', function(e) {
+                  e.preventDefault();
+                  window.__deferredPrompt = e;
+                  window.dispatchEvent(new CustomEvent('pwa_prompt_ready', { detail: e }));
                 });
+                if ('serviceWorker' in navigator) {
+                  window.addEventListener('load', function() {
+                    navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                      console.warn('[SW Register] Non-fatal:', err);
+                    });
+                  });
+                }
               }
             `,
           }}
