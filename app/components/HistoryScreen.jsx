@@ -80,9 +80,9 @@ export default function HistoryScreen({
   // historyItems: Single source of truth untuk validasi riwayat belanja
   const historyItems = uniqueHistoryList || historyList || [];
 
-  // Sinkronisasi & Reset Ghost Data: jika data transaksi A atau B sudah dihapus dari database, atau history < 2
+  // Sinkronisasi & Reset Ghost Data: jika data transaksi A atau B sudah dihapus dari database atau riwayat kosong
   useEffect(() => {
-    if (!historyItems || historyItems.length < 2) {
+    if (!historyItems || historyItems.length === 0) {
       setSelectedTxA(null);
       setSelectedTxB(null);
       setIsSelectingFor('A');
@@ -348,20 +348,21 @@ export default function HistoryScreen({
         </div>
       </div>
 
-      {/* 2. FITUR PERBANDINGAN PENGELUARAN ANTAR TRANSAKSI (SISTEM DIRECT CARD SELECTION) */}
-      {historyItems.length >= 2 && (
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-slate-200/90 space-y-3 perbandingan-transaksi-container">
-          {/* Header Card dengan Tombol Ulangi Pemilihan (Reset) & Badge Status */}
+      {/* 2. FITUR PERBANDINGAN PENGELUARAN ANTAR TRANSAKSI (SISTEM DIRECT CARD SELECTION - PERSISTENT EMPTY STATE) */}
+      <div className="bg-white rounded-xl shadow-sm p-4 border border-slate-200/90 space-y-3 perbandingan-transaksi-container">
+        {/* Header Card dengan Tombol Ulangi Pemilihan (Reset) & Badge Status */}
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-extrabold text-slate-800 tracking-tight">
               Perbandingan Transaksi
             </h3>
             <p className="text-[10.5px] text-slate-500 font-medium mt-0.5">
-              {isSelectingFor === 'A' && '👉 Klik kartu pada daftar di bawah untuk memilih Transaksi A'}
-              {isSelectingFor === 'B' && '👉 Transaksi A terpilih! Sekarang klik kartu untuk Transaksi B'}
-              {!isSelectingFor && hasBothSelected && 'Hasil perbandingan 2 sesi belanja'}
-              {!isSelectingFor && !hasBothSelected && 'Klik slot di bawah untuk memilih transaksi'}
+              {historyItems.length === 0
+                ? 'Belum ada data untuk dibandingkan (Minimal 2 transaksi)'
+                : (isSelectingFor === 'A' && '👉 Klik kartu pada daftar di bawah untuk memilih Transaksi A')
+                || (isSelectingFor === 'B' && '👉 Transaksi A terpilih! Sekarang klik kartu untuk Transaksi B')
+                || (!isSelectingFor && hasBothSelected && 'Hasil perbandingan 2 sesi belanja')
+                || (!isSelectingFor && !hasBothSelected && 'Klik slot di bawah untuk memilih transaksi')}
             </p>
           </div>
 
@@ -422,21 +423,36 @@ export default function HistoryScreen({
           ) : (
             <div
               onClick={() => {
+                if (historyItems.length === 0) return;
                 playTapSound();
                 setIsSelectingFor('A');
               }}
-              className={`rounded-xl border-2 border-dashed p-3 text-center cursor-pointer transition-all ${
-                isSelectingFor === 'A'
-                  ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-200 shadow-xs'
-                  : 'border-slate-300 bg-slate-50 hover:border-slate-400'
+              className={`rounded-xl border-2 border-dashed p-3 text-center transition-all ${
+                historyItems.length === 0
+                  ? 'border-slate-200 bg-slate-50/50 text-slate-400 cursor-not-allowed opacity-75'
+                  : (isSelectingFor === 'A'
+                      ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-200 shadow-xs cursor-pointer'
+                      : 'border-slate-300 bg-slate-50 hover:border-slate-400 cursor-pointer')
               }`}
             >
               <div className="flex items-center justify-center space-x-1 mb-1">
-                <span className={`w-2 h-2 rounded-full ${isSelectingFor === 'A' ? 'bg-emerald-600 animate-ping' : 'bg-slate-400'}`} />
-                <span className="text-[11px] font-bold text-slate-700">Transaksi A</span>
+                <span className={`w-2 h-2 rounded-full ${
+                  historyItems.length === 0
+                    ? 'bg-slate-300'
+                    : (isSelectingFor === 'A' ? 'bg-emerald-600 animate-ping' : 'bg-slate-400')
+                }`} />
+                <span className={`text-[11px] font-bold ${historyItems.length === 0 ? 'text-slate-400' : 'text-slate-700'}`}>
+                  Transaksi A
+                </span>
               </div>
-              <p className={`text-[11px] leading-snug ${isSelectingFor === 'A' ? 'text-emerald-700 font-bold' : 'text-slate-500 font-medium'}`}>
-                {isSelectingFor === 'A' ? '👇 Klik kartu di bawah' : 'Pilih Transaksi A di bawah'}
+              <p className={`text-[11px] leading-snug ${
+                historyItems.length === 0
+                  ? 'text-slate-400 font-normal'
+                  : (isSelectingFor === 'A' ? 'text-emerald-700 font-bold' : 'text-slate-500 font-medium')
+              }`}>
+                {historyItems.length === 0
+                  ? 'Belum ada riwayat transaksi'
+                  : (isSelectingFor === 'A' ? '👇 Klik kartu di bawah' : 'Pilih Transaksi A di bawah')}
               </p>
             </div>
           )}
@@ -475,21 +491,36 @@ export default function HistoryScreen({
           ) : (
             <div
               onClick={() => {
+                if (historyItems.length === 0) return;
                 playTapSound();
                 setIsSelectingFor('B');
               }}
-              className={`rounded-xl border-2 border-dashed p-3 text-center cursor-pointer transition-all ${
-                isSelectingFor === 'B'
-                  ? 'border-blue-500 bg-blue-50/70 ring-2 ring-blue-200 shadow-xs'
-                  : 'border-slate-300 bg-slate-50 hover:border-slate-400'
+              className={`rounded-xl border-2 border-dashed p-3 text-center transition-all ${
+                historyItems.length === 0
+                  ? 'border-slate-200 bg-slate-50/50 text-slate-400 cursor-not-allowed opacity-75'
+                  : (isSelectingFor === 'B'
+                      ? 'border-blue-500 bg-blue-50/70 ring-2 ring-blue-200 shadow-xs cursor-pointer'
+                      : 'border-slate-300 bg-slate-50 hover:border-slate-400 cursor-pointer')
               }`}
             >
               <div className="flex items-center justify-center space-x-1 mb-1">
-                <span className={`w-2 h-2 rounded-full ${isSelectingFor === 'B' ? 'bg-blue-600 animate-ping' : 'bg-slate-400'}`} />
-                <span className="text-[11px] font-bold text-slate-700">Transaksi B</span>
+                <span className={`w-2 h-2 rounded-full ${
+                  historyItems.length === 0
+                    ? 'bg-slate-300'
+                    : (isSelectingFor === 'B' ? 'bg-blue-600 animate-ping' : 'bg-slate-400')
+                }`} />
+                <span className={`text-[11px] font-bold ${historyItems.length === 0 ? 'text-slate-400' : 'text-slate-700'}`}>
+                  Transaksi B
+                </span>
               </div>
-              <p className={`text-[11px] leading-snug ${isSelectingFor === 'B' ? 'text-blue-700 font-bold' : 'text-slate-500 font-medium'}`}>
-                {isSelectingFor === 'B' ? '👇 Klik kartu di bawah' : 'Pilih Transaksi B di bawah'}
+              <p className={`text-[11px] leading-snug ${
+                historyItems.length === 0
+                  ? 'text-slate-400 font-normal'
+                  : (isSelectingFor === 'B' ? 'text-blue-700 font-bold' : 'text-slate-500 font-medium')
+              }`}>
+                {historyItems.length === 0
+                  ? 'Belum ada riwayat transaksi'
+                  : (isSelectingFor === 'B' ? '👇 Klik kartu di bawah' : 'Pilih Transaksi B di bawah')}
               </p>
             </div>
           )}
@@ -548,14 +579,15 @@ export default function HistoryScreen({
         ) : (
           <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/70 text-center">
             <p className="text-[11.5px] text-slate-500">
-              {isSelectingFor === 'A' && 'Silakan pilih sesi belanja pertama sebagai Transaksi A dari daftar di bawah.'}
-              {isSelectingFor === 'B' && 'Transaksi A berhasil dipilih! Silakan klik sesi belanja kedua sebagai Transaksi B.'}
-              {!isSelectingFor && 'Pilih 2 transaksi untuk melihat analisis perbandingan nominal.'}
+              {historyItems.length === 0
+                ? 'Belum ada riwayat transaksi belanja untuk dibandingkan.'
+                : (isSelectingFor === 'A' && 'Silakan pilih sesi belanja pertama sebagai Transaksi A dari daftar di bawah.')
+                || (isSelectingFor === 'B' && 'Transaksi A berhasil dipilih! Silakan klik sesi belanja kedua sebagai Transaksi B.')
+                || (!isSelectingFor && 'Pilih 2 transaksi untuk melihat analisis perbandingan nominal.')}
             </p>
           </div>
         )}
       </div>
-      )}
 
       {/* Sub-row: Indikator Periode Aktif */}
       <div className="flex items-center justify-between text-[11px] px-1 font-semibold text-slate-600">
