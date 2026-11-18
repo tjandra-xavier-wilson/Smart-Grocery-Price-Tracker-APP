@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   X, 
   Wallet, 
@@ -25,9 +25,9 @@ import {
   Database
 } from 'lucide-react';
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
-import { playTapSound, playSuccessSound, playWarningBeep } from '../utils/sound';
+import { playTapSound, playSuccessSound, playWarningBeep, playBarcodeBeep } from '../utils/sound';
 import { getProductEmoji } from '../utils/emoji';
-import { supabase } from '../../src/lib/supabaseClient';
+import { supabase, generateDefaultPrices } from '../../src/lib/supabaseClient';
 
 /**
  * 1. Modal Edit Batas Saldo Dompet
@@ -518,17 +518,191 @@ export function StoreModal({
 }
 
 /**
- * 3. Modal Barcode Scanner Simulasi
+ * 3. Modal Barcode Scanner Supermarket (Live Camera + Fallback Mode Simulasi Developer)
  */
-export function BarcodeScannerModal({ isOpen, onClose, onScannedItem }) {
-  if (!isOpen) return null;
+export function BarcodeScannerModal({ isOpen, onClose, onScannedItem, catalogItems = [], onAddToCart }) {
+  const [cameraError, setCameraError] = useState(null);
+  const [isScannerReady, setIsScannerReady] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
+  const scannerRef = useRef(null);
+  const isDebouncingRef = useRef(false);
 
   const sampleBarcodes = [
-    { code: '899275300101', name: 'Beras Premium Rojolele 5kg', price: 74000, category: 'Bahan Pokok', unit: 'karung / 5kg' },
-    { code: '899100120045', name: 'Minyak Goreng Sania 2L', price: 33500, category: 'Bahan Pokok', unit: 'pouch / 2L' },
-    { code: '899300511029', name: 'Susu UHT Full Cream Greenfields 1L', price: 21500, category: 'Produk Susu & Telur', unit: 'kotak / 1L' },
-    { code: '899450239018', name: 'Sabun Mandi Dettol Reff 450ml', price: 28500, category: 'Perlengkapan Mandi', unit: 'pouch / 450ml' },
+    { code: '899275300101', barcode: '899275300101', name: 'Beras Premium Rojolele 5kg', price: 74000, category: 'Bahan Pokok', unit: 'karung / 5kg' },
+    { code: '899100120045', barcode: '899100120045', name: 'Minyak Goreng Sania 2L', price: 33500, category: 'Bahan Pokok', unit: 'pouch / 2L' },
+    { code: '899300511029', barcode: '899300511029', name: 'Susu UHT Full Cream Greenfields 1L', price: 21500, category: 'Produk Susu & Telur', unit: 'kotak / 1L' },
+    { code: '899450239018', barcode: '899450239018', name: 'Sabun Mandi Dettol Reff 450ml', price: 28500, category: 'Perlengkapan Mandi', unit: 'pouch / 450ml' },
   ];
+
+  const handleScanSuccess = useCallback((decodedText) => {
+    if (isDebouncingRef.current) return;
+    isDebouncingRef.current = true;
+
+    const cleanCode = String(decodedText || '').trim();
+    const itemsPool = [...(catalogItems || []), ...sampleBarcodes];
+    const scannedItem = itemsPool.find(
+      (item) => String(item.barcode || item.code || item.id || '').trim() === cleanCode
+    );
+
+    if (scannedItem) {
+      // 1. Efek suara beep pemindai barcode
+      playBarcodeBeep();
+
+      // Format objek barang siap masuk ke keranjang belanja
+      const rawPrice = Number(String(scannedItem.price || scannedItem.base_price || 0).replace(/[^0-9]/g, ''));
+      const cartReadyItem = {
+        ...scannedItem,
+        barcode: scannedItem.barcode || cleanCode,
+        price: rawPrice,
+        prices: scannedItem.prices || generateDefaultPrices(rawPrice),
+        quantity: 1
+      };
+
+      // 2. Langsung masukkan barang ke state keranjang
+      if (onAddToCart) {
+        onAddToCart(cartReadyItem);
+      } else if (onScannedItem) {
+        onScannedItem(cartReadyItem);
+      }
+
+      setToastMessage({
+        type: 'success',
+        text: `✓ ${scannedItem.name} berhasil ditambahkan ke keranjang!`
+      });
+
+      // 3. Tutup modal secara otomatis setelah jeda singkat
+      setTimeout(() => {
+        onClose();
+        isDebouncingRef.current = false;
+        setToastMessage(null);
+      }, 700);
+    } else {
+      // JIKA barang tidak ditemukan
+      setToastMessage({
+        type: 'warning',
+        text: `Barcode [${cleanCode}] tidak dikenali. Silakan input manual sebagai barang kustom.`
+      });
+
+      // Beri jeda 2 detik sebelum scanner bisa memindai barcode lain
+      setTimeout(() => {
+        isDebouncingRef.current = false;
+        setToastMessage(null);
+      }, 2000);
+    }
+  }, [catalogItems, onAddToCart, onScannedItem, onClose]);
+
+  // Inisialisasi html5-qrcode live camera
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let isMounted = true;
+    let html5QrCode = null;
+    const scannerElementId = 'barcode-live-camera-feed';
+
+    const startCamera = async () => {
+      try {
+        setCameraError(null);
+        setIsScannerReady(false);
+
+        // Dinamis import untuk memastikan aman dari lingkungan SSR Next.js
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
+        if (!isMounted) return;
+
+        // Beri waktu 100ms agar container DOM terpasang sempurna
+        await new Promise((r) => setTimeout(r, 120));
+        if (!document.getElementById(scannerElementId)) return;
+
+        html5QrCode = new Html5Qrcode(scannerElementId, {
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.QR_CODE
+          ],
+          verbose: false
+        });
+        scannerRef.current = html5QrCode;
+
+        const qrConfig = {
+          fps: 10,
+          qrbox: { width: 250, height: 140 },
+          aspectRatio: 1.333333
+        };
+
+        // Prioritas kamera belakang (environment), fallback ke kamera yang tersedia
+        try {
+          await html5QrCode.start(
+            { facingMode: 'environment' },
+            qrConfig,
+            (decodedText) => {
+              if (isMounted) handleScanSuccess(decodedText);
+            },
+            () => {}
+          );
+        } catch (envErr) {
+          const cameras = await Html5Qrcode.getCameras();
+          if (cameras && cameras.length > 0) {
+            await html5QrCode.start(
+              cameras[0].id,
+              qrConfig,
+              (decodedText) => {
+                if (isMounted) handleScanSuccess(decodedText);
+              },
+              () => {}
+            );
+          } else {
+            throw envErr;
+          }
+        }
+
+        if (isMounted) {
+          setIsScannerReady(true);
+          setCameraError(null);
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        console.error('Camera scanner init error:', err);
+        const errStr = String(err?.message || err).toLowerCase();
+        if (
+          errStr.includes('permission') ||
+          errStr.includes('notallowed') ||
+          errStr.includes('denied')
+        ) {
+          setCameraError('Akses kamera ditolak. Mohon izinkan akses kamera di pengaturan browser Anda.');
+        } else {
+          setCameraError('Akses kamera tidak tersedia atau tidak diizinkan. Mohon izinkan akses kamera di pengaturan browser Anda.');
+        }
+        setIsScannerReady(false);
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      isMounted = false;
+      if (html5QrCode) {
+        try {
+          const state = html5QrCode.getState?.();
+          if (state === 2 || state === 3) {
+            html5QrCode.stop().then(() => {
+              try { html5QrCode.clear(); } catch (e) {}
+            }).catch(() => {
+              try { html5QrCode.clear(); } catch (e) {}
+            });
+          } else {
+            try { html5QrCode.clear(); } catch (e) {}
+          }
+        } catch (e) {
+          try { html5QrCode.clear(); } catch (err) {}
+        }
+      }
+    };
+  }, [isOpen, handleScanSuccess]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in">
@@ -542,35 +716,75 @@ export function BarcodeScannerModal({ isOpen, onClose, onScannedItem }) {
             <h3 className="font-extrabold text-sm text-white">Scanner Barcode Supermarket</h3>
           </div>
           <button 
+            type="button"
             onClick={() => { playTapSound(); onClose(); }}
-            className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center"
+            className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Viewfinder Camera Simulation */}
-        <div className="w-full my-4 relative bg-slate-950 rounded-2xl h-44 overflow-hidden border border-slate-800 flex items-center justify-center">
-          <div className="w-48 h-28 border-2 border-emerald-400/80 rounded-xl relative flex items-center justify-center">
-            {/* Red Laser Scanning Line */}
-            <div className="w-full h-0.5 bg-red-500 shadow-[0_0_8px_#ef4444] animate-pulse" />
+        {/* Status Toast Banner Notifikasi */}
+        {toastMessage && (
+          <div className={`w-full mt-3 p-2.5 rounded-xl text-xs font-bold text-center animate-fade-in ${
+            toastMessage.type === 'success'
+              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+              : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+          }`}>
+            {toastMessage.text}
           </div>
-          <span className="absolute bottom-2 text-[10px] text-slate-400 font-mono">
-            Arahkan kamera ke barcode kemasan barang
-          </span>
+        )}
+
+        {/* Live Camera Viewfinder Feed */}
+        <div className="w-full my-3 relative bg-slate-950 rounded-2xl h-48 sm:h-52 overflow-hidden border border-slate-800 flex items-center justify-center">
+          <div id="barcode-live-camera-feed" className="w-full h-full object-cover [&_video]:w-full [&_video]:h-full [&_video]:object-cover" />
+
+          {/* Scanner Overlay Box & Red Laser (aktif saat kamera hidup) */}
+          {!cameraError && (
+            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+              <div className="w-48 h-28 border-2 border-emerald-400/80 rounded-xl relative flex items-center justify-center shadow-[0_0_12px_rgba(52,211,153,0.3)]">
+                {/* Red Laser Scanning Line */}
+                <div className="w-full h-0.5 bg-red-500 shadow-[0_0_8px_#ef4444] animate-pulse" />
+              </div>
+              <span className="mt-2 text-[10px] text-slate-300 font-mono bg-slate-900/80 px-2.5 py-0.5 rounded-full border border-slate-700">
+                Arahkan kamera ke barcode kemasan barang
+              </span>
+            </div>
+          )}
+
+          {/* Camera Permission Denied / Error State */}
+          {cameraError && (
+            <div className="absolute inset-0 p-4 bg-slate-950/95 flex flex-col items-center justify-center text-center z-10">
+              <AlertTriangle className="w-7 h-7 text-amber-400 mb-2" />
+              <p className="text-xs text-amber-200 font-semibold px-2 mb-2 leading-relaxed">
+                {cameraError}
+              </p>
+              <span className="text-[10px] text-slate-400">
+                Gunakan "Mode Simulasi (Developer)" di bawah untuk memindai tanpa kamera.
+              </span>
+            </div>
+          )}
+
+          {/* Initializing Spinner */}
+          {!isScannerReady && !cameraError && (
+            <div className="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center space-y-2 z-10">
+              <Loader2 className="w-7 h-7 text-emerald-400 animate-spin" />
+              <span className="text-xs text-slate-400 font-medium">Menghubungkan live camera...</span>
+            </div>
+          )}
         </div>
 
-        {/* Barcode Quick Select */}
+        {/* Barcode Fallback: Mode Simulasi (Developer) */}
         <div className="w-full space-y-1.5">
-          <span className="text-[11px] font-bold text-slate-300">Pilih Barcode Deteksi Cepat:</span>
+          <div className="flex items-center justify-between pb-0.5">
+            <span className="text-[11px] font-bold text-slate-300">Mode Simulasi (Developer)</span>
+            <span className="text-[9px] text-emerald-400/90 font-mono">Klik manual untuk tes</span>
+          </div>
           {sampleBarcodes.map((item) => (
             <button
               key={item.code}
-              onClick={() => {
-                playSuccessSound();
-                onScannedItem(item);
-                onClose();
-              }}
+              type="button"
+              onClick={() => handleScanSuccess(item.code)}
               className="w-full p-2.5 bg-slate-800/90 hover:bg-slate-700/90 rounded-xl text-left flex items-center justify-between border border-slate-700 transition-colors cursor-pointer"
             >
               <div>

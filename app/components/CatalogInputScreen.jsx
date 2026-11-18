@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Store, 
   Scan, 
@@ -21,6 +21,77 @@ import { GROCERY_PRODUCTS } from '../data/groceryData';
 import { getProductEmoji, ProductEmojiBox, PriceFluctuationBadge } from '../utils/emoji';
 import { generateDefaultPrices } from '../../src/lib/supabaseClient';
 import { getItemStorePrice } from '../utils/storePrices';
+
+/**
+ * Hook untuk mengaktifkan Mouse Drag to Scroll pada kontainer horizontal
+ */
+function useDraggableScroll(ref, onScrollCallback) {
+  const isDownRef = useRef(false);
+  const startXRef = useRef(0);
+  const scrollLeftRef = useRef(0);
+  const hasMovedRef = useRef(false);
+
+  const onMouseDown = (e) => {
+    if (e.button !== 0) return;
+    const el = ref.current;
+    if (!el) return;
+    isDownRef.current = true;
+    hasMovedRef.current = false;
+    startXRef.current = e.pageX - el.offsetLeft;
+    scrollLeftRef.current = el.scrollLeft;
+    el.style.cursor = 'grabbing';
+    el.style.userSelect = 'none';
+  };
+
+  const onMouseLeave = () => {
+    if (!isDownRef.current) return;
+    isDownRef.current = false;
+    const el = ref.current;
+    if (el) {
+      el.style.cursor = '';
+      el.style.removeProperty('user-select');
+    }
+  };
+
+  const onMouseUp = () => {
+    if (!isDownRef.current) return;
+    isDownRef.current = false;
+    const el = ref.current;
+    if (el) {
+      el.style.cursor = '';
+      el.style.removeProperty('user-select');
+    }
+  };
+
+  const onMouseMove = (e) => {
+    if (!isDownRef.current) return;
+    const el = ref.current;
+    if (!el) return;
+    e.preventDefault();
+    const x = e.pageX - el.offsetLeft;
+    const walk = (x - startXRef.current) * 1.5;
+    if (Math.abs(walk) > 4) {
+      hasMovedRef.current = true;
+    }
+    el.scrollLeft = scrollLeftRef.current - walk;
+    if (onScrollCallback) onScrollCallback();
+  };
+
+  const onClickCapture = (e) => {
+    if (hasMovedRef.current) {
+      e.stopPropagation();
+      hasMovedRef.current = false;
+    }
+  };
+
+  return {
+    onMouseDown,
+    onMouseLeave,
+    onMouseUp,
+    onMouseMove,
+    onClickCapture
+  };
+}
 
 export default function CatalogInputScreen({
   currentStore = 'Lotte Mart Grocery - Puri Indah',
@@ -46,6 +117,38 @@ export default function CatalogInputScreen({
   
   // Validation state
   const [errorMessage, setErrorMessage] = useState('');
+
+  // 1. Referensi React (useRef) untuk kontainer Sering Dibeli & Kategori Barang
+  const frequentItemsRef = useRef(null);
+  const categoryItemsRef = useRef(null);
+
+  // 2. State & Event Listener untuk Indikator Progress Bilah Gulir Visual
+  const [frequentScrollProgress, setFrequentScrollProgress] = useState(0);
+  const [categoryScrollProgress, setCategoryScrollProgress] = useState(0);
+
+  const handleScroll = (ref, setProgress) => {
+    const el = ref?.current;
+    if (!el) return;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    if (maxScroll <= 0) {
+      setProgress(0);
+      return;
+    }
+    const progress = Math.min(100, Math.max(0, (el.scrollLeft / maxScroll) * 100));
+    setProgress(progress);
+  };
+
+  const frequentDrag = useDraggableScroll(frequentItemsRef, () => {
+    handleScroll(frequentItemsRef, setFrequentScrollProgress);
+  });
+  const categoryDrag = useDraggableScroll(categoryItemsRef, () => {
+    handleScroll(categoryItemsRef, setCategoryScrollProgress);
+  });
+
+  useEffect(() => {
+    handleScroll(frequentItemsRef, setFrequentScrollProgress);
+    handleScroll(categoryItemsRef, setCategoryScrollProgress);
+  }, []);
 
   // Skenario Uji 4 (SRS F-04): 3 Mock Items Wajib
   const srsMockItems = [
@@ -446,8 +549,13 @@ export default function CatalogInputScreen({
             )}
           </div>
 
-          {/* Tag Barang Sering Dibeli (Horizontal Scroll / Swipeable Carousel) */}
-          <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-2 pt-2 w-full no-scrollbar scrollbar-hide [&::-webkit-scrollbar]:hidden text-[10px]">
+          {/* Tag Barang Sering Dibeli (Horizontal Scroll / Swipeable Carousel + Mouse Drag) */}
+          <div 
+            ref={frequentItemsRef}
+            onScroll={() => handleScroll(frequentItemsRef, setFrequentScrollProgress)}
+            {...frequentDrag}
+            className="flex overflow-x-auto whitespace-nowrap gap-2 pb-1 pt-2 w-full no-scrollbar scrollbar-hide [&::-webkit-scrollbar]:hidden text-[10px] cursor-grab active:cursor-grabbing select-none"
+          >
             {quickItems.map((item, idx) => (
               <button
                 key={idx}
@@ -460,9 +568,22 @@ export default function CatalogInputScreen({
               </button>
             ))}
           </div>
+
+          {/* Visual Scroll Indicator untuk Tag Barang Sering Dibeli (Tanpa Tombol) */}
+          <div className="w-full flex justify-center mt-1.5 mb-3">
+            <div className="w-28 sm:w-32 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-teal-600 rounded-full transition-all duration-150 ease-out"
+                style={{ 
+                  width: '30%',
+                  transform: `translateX(${((frequentScrollProgress || 0) / 100) * 233}%)`
+                }} 
+              />
+            </div>
+          </div>
         </div>
 
-        {/* Kategori Barang (Horizontal Scroll / Swipeable Carousel) */}
+        {/* Kategori Barang (Horizontal Scroll / Swipeable Carousel + Mouse Drag) */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs font-bold text-slate-800">
@@ -472,7 +593,12 @@ export default function CatalogInputScreen({
               Geser ke samping →
             </span>
           </div>
-          <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-2 w-full no-scrollbar scrollbar-hide [&::-webkit-scrollbar]:hidden">
+          <div 
+            ref={categoryItemsRef}
+            onScroll={() => handleScroll(categoryItemsRef, setCategoryScrollProgress)}
+            {...categoryDrag}
+            className="flex overflow-x-auto whitespace-nowrap gap-2 pb-1 w-full no-scrollbar scrollbar-hide [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing select-none"
+          >
             {CATEGORY_ITEMS.map((cat) => {
               const isActive = category === cat.id;
               return (
@@ -498,6 +624,19 @@ export default function CatalogInputScreen({
                 </button>
               );
             })}
+          </div>
+
+          {/* Visual Scroll Indicator untuk Kategori Barang (Tanpa Tombol) */}
+          <div className="w-full flex justify-center mt-1.5 mb-3">
+            <div className="w-28 sm:w-32 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-teal-600 rounded-full transition-all duration-150 ease-out"
+                style={{ 
+                  width: '30%',
+                  transform: `translateX(${((categoryScrollProgress || 0) / 100) * 233}%)`
+                }} 
+              />
+            </div>
           </div>
         </div>
 

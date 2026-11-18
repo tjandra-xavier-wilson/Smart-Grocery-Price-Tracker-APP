@@ -45,7 +45,7 @@ import {
   deleteCustomProduct
 } from '../src/lib/supabaseClient';
 import { toIndoDisplayDate, toISODateString } from './utils/date';
-import { playTapSound, playSuccessSound } from './utils/sound';
+import { playTapSound, playSuccessSound, playBarcodeBeep } from './utils/sound';
 import { getProductImage } from './utils/emoji';
 import { getItemStorePrice } from './utils/storePrices';
 
@@ -296,6 +296,7 @@ export default function Home() {
     {
       id: 'base-1',
       name: 'Beras 5kg',
+      barcode: '899275300101',
       price: 74000,
       lastMonthPrice: 68000,
       category: 'Bahan Pokok',
@@ -476,6 +477,7 @@ export default function Home() {
     {
       id: 'base-13',
       name: 'Deterjen Rinso Cair 750ml',
+      barcode: '899450239019',
       price: 21500,
       lastMonthPrice: 20000,
       category: 'Peralatan Kebersihan',
@@ -486,6 +488,70 @@ export default function Home() {
         'Super Indo - Pesanggrahan': { current: 20900, history: 22900 },
         'Hypermart - Puri Mall': { current: 21000, history: 21000 },
         'Indogrosir Daan Mogot': { current: 18500, history: 17500 }
+      }
+    },
+    {
+      id: 'base-14',
+      name: 'Beras Premium Rojolele 5kg',
+      barcode: '899275300101',
+      price: 74000,
+      lastMonthPrice: 68000,
+      category: 'Bahan Pokok',
+      unit: 'karung / 5kg',
+      isCustom: false,
+      prices: {
+        'Lotte Mart - Puri Indah': { current: 74000, history: 68000 },
+        'Super Indo - Pesanggrahan': { current: 71900, history: 74900 },
+        'Hypermart - Puri Mall': { current: 73000, history: 73000 },
+        'Indogrosir Daan Mogot': { current: 67000, history: 62000 }
+      }
+    },
+    {
+      id: 'base-15',
+      name: 'Minyak Goreng Sania 2L',
+      barcode: '899100120045',
+      price: 33500,
+      lastMonthPrice: 35000,
+      category: 'Bahan Pokok',
+      unit: 'pouch / 2L',
+      isCustom: false,
+      prices: {
+        'Lotte Mart - Puri Indah': { current: 33500, history: 35000 },
+        'Super Indo - Pesanggrahan': { current: 33000, history: 34000 },
+        'Hypermart - Puri Mall': { current: 33500, history: 33500 },
+        'Indogrosir Daan Mogot': { current: 31500, history: 32000 }
+      }
+    },
+    {
+      id: 'base-16',
+      name: 'Susu UHT Full Cream Greenfields 1L',
+      barcode: '899300511029',
+      price: 21500,
+      lastMonthPrice: 21500,
+      category: 'Minuman',
+      unit: 'kotak / 1L',
+      isCustom: false,
+      prices: {
+        'Lotte Mart - Puri Indah': { current: 21500, history: 21500 },
+        'Super Indo - Pesanggrahan': { current: 21000, history: 21000 },
+        'Hypermart - Puri Mall': { current: 21500, history: 21500 },
+        'Indogrosir Daan Mogot': { current: 19500, history: 19500 }
+      }
+    },
+    {
+      id: 'base-17',
+      name: 'Sabun Mandi Dettol Reff 450ml',
+      barcode: '899450239018',
+      price: 28500,
+      lastMonthPrice: 29000,
+      category: 'Peralatan Kebersihan',
+      unit: 'pouch / 450ml',
+      isCustom: false,
+      prices: {
+        'Lotte Mart - Puri Indah': { current: 28500, history: 29000 },
+        'Super Indo - Pesanggrahan': { current: 28000, history: 28500 },
+        'Hypermart - Puri Mall': { current: 28500, history: 28500 },
+        'Indogrosir Daan Mogot': { current: 26000, history: 26000 }
       }
     }
   ], []);
@@ -1997,16 +2063,37 @@ export default function Home() {
     }
   };
 
-  // Barcode scanned item
+  // Auto-Detect & Add to Cart untuk Pemindai Barcode
   const handleBarcodeScanned = (scanned) => {
-    setInputInitialValues({
-      name: scanned.name,
-      price: scanned.price,
-      category: scanned.category,
-      unit: scanned.unit,
-      quantity: 1
-    });
-    setActiveTab('input');
+    if (!scanned) return;
+
+    let targetItem = null;
+    let barcodeCode = '';
+
+    if (typeof scanned === 'string') {
+      barcodeCode = scanned.trim();
+      targetItem = recommendedItems.find(
+        (i) => String(i.barcode || i.code || i.id || '').trim() === barcodeCode
+      );
+    } else if (typeof scanned === 'object') {
+      targetItem = scanned;
+      barcodeCode = scanned.barcode || scanned.code || '';
+    }
+
+    if (targetItem) {
+      playBarcodeBeep();
+      const rawPrice = Number(String(targetItem.price || targetItem.base_price || 0).replace(/[^0-9]/g, ''));
+      const itemToAdd = {
+        ...targetItem,
+        barcode: targetItem.barcode || barcodeCode,
+        price: rawPrice,
+        prices: targetItem.prices || generateDefaultPrices(rawPrice),
+        quantity: 1
+      };
+      handleAddToCart(itemToAdd);
+    } else {
+      alert(`Barcode [${barcodeCode}] tidak dikenali. Silakan input manual sebagai barang kustom.`);
+    }
   };
 
   // Checkout Save & Double Submit Prevention (Evaluasi Dinamis Berdasarkan Toko Terpilih)
@@ -2357,6 +2444,8 @@ export default function Home() {
                   isOpen={isBarcodeModalOpen}
                   onClose={() => setIsBarcodeModalOpen(false)}
                   onScannedItem={handleBarcodeScanned}
+                  catalogItems={recommendedItems}
+                  onAddToCart={handleAddToCart}
                 />
 
                 <ReceiptDetailModal

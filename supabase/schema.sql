@@ -65,6 +65,8 @@ CREATE TABLE IF NOT EXISTS public.products (
   name TEXT NOT NULL,
   category TEXT DEFAULT 'Bahan Pokok',
   unit TEXT DEFAULT 'pcs',
+  barcode TEXT,
+  base_price NUMERIC DEFAULT 0,
   prices JSONB DEFAULT '{}'::jsonb,
   is_custom BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -346,9 +348,15 @@ CREATE TABLE IF NOT EXISTS public.products (
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     category TEXT NOT NULL,
+    barcode TEXT,
+    base_price NUMERIC DEFAULT 0,
     is_custom BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Migrasi adaptif kolom barcode & base_price
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS barcode TEXT;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS base_price NUMERIC DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_products_user_id ON public.products (user_id);
 CREATE INDEX IF NOT EXISTS idx_products_created_at ON public.products (created_at DESC);

@@ -1320,6 +1320,7 @@ export async function insertCustomProduct(productData) {
     isCustom: true,
     price: productData.price,
     base_price: productData.base_price ?? productData.price,
+    barcode: productData.barcode || null,
     user_id: targetUserId || null
   };
 
@@ -1343,12 +1344,21 @@ export async function insertCustomProduct(productData) {
       category: payload.category || 'Bahan Pokok',
       is_custom: true,
       user_id: payload.user_id,
-      base_price: rawPrice
+      base_price: rawPrice,
+      barcode: payload.barcode || null
     };
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('products')
       .insert([insertPayload])
       .select();
+
+    if (error && (error.message?.includes('barcode') || error.code === '42703' || error.code === 'PGRST204')) {
+      const fallbackPayload = { ...insertPayload };
+      delete fallbackPayload.barcode;
+      const res = await supabase.from('products').insert([fallbackPayload]).select();
+      data = res.data;
+      error = res.error;
+    }
 
     if (!error && data?.[0]) {
       payload.id = data[0].id;
@@ -1426,6 +1436,7 @@ export async function getCustomProducts(userId = null) {
             price: rawPrice,
             base_price: rawPrice,
             prices,
+            barcode: item.barcode || localItem?.barcode || null,
             isCustom: true,
             historyPrice: null,
             lastMonthPrice: null

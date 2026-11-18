@@ -72,6 +72,31 @@ export function playSuccessSound() {
   } catch (e) {}
 }
 
+export function playBarcodeBeep() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1760, ctx.currentTime); // High-pitched 1.76kHz supermarket scanner beep
+
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.12);
+
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(60);
+    }
+  } catch (e) {}
+}
+
 export function playWarningBeep() {
   try {
     const ctx = getAudioContext();
