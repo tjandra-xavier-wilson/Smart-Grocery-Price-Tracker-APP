@@ -201,6 +201,16 @@ export function StoreModal({
     }
   });
 
+  // Pastikan currentStore jika kustom tetap muncul di daftar pilihan HP & Laptop
+  if (currentStore && !isDefaultStore(currentStore) && !allStoreMap.has(currentStore.toLowerCase())) {
+    allStoreMap.set(currentStore.toLowerCase(), {
+      id: `custom-${currentStore}`,
+      name: currentStore,
+      store_name: currentStore,
+      isCustom: true
+    });
+  }
+
   const allStores = Array.from(allStoreMap.values());
 
   const handleSaveNewStore = async () => {
@@ -224,25 +234,23 @@ export function StoreModal({
     }
   };
 
-  const handleDeleteStore = async (e, item) => {
+  const [storeToDeletePrompt, setStoreToDeletePrompt] = useState(null);
+
+  const handleDeleteStore = (e, item) => {
     e.stopPropagation();
     if (deletingStoreId) return;
+    setStoreToDeletePrompt(item);
+  };
 
+  const executeDeleteStore = async (item) => {
+    if (!item || deletingStoreId) return;
     const storeId = item.id;
     const storeName = item.store_name || item.name;
-
-    // 1. Dialog Konfirmasi Peringatan Hapus Toko Kustom
-    const confirmed = window.confirm(
-      `Apakah Anda yakin ingin menghapus lokasi toko '${storeName}'? Riwayat transaksi di toko ini tidak akan terhapus, tetapi lokasi ini akan hilang dari pilihan. Tindakan ini tidak dapat dibatalkan.`
-    );
-    if (!confirmed) {
-      return;
-    }
 
     setDeletingStoreId(storeId);
     playTapSound();
 
-    // 2. Logika Hapus: Eksekusi delete ke tabel custom_stores Supabase
+    // 1. Logika Hapus: Eksekusi delete ke tabel custom_stores Supabase
     try {
       if (storeId && !String(storeId).startsWith('custom-store-') && !String(storeId).startsWith('local-')) {
         await supabase.from('custom_stores').delete().eq('id', storeId);
@@ -251,18 +259,19 @@ export function StoreModal({
       console.warn('[deleteCustomStore error]:', err);
     }
 
-    // 3. Panggil handler parent untuk update state lokal & LocalStorage
+    // 2. Panggil handler parent untuk update state lokal & LocalStorage & Realtime Broadcast
     if (onDeleteCustomStore) {
       await onDeleteCustomStore(item);
     }
 
-    // 4. Fallback Aktif: Jika toko yang dihapus kebetulan sedang menjadi selectedSupermarket aktif,
+    // 3. Fallback Aktif: Jika toko yang dihapus kebetulan sedang menjadi selectedSupermarket aktif,
     // otomatis ubah selectedSupermarket kembali ke "Lotte Mart - Puri Indah" agar aplikasi tidak error
     if (store === storeName || currentStore === storeName) {
       setStore('Lotte Mart - Puri Indah');
     }
 
     setDeletingStoreId(null);
+    setStoreToDeletePrompt(null);
   };
 
   return (
@@ -440,6 +449,58 @@ export function StoreModal({
             Terapkan Perubahan
           </button>
         </div>
+
+        {/* Modal Konfirmasi Peringatan Hapus Lokasi Supermarket */}
+        {storeToDeletePrompt && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4 animate-fade-in">
+            <div 
+              className="w-full max-w-[340px] bg-white rounded-3xl p-5 shadow-2xl border border-rose-100 animate-slide-up text-center space-y-3"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-12 h-12 mx-auto rounded-full bg-rose-100 text-rose-600 flex items-center justify-center ring-4 ring-rose-50">
+                <Trash2 className="w-6 h-6" />
+              </div>
+
+              <div>
+                <h3 className="font-extrabold text-sm text-slate-900">
+                  Hapus Lokasi Supermarket?
+                </h3>
+                <p className="text-[11px] text-slate-600 mt-1.5 leading-relaxed">
+                  Apakah Anda yakin ingin menghapus lokasi toko <strong>&apos;{storeToDeletePrompt.store_name || storeToDeletePrompt.name}&apos;</strong>? Lokasi ini akan dihapus dari pilihan di laptop dan HP secara seketika.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={deletingStoreId === storeToDeletePrompt.id}
+                  onClick={() => {
+                    playTapSound();
+                    setStoreToDeletePrompt(null);
+                  }}
+                  className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={deletingStoreId === storeToDeletePrompt.id}
+                  onClick={() => executeDeleteStore(storeToDeletePrompt)}
+                  className="w-full py-2 px-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center space-x-1 cursor-pointer"
+                >
+                  {deletingStoreId === storeToDeletePrompt.id ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Menghapus...</span>
+                    </>
+                  ) : (
+                    <span>Hapus Lokasi</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

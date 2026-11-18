@@ -530,17 +530,39 @@ export default function Home() {
       isCustom: true
     };
 
+    let nextStores = [];
     setCustomSupermarkets(prev => {
       const exists = prev.some(s => (typeof s === 'string' ? s : s.name || s.store_name) === cleanName);
-      if (exists) return prev;
-      return [...prev, tempStoreObj];
+      if (exists) {
+        nextStores = prev;
+        return prev;
+      }
+      nextStores = [...prev, tempStoreObj];
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(nextStores));
+      }
+      return nextStores;
     });
 
     // 2. Otomatis atur toko yang baru dibuat sebagai selectedSupermarket yang aktif
     setCurrentStore(cleanName);
-    persistState(undefined, undefined, cleanName);
+    persistState(undefined, undefined, cleanName, undefined, nextStores);
 
-    // 3. Simpan permanen ke Supabase tabel custom_stores
+    // 3. Multi-device Broadcast Instan via Supabase Realtime WebSocket (0 DELAY)
+    try {
+      supabaseSyncChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'REALTIME_STORE_CHANGE',
+        payload: {
+          action: 'ADD_STORE',
+          store: tempStoreObj,
+          allStores: nextStores,
+          selectedStore: cleanName
+        }
+      });
+    } catch (e) {}
+
+    // 4. Simpan permanen ke Supabase Cloud (tabel custom_stores & Cloud Sync Hub)
     try {
       const res = await insertCustomStore(cleanName, currentUser?.id);
       if (res && res.data && res.data.id) {
@@ -569,69 +591,54 @@ export default function Home() {
     const storeId = typeof storeToDelete === 'object' ? storeToDelete.id : null;
     const storeName = typeof storeToDelete === 'string' ? storeToDelete : (storeToDelete.name || storeToDelete.store_name);
 
-    // 1. Logika Hapus: Eksekusi delete ke Supabase tabel custom_stores
-    let isSuccess = false;
+    // 1. Optimistic remove dari state lokal customSupermarkets
+    let remainingStores = [];
+    setCustomSupermarkets(prev => {
+      remainingStores = prev.filter(s => {
+        const sId = typeof s === 'object' ? s.id : null;
+        const sName = typeof s === 'string' ? s : (s.name || s.store_name);
+        if (storeId && sId === storeId) return false;
+        if (storeName && sName === storeName) return false;
+        return true;
+      });
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(remainingStores));
+      }
+      return remainingStores;
+    });
+
+    // 2. Fallback Aktif: Jika toko yang dihapus kebetulan sedang menjadi selectedSupermarket aktif,
+    // otomatis ubah selectedSupermarket kembali ke "Lotte Mart - Puri Indah"
+    const nextStore = currentStore === storeName ? 'Lotte Mart - Puri Indah' : currentStore;
+    if (currentStore === storeName) {
+      setCurrentStore('Lotte Mart - Puri Indah');
+      persistState(undefined, undefined, 'Lotte Mart - Puri Indah', undefined, remainingStores);
+    }
+
+    // 3. Multi-device Broadcast Instan via Supabase Realtime WebSocket (0 DELAY)
     try {
-      let query = supabase.from('custom_stores').delete();
-      if (storeId && !String(storeId).startsWith('store-') && !String(storeId).startsWith('custom-') && !String(storeId).startsWith('local-')) {
-        query = query.eq('id', storeId);
-      } else if (storeName) {
-        query = query.eq('store_name', storeName);
-      }
-      if (currentUser?.id) {
-        query = query.eq('user_id', currentUser.id);
-      }
-      const { error, status } = await query;
-      if (!error && (status === 200 || status === 204 || status === null || status === undefined)) {
-        isSuccess = true;
-      }
+      supabaseSyncChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'REALTIME_STORE_CHANGE',
+        payload: {
+          action: 'DELETE_STORE',
+          storeName: storeName,
+          storeId: storeId,
+          allStores: remainingStores,
+          selectedStore: nextStore
+        }
+      });
+    } catch (e) {}
+
+    // 4. Hapus dari Supabase Cloud (tabel custom_stores & Cloud Sync Hub)
+    try {
+      await deleteCustomStore(storeId, storeName, currentUser?.id);
     } catch (e) {
       console.warn('[Delete Custom Store Error]:', e);
     }
-
-    // Jika gagal di server dan bukan data lokal sementara, batalkan mutasi state
-    if (!isSuccess && storeId && !String(storeId).startsWith('store-') && !String(storeId).startsWith('local-')) {
-      alert('Gagal menghapus toko dari server Supabase.');
-      return;
-    }
-
-    // 2. Hapus dari LocalStorage
-    if (typeof localStorage !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('sakugrosir_custom_stores_v1');
-        if (stored) {
-          let list = JSON.parse(stored);
-          list = list.filter(item => {
-            if (typeof item === 'string') return item !== storeName;
-            const sName = item.store_name || item.name;
-            const sId = item.id;
-            if (storeId && sId === storeId) return false;
-            if (storeName && sName === storeName) return false;
-            return true;
-          });
-          localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(list));
-        }
-      } catch (e) {}
-    }
-
-    // 3. Hapus dari state lokal customSupermarkets
-    setCustomSupermarkets(prev => prev.filter(s => {
-      const sId = typeof s === 'object' ? s.id : null;
-      const sName = typeof s === 'string' ? s : (s.name || s.store_name);
-      if (storeId && sId === storeId) return false;
-      if (storeName && sName === storeName) return false;
-      return true;
-    }));
-
-    // 4. Fallback Aktif: Jika toko yang dihapus kebetulan sedang menjadi selectedSupermarket aktif,
-    // otomatis ubah selectedSupermarket kembali ke "Lotte Mart - Puri Indah" agar aplikasi tidak error
-    if (currentStore === storeName) {
-      setCurrentStore('Lotte Mart - Puri Indah');
-      persistState(undefined, undefined, 'Lotte Mart - Puri Indah');
-    }
   };
 
-  // Handler simpan barang kustom baru: Optimistic UI + Insert Supabase
+  // Handler simpan barang kustom baru: Optimistic UI + Realtime Broadcast + Supabase Cloud
   const handleAddCustomProduct = async (productData) => {
     const defaultPrices = productData.prices || generateDefaultPrices(productData.price);
     const newProductObj = {
@@ -648,10 +655,30 @@ export default function Home() {
     };
 
     // Optimistic UI: langsung tampil di Rekomendasi Belanja & Autocomplete seketika
-    setCustomProducts(prev => [newProductObj, ...(prev || []).filter(p => p.name.toLowerCase() !== newProductObj.name.toLowerCase())]);
+    let nextProducts = [];
+    setCustomProducts(prev => {
+      nextProducts = [newProductObj, ...(prev || []).filter(p => p.name.toLowerCase() !== newProductObj.name.toLowerCase())];
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(nextProducts));
+      }
+      return nextProducts;
+    });
     setRecommendedItems(prev => [newProductObj, ...(prev || []).filter(p => p.name.toLowerCase() !== newProductObj.name.toLowerCase())]);
 
-    // Insert ke tabel products Supabase di latar belakang
+    // Multi-device Broadcast Instan via Supabase Realtime WebSocket (0 DELAY)
+    try {
+      supabaseSyncChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'REALTIME_PRODUCT_CHANGE',
+        payload: {
+          action: 'ADD_PRODUCT',
+          product: newProductObj,
+          allProducts: nextProducts
+        }
+      });
+    } catch (e) {}
+
+    // Insert ke Supabase Cloud
     try {
       const res = await insertCustomProduct({
         ...newProductObj,
@@ -667,47 +694,38 @@ export default function Home() {
     }
   };
 
-  // Handler hapus barang kustom: Supabase + LocalStorage + State recommendedItems & customProducts
+  // Handler hapus barang kustom: Supabase + LocalStorage + Realtime Broadcast + State recommendedItems & customProducts
   const handleDeleteCustomProduct = async (itemId, itemName) => {
-    let isSuccess = false;
+    let remainingProducts = [];
+    setCustomProducts(prev => {
+      remainingProducts = (prev || []).filter(p => p.id !== itemId && p.name !== itemName);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(remainingProducts));
+      }
+      return remainingProducts;
+    });
+    setRecommendedItems(prev => (prev || []).filter(p => p.id !== itemId && p.name !== itemName));
+
+    // Multi-device Broadcast Instan via Supabase Realtime WebSocket (0 DELAY)
     try {
-      let query = supabase.from('products').delete();
-      if (itemId && !String(itemId).startsWith('prod-') && !String(itemId).startsWith('local-')) {
-        query = query.eq('id', itemId);
-      } else if (itemName) {
-        query = query.eq('name', itemName);
-      }
-      if (currentUser?.id) {
-        query = query.eq('user_id', currentUser.id);
-      }
-      const { error, status } = await query;
-      if (!error && (status === 200 || status === 204 || status === null || status === undefined)) {
-        isSuccess = true;
-      }
+      supabaseSyncChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'REALTIME_PRODUCT_CHANGE',
+        payload: {
+          action: 'DELETE_PRODUCT',
+          itemId: itemId,
+          itemName: itemName,
+          allProducts: remainingProducts
+        }
+      });
+    } catch (e) {}
+
+    // Delete dari Supabase Cloud
+    try {
+      await deleteCustomProduct(itemId, itemName, currentUser?.id);
     } catch (e) {
       console.warn('[Delete Custom Product Error]:', e);
     }
-
-    // Jika gagal di server dan bukan data lokal sementara, batalkan mutasi state
-    if (!isSuccess && itemId && !String(itemId).startsWith('prod-') && !String(itemId).startsWith('local-')) {
-      alert('Gagal menghapus barang dari server Supabase.');
-      return;
-    }
-
-    // LocalStorage fallback sync
-    if (typeof localStorage !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('sakugrosir_custom_products_v1');
-        if (stored) {
-          const list = JSON.parse(stored);
-          const filtered = list.filter(p => p.id !== itemId && p.name !== itemName);
-          localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(filtered));
-        }
-      } catch (e) {}
-    }
-
-    setCustomProducts(prev => (prev || []).filter(p => p.id !== itemId && p.name !== itemName));
-    setRecommendedItems(prev => (prev || []).filter(p => p.id !== itemId && p.name !== itemName));
   };
 
   // Refresh / Fetch Ulang Data Custom Products & Stores saat dibutuhkan
@@ -1202,6 +1220,42 @@ export default function Home() {
           if (typeof localStorage !== 'undefined') {
             localStorage.setItem(STORAGE_KEYS.STORE, data.store);
           }
+          // Jika lokasi adalah kustom, pastikan otomatis masuk ke pilihan customSupermarkets di HP/Laptop
+          setCustomSupermarkets(prev => {
+            const isDef = ['Lotte Mart - Puri Indah', 'Lotte Mart Grocery - Puri Indah', 'Super Indo - Pesanggrahan', 'Hypermart - Puri Mall', 'Indogrosir Daan Mogot'].some(
+              d => d.toLowerCase() === data.store.toLowerCase()
+            );
+            if (!isDef && !prev.some(s => (typeof s === 'string' ? s : s.name || s.store_name).toLowerCase() === data.store.toLowerCase())) {
+              const newCustom = {
+                id: 'store-' + Date.now(),
+                name: data.store,
+                store_name: data.store,
+                isCustom: true
+              };
+              const updated = [...prev, newCustom];
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(updated));
+              }
+              return updated;
+            }
+            return prev;
+          });
+        }
+        if (data.customStores && Array.isArray(data.customStores)) {
+          setCustomSupermarkets(data.customStores);
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(data.customStores));
+          }
+        }
+        if (data.customProducts && Array.isArray(data.customProducts)) {
+          setCustomProducts(data.customProducts);
+          setRecommendedItems(prev => {
+            const baseItems = prev.filter(i => !i.isCustom);
+            return [...data.customProducts.map(p => ({ ...p, isCustom: true })), ...baseItems];
+          });
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(data.customProducts));
+          }
         }
         if (data.date) {
           setTransactionDate(data.date);
@@ -1210,6 +1264,112 @@ export default function Home() {
           }
         }
         setSyncStatus('Realtime Multi-Device Live');
+      })
+      .on('broadcast', { event: 'REALTIME_STORE_CHANGE' }, (payload) => {
+        const data = payload?.payload;
+        if (!data || isLocalMutatingRef.current) return;
+        console.log('⚡ [Realtime Store Change Event]:', data);
+
+        if (data.action === 'ADD_STORE') {
+          if (data.allStores && Array.isArray(data.allStores)) {
+            setCustomSupermarkets(data.allStores);
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(data.allStores));
+            }
+          } else if (data.store) {
+            setCustomSupermarkets(prev => {
+              const sName = data.store.name || data.store.store_name;
+              if (prev.some(s => (typeof s === 'string' ? s : s.name || s.store_name).toLowerCase() === sName.toLowerCase())) {
+                return prev;
+              }
+              const updated = [...prev, data.store];
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(updated));
+              }
+              return updated;
+            });
+          }
+          if (data.selectedStore) {
+            setCurrentStore(data.selectedStore);
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(STORAGE_KEYS.STORE, data.selectedStore);
+            }
+          }
+        } else if (data.action === 'DELETE_STORE') {
+          if (data.allStores && Array.isArray(data.allStores)) {
+            setCustomSupermarkets(data.allStores);
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(data.allStores));
+            }
+          } else {
+            setCustomSupermarkets(prev => {
+              const updated = prev.filter(s => {
+                const sId = typeof s === 'object' ? s.id : null;
+                const sName = typeof s === 'string' ? s : (s.name || s.store_name);
+                if (data.storeId && sId === data.storeId) return false;
+                if (data.storeName && sName === data.storeName) return false;
+                return true;
+              });
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(updated));
+              }
+              return updated;
+            });
+          }
+          if (data.selectedStore) {
+            setCurrentStore(data.selectedStore);
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(STORAGE_KEYS.STORE, data.selectedStore);
+            }
+          }
+        }
+      })
+      .on('broadcast', { event: 'REALTIME_PRODUCT_CHANGE' }, (payload) => {
+        const data = payload?.payload;
+        if (!data || isLocalMutatingRef.current) return;
+        console.log('⚡ [Realtime Product Change Event]:', data);
+
+        if (data.action === 'ADD_PRODUCT') {
+          if (data.allProducts && Array.isArray(data.allProducts)) {
+            setCustomProducts(data.allProducts);
+            setRecommendedItems(prev => {
+              const baseItems = prev.filter(i => !i.isCustom);
+              return [...data.allProducts.map(p => ({ ...p, isCustom: true })), ...baseItems];
+            });
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(data.allProducts));
+            }
+          } else if (data.product) {
+            setCustomProducts(prev => {
+              const updated = [data.product, ...(prev || []).filter(p => p.name.toLowerCase() !== data.product.name.toLowerCase())];
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(updated));
+              }
+              return updated;
+            });
+            setRecommendedItems(prev => [data.product, ...(prev || []).filter(p => p.name.toLowerCase() !== data.product.name.toLowerCase())]);
+          }
+        } else if (data.action === 'DELETE_PRODUCT') {
+          if (data.allProducts && Array.isArray(data.allProducts)) {
+            setCustomProducts(data.allProducts);
+            setRecommendedItems(prev => {
+              const baseItems = prev.filter(i => !i.isCustom);
+              return [...data.allProducts.map(p => ({ ...p, isCustom: true })), ...baseItems];
+            });
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(data.allProducts));
+            }
+          } else {
+            setCustomProducts(prev => {
+              const updated = (prev || []).filter(p => p.id !== data.itemId && p.name !== data.itemName);
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(updated));
+              }
+              return updated;
+            });
+            setRecommendedItems(prev => (prev || []).filter(p => p.id !== data.itemId && p.name !== data.itemName));
+          }
+        }
       })
       .on('broadcast', { event: 'REALTIME_CHECKOUT_EVENT' }, () => {
         // Multi-device: Ambil history terupdate dari cloud dan kosongkan keranjang aktif
@@ -1391,7 +1551,7 @@ export default function Home() {
   }, [activeTab, currentUser]);
 
   // Broadcast & Save changes to LocalStorage & Realtime Cloud (Multi-Device Sync)
-  const persistState = (newCart, newBudget, newStore, newDate) => {
+  const persistState = (newCart, newBudget, newStore, newDate, newCustomStores, newCustomProducts) => {
     if (typeof localStorage === 'undefined') return;
 
     const rawCart = newCart !== undefined ? newCart : cartItems;
@@ -1402,6 +1562,8 @@ export default function Home() {
     const finalBudget = newBudget !== undefined ? newBudget : budgetLimit;
     const finalStore = newStore !== undefined ? newStore : currentStore;
     const finalDate = newDate !== undefined ? newDate : transactionDate;
+    const finalCustomStores = newCustomStores !== undefined ? newCustomStores : customSupermarkets;
+    const finalCustomProducts = newCustomProducts !== undefined ? newCustomProducts : customProducts;
 
     if (newCart !== undefined) {
       localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(finalCart));
@@ -1418,6 +1580,12 @@ export default function Home() {
     if (newDate !== undefined) {
       localStorage.setItem(STORAGE_KEYS.DATE, newDate);
     }
+    if (newCustomStores !== undefined) {
+      localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(newCustomStores));
+    }
+    if (newCustomProducts !== undefined) {
+      localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(newCustomProducts));
+    }
 
     // Flag mutasi lokal sementara agar listener realtime tidak memicu echo-loop
     isLocalMutatingRef.current = true;
@@ -1428,10 +1596,12 @@ export default function Home() {
       budget: finalBudget,
       store: finalStore,
       date: finalDate,
+      customStores: finalCustomStores,
+      customProducts: finalCustomProducts,
       timestamp: Date.now()
     };
 
-    // 1. Broadcast ke perangkat lain seketika via Supabase Realtime WebSocket
+    // 1. Broadcast ke perangkat lain seketika via Supabase Realtime WebSocket (0 DELAY)
     try {
       supabaseSyncChannelRef.current?.send({
         type: 'broadcast',

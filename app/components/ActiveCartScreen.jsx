@@ -63,6 +63,8 @@ export default function ActiveCartScreen({
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [deletingItemId, setDeletingItemId] = useState(null);
+  const [itemToDeleteFromCart, setItemToDeleteFromCart] = useState(null);
+  const [customProductToDelete, setCustomProductToDelete] = useState(null);
 
   // Sinkronisasi otomatis saat komponen dimuat
   useEffect(() => {
@@ -656,16 +658,14 @@ export default function ActiveCartScreen({
     }
   };
 
-  // Handler Hapus Barang Kustom: konfirmasi spesifik -> delete ke Supabase -> update state
-  const handleDeleteProduct = async (prod) => {
+  // Handler Hapus Barang Kustom: Peringatan Konfirmasi -> Delete Supabase -> Realtime Multi-Device Sync
+  const handleDeleteProduct = (prod) => {
     if (deletingItemId) return;
-    const confirmed = window.confirm(
-      `Apakah Anda yakin ingin menghapus barang '${prod.name}' dari katalog? Barang ini akan hilang secara permanen dari daftar rekomendasi Anda.`
-    );
-    if (!confirmed) {
-      return;
-    }
+    setCustomProductToDelete(prod);
+  };
 
+  const executeDeleteProduct = async (prod) => {
+    if (!prod || deletingItemId) return;
     setDeletingItemId(prod.id);
     playTapSound();
     const itemId = prod.id;
@@ -682,6 +682,7 @@ export default function ActiveCartScreen({
     }
 
     setDeletingItemId(null);
+    setCustomProductToDelete(null);
   };
 
   // Render Product Card (Horizontal List Layout with Full Emoji Box & Dynamic Store Pricing)
@@ -1417,7 +1418,7 @@ export default function ActiveCartScreen({
                     <button
                       onClick={() => {
                         playTapSound();
-                        onRemoveItem(item.id);
+                        setItemToDeleteFromCart(item);
                       }}
                       className="absolute top-2.5 right-2.5 p-1 text-slate-300 hover:text-rose-600 transition-colors cursor-pointer"
                       title="Hapus Barang"
@@ -1517,6 +1518,125 @@ export default function ActiveCartScreen({
           </div>
         )}
       </div>
+
+      {/* 8. MODAL PERINGATAN HAPUS BARANG DARI KERANJANG BELANJA (SETELAH DIINPUT) */}
+      {itemToDeleteFromCart && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4 animate-fade-in">
+          <div 
+            className="w-full max-w-[350px] bg-white rounded-3xl p-5 shadow-2xl border border-rose-100 animate-slide-up text-center space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 mx-auto rounded-full bg-rose-100 text-rose-600 flex items-center justify-center ring-4 ring-rose-50">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h3 className="font-extrabold text-sm text-slate-900">
+                Hapus Barang Belanjaan?
+              </h3>
+              <p className="text-[11px] text-slate-600 mt-1.5 leading-relaxed">
+                Apakah Anda yakin ingin menghapus barang <strong>&apos;{itemToDeleteFromCart.name}&apos;</strong> dari keranjang belanja?
+              </p>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-2.5 text-left space-y-0.5">
+              <div className="text-xs font-bold text-slate-900">{itemToDeleteFromCart.name}</div>
+              <div className="text-[11px] text-slate-500 font-medium">
+                {itemToDeleteFromCart.quantity || 1} {itemToDeleteFromCart.unit || 'pcs'} • Rp {Number(itemToDeleteFromCart.price || 0).toLocaleString('id-ID')}
+              </div>
+              <div className="text-xs font-black text-rose-600">
+                Total: Rp {((Number(itemToDeleteFromCart.price) || 0) * (Number(itemToDeleteFromCart.quantity) || 1)).toLocaleString('id-ID')}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  playTapSound();
+                  setItemToDeleteFromCart(null);
+                }}
+                className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  playTapSound();
+                  const targetId = itemToDeleteFromCart.id;
+                  setItemToDeleteFromCart(null);
+                  onRemoveItem(targetId);
+                }}
+                className="w-full py-2 px-3 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center space-x-1 cursor-pointer"
+              >
+                <span>Hapus</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 9. MODAL PERINGATAN HAPUS BARANG KUSTOM DARI REKOMENDASI BELANJA */}
+      {customProductToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4 animate-fade-in">
+          <div 
+            className="w-full max-w-[350px] bg-white rounded-3xl p-5 shadow-2xl border border-rose-100 animate-slide-up text-center space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 mx-auto rounded-full bg-rose-100 text-rose-600 flex items-center justify-center ring-4 ring-rose-50">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h3 className="font-extrabold text-sm text-slate-900">
+                Hapus Barang Kustom?
+              </h3>
+              <p className="text-[11px] text-slate-600 mt-1.5 leading-relaxed">
+                Apakah Anda yakin ingin menghapus barang kustom <strong>&apos;{customProductToDelete.name}&apos;</strong> dari rekomendasi belanja? Barang ini akan hilang secara permanen di laptop &amp; HP.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-2.5 text-left space-y-0.5">
+              <div className="text-xs font-bold text-slate-900">{customProductToDelete.name}</div>
+              <div className="text-[11px] text-slate-500 font-medium">
+                Kategori: {customProductToDelete.category || 'Bahan Pokok'} • Satuan: {customProductToDelete.unit || 'pcs'}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                disabled={deletingItemId === customProductToDelete.id}
+                onClick={() => {
+                  playTapSound();
+                  setCustomProductToDelete(null);
+                }}
+                className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={deletingItemId === customProductToDelete.id}
+                onClick={async () => {
+                  await executeDeleteProduct(customProductToDelete);
+                }}
+                className="w-full py-2 px-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center space-x-1 cursor-pointer"
+              >
+                {deletingItemId === customProductToDelete.id ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Menghapus...</span>
+                  </>
+                ) : (
+                  <span>Hapus Permanen</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

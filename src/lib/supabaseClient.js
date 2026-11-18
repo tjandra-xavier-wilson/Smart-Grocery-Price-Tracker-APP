@@ -338,6 +338,9 @@ export async function getShoppingHistoryList(userId = null) {
     }
 
     let data = rawData || [];
+    // Filter ketat: Abaikan row sinkronisasi internal aplikasi (##sakugrosir_custom_config##)
+    data = data.filter(row => !row.notes || !row.notes.startsWith('##sakugrosir_custom_config##'));
+
     // Filter ketat berdasarkan identitas pengguna (tag ##uid:...## di notes atau kolom user_id)
     // Mencegah data bleeding antar akun Google
     if (targetUserId) {
@@ -1207,8 +1210,68 @@ export function generateDefaultPrices(basePrice = 10000) {
   };
 }
 
+export const CONFIG_TAG = '##sakugrosir_custom_config##';
+
 /**
- * Simpan barang custom baru ke tabel products Supabase dengan fallback LocalStorage
+ * Mengambil konfigurasi custom stores dan custom products dari Cloud Supabase
+ */
+export async function fetchCloudCustomConfig() {
+  try {
+    const { data, error } = await supabase
+      .from('grocery_history')
+      .select('id, notes, created_at')
+      .ilike('notes', `${CONFIG_TAG}%`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data || !data.notes) return null;
+    const jsonStr = data.notes.slice(CONFIG_TAG.length);
+    const parsed = JSON.parse(jsonStr);
+    return { id: data.id, ...parsed };
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Menyimpan konfigurasi custom stores dan custom products ke Cloud Supabase
+ */
+export async function saveCloudCustomConfig(config) {
+  try {
+    const existing = await fetchCloudCustomConfig();
+    const today = (function() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+
+    const payload = {
+      shopping_date: today,
+      total_spent: 0,
+      notes: CONFIG_TAG + JSON.stringify({
+        stores: config.stores || [],
+        products: config.products || []
+      })
+    };
+
+    if (existing && existing.id) {
+      await supabase
+        .from('grocery_history')
+        .update(payload)
+        .eq('id', existing.id);
+    } else {
+      await supabase
+        .from('grocery_history')
+        .insert([payload]);
+    }
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
+ * Simpan barang custom baru ke tabel products Supabase & Cloud Sync Hub dengan fallback LocalStorage
  */
 export async function insertCustomProduct(productData) {
   if (!productData || !productData.name) {
@@ -1233,47 +1296,67 @@ export async function insertCustomProduct(productData) {
   }
 
   const pricesObj = productData.prices || generateDefaultPrices(productData.price);
+  const tempId = productData.id || ('prod-' + Date.now());
 
   const payload = {
+    id: tempId,
     name: productData.name.trim(),
     category: productData.category || 'Bahan Pokok',
     unit: productData.unit || 'pcs',
     prices: pricesObj,
     is_custom: true,
+    isCustom: true,
+    price: productData.price,
     user_id: targetUserId || null
   };
 
-  // Simpan ke offline fallback LocalStorage
+  // 1. Simpan ke offline fallback LocalStorage
   if (typeof localStorage !== 'undefined') {
     try {
       const stored = localStorage.getItem('sakugrosir_custom_products_v1');
       const list = stored ? JSON.parse(stored) : [];
-      const itemWithId = { ...payload, id: productData.id || ('prod-' + Date.now()) };
-      list.unshift(itemWithId);
-      localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(list));
+      const filtered = list.filter(p => p.name.toLowerCase() !== payload.name.toLowerCase());
+      filtered.unshift(payload);
+      localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(filtered));
     } catch (e) {}
   }
 
+  // 2. Simpan ke Supabase tabel products jika tabel sudah ada di PostgreSQL
   try {
     const { data, error } = await supabase
       .from('products')
-      .insert([payload])
+      .insert([{
+        name: payload.name,
+        category: payload.category,
+        unit: payload.unit,
+        prices: payload.prices,
+        is_custom: true,
+        user_id: payload.user_id
+      }])
       .select();
 
-    if (error) {
-      console.warn('[Supabase insertCustomProduct] Table insert error (fallback used):', error.message);
-      return { success: true, fallback: true, data: payload };
+    if (!error && data?.[0]) {
+      payload.id = data[0].id;
     }
+  } catch (err) {}
 
-    return { success: true, data: data?.[0] || payload };
-  } catch (err) {
-    console.warn('[Supabase insertCustomProduct] Network error (fallback used):', err.message);
-    return { success: true, fallback: true, data: payload };
-  }
+  // 3. Simpan ke Cloud Sync Hub di Supabase (grocery_history config) untuk persistensi multi-device
+  try {
+    const cloudConfig = await fetchCloudCustomConfig();
+    const currentProds = cloudConfig?.products || [];
+    const filtered = currentProds.filter(p => p.name.toLowerCase() !== payload.name.toLowerCase());
+    filtered.unshift(payload);
+    await saveCloudCustomConfig({
+      stores: cloudConfig?.stores || [],
+      products: filtered
+    });
+  } catch (e) {}
+
+  return { success: true, data: payload };
 }
 
 /**
- * Mengambil daftar barang custom / produk dari tabel products Supabase & LocalStorage
+ * Mengambil daftar barang custom / produk dari Supabase Cloud & LocalStorage
  */
 export async function getCustomProducts(userId = null) {
   let localList = [];
@@ -1284,37 +1367,69 @@ export async function getCustomProducts(userId = null) {
     } catch (e) {}
   }
 
+  const byName = new Map();
+
+  // 1. Coba ambil dari tabel products Supabase
   try {
     let query = supabase.from('products').select('*').order('created_at', { ascending: false });
     if (userId) {
       query = query.eq('user_id', userId);
     }
     const { data, error } = await query;
-    if (error || !data || data.length === 0) {
-      return localList;
+    if (!error && data && data.length > 0) {
+      data.forEach(item => {
+        if (item && item.name) {
+          byName.set(item.name.toLowerCase(), {
+            ...item,
+            isCustom: true,
+            historyPrice: null,
+            lastMonthPrice: null
+          });
+        }
+      });
     }
+  } catch (err) {}
 
-    // Merge data dari cloud dengan lokal
-    const byName = new Map();
-    [...data, ...localList].forEach(item => {
-      if (item && item.name && !byName.has(item.name.toLowerCase())) {
-        byName.set(item.name.toLowerCase(), {
-          ...item,
-          isCustom: true,
-          historyPrice: null,
-          lastMonthPrice: null
-        });
-      }
-    });
+  // 2. Ambil dari Supabase Cloud Sync Hub jika tabel belum ada atau kosong
+  try {
+    const cloudConfig = await fetchCloudCustomConfig();
+    if (cloudConfig?.products && Array.isArray(cloudConfig.products)) {
+      cloudConfig.products.forEach(item => {
+        if (item && item.name && !byName.has(item.name.toLowerCase())) {
+          byName.set(item.name.toLowerCase(), {
+            ...item,
+            isCustom: true,
+            historyPrice: null,
+            lastMonthPrice: null
+          });
+        }
+      });
+    }
+  } catch (e) {}
 
-    return Array.from(byName.values());
-  } catch (err) {
-    return localList;
+  // 3. Merge dengan local fallback
+  localList.forEach(item => {
+    if (item && item.name && !byName.has(item.name.toLowerCase())) {
+      byName.set(item.name.toLowerCase(), {
+        ...item,
+        isCustom: true,
+        historyPrice: null,
+        lastMonthPrice: null
+      });
+    }
+  });
+
+  const merged = Array.from(byName.values());
+  if (typeof localStorage !== 'undefined' && merged.length > 0) {
+    try {
+      localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(merged));
+    } catch (e) {}
   }
+  return merged;
 }
 
 /**
- * Simpan Lokasi Supermarket Kustom ke Supabase (tabel custom_stores)
+ * Simpan Lokasi Supermarket Kustom ke Supabase & Cloud Sync Hub
  */
 export async function insertCustomStore(storeName, userId = null) {
   if (!storeName || !storeName.trim()) return { success: false, error: 'Nama toko tidak boleh kosong' };
@@ -1338,7 +1453,28 @@ export async function insertCustomStore(storeName, userId = null) {
   }
 
   const tempId = 'store-' + Date.now();
+  const normalizedItem = {
+    id: tempId,
+    store_name: cleanName,
+    name: cleanName,
+    user_id: targetUserId || null,
+    isCustom: true
+  };
 
+  // 1. Simpan ke offline storage fallback
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('sakugrosir_custom_stores_v1');
+      const list = stored ? JSON.parse(stored) : [];
+      const exists = list.some(item => (typeof item === 'string' ? item : item.store_name || item.name) === cleanName);
+      if (!exists) {
+        list.push(normalizedItem);
+        localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(list));
+      }
+    } catch (e) {}
+  }
+
+  // 2. Simpan ke Supabase tabel custom_stores jika tabel sudah ada di PostgreSQL
   try {
     const payload = {
       store_name: cleanName,
@@ -1350,42 +1486,30 @@ export async function insertCustomStore(storeName, userId = null) {
       .insert([payload])
       .select();
 
-    const created = data?.[0] || { id: tempId, store_name: cleanName, name: cleanName, isCustom: true };
-    const normalizedItem = {
-      id: created.id || tempId,
-      store_name: cleanName,
-      name: cleanName,
-      user_id: targetUserId || null,
-      isCustom: true
-    };
-
-    // Simpan ke offline storage fallback
-    if (typeof localStorage !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('sakugrosir_custom_stores_v1');
-        const list = stored ? JSON.parse(stored) : [];
-        const exists = list.some(item => (typeof item === 'string' ? item : item.store_name || item.name) === cleanName);
-        if (!exists) {
-          list.push(normalizedItem);
-          localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(list));
-        }
-      } catch (e) {}
+    if (!error && data?.[0]) {
+      normalizedItem.id = data[0].id;
     }
+  } catch (err) {}
 
-    if (error) {
-      console.warn('[insertCustomStore Supabase Warn]:', error.message);
-      return { success: true, store_name: cleanName, id: tempId, data: normalizedItem, offline: true };
+  // 3. Simpan ke Cloud Sync Hub di Supabase (grocery_history config) untuk persistensi multi-device
+  try {
+    const cloudConfig = await fetchCloudCustomConfig();
+    const currentStores = cloudConfig?.stores || [];
+    const exists = currentStores.some(s => (typeof s === 'string' ? s : s.name || s.store_name) === cleanName);
+    if (!exists) {
+      currentStores.push(normalizedItem);
+      await saveCloudCustomConfig({
+        stores: currentStores,
+        products: cloudConfig?.products || []
+      });
     }
+  } catch (e) {}
 
-    return { success: true, store_name: cleanName, id: normalizedItem.id, data: normalizedItem };
-  } catch (err) {
-    console.warn('[insertCustomStore Error]:', err.message);
-    return { success: true, store_name: cleanName, id: tempId, offline: true };
-  }
+  return { success: true, store_name: cleanName, id: normalizedItem.id, data: normalizedItem };
 }
 
 /**
- * Hapus Lokasi Supermarket Kustom dari Supabase (tabel custom_stores) & LocalStorage
+ * Hapus Lokasi Supermarket Kustom dari Supabase (tabel custom_stores & Cloud Sync) & LocalStorage
  */
 export async function deleteCustomStore(storeId, storeName = null, userId = null) {
   let targetUserId = userId;
@@ -1399,7 +1523,7 @@ export async function deleteCustomStore(storeId, storeName = null, userId = null
     } catch (e) {}
   }
 
-  // 1. Eksekusi delete ke Supabase terlebih dahulu
+  // 1. Eksekusi delete ke Supabase tabel custom_stores jika ada
   try {
     let query = supabase.from('custom_stores').delete();
     if (storeId && !String(storeId).startsWith('store-') && !String(storeId).startsWith('local-')) {
@@ -1410,17 +1534,29 @@ export async function deleteCustomStore(storeId, storeName = null, userId = null
     if (targetUserId) {
       query = query.eq('user_id', targetUserId);
     }
-    const { error } = await query;
-    if (error) {
-      console.warn('[deleteCustomStore Supabase Error]:', error.message);
-      return { success: false, error };
-    }
-  } catch (err) {
-    console.warn('[deleteCustomStore Error]:', err.message);
-    return { success: false, error: err };
-  }
+    await query;
+  } catch (err) {}
 
-  // 2. Bersihkan dari LocalStorage HANYA jika server berhasil
+  // 2. Hapus dari Cloud Sync Hub di Supabase
+  try {
+    const cloudConfig = await fetchCloudCustomConfig();
+    if (cloudConfig?.stores) {
+      const updatedStores = cloudConfig.stores.filter(s => {
+        if (typeof s === 'string') return s !== storeName;
+        const sName = s.store_name || s.name;
+        const sId = s.id;
+        if (storeId && sId === storeId) return false;
+        if (storeName && sName === storeName) return false;
+        return true;
+      });
+      await saveCloudCustomConfig({
+        stores: updatedStores,
+        products: cloudConfig.products || []
+      });
+    }
+  } catch (e) {}
+
+  // 3. Bersihkan dari LocalStorage
   if (typeof localStorage !== 'undefined') {
     try {
       const stored = localStorage.getItem('sakugrosir_custom_stores_v1');
@@ -1443,7 +1579,7 @@ export async function deleteCustomStore(storeId, storeName = null, userId = null
 }
 
 /**
- * Hapus Barang Kustom dari Supabase (tabel products) & LocalStorage
+ * Hapus Barang Kustom dari Supabase (tabel products & Cloud Sync) & LocalStorage
  */
 export async function deleteCustomProduct(productId, productName = null, userId = null) {
   let targetUserId = userId;
@@ -1457,7 +1593,7 @@ export async function deleteCustomProduct(productId, productName = null, userId 
     } catch (e) {}
   }
 
-  // 1. Eksekusi delete ke Supabase terlebih dahulu
+  // 1. Eksekusi delete ke Supabase tabel products jika ada
   try {
     let query = supabase.from('products').delete();
     if (productId && !String(productId).startsWith('prod-') && !String(productId).startsWith('local-')) {
@@ -1468,17 +1604,26 @@ export async function deleteCustomProduct(productId, productName = null, userId 
     if (targetUserId) {
       query = query.eq('user_id', targetUserId);
     }
-    const { error } = await query;
-    if (error) {
-      console.warn('[deleteCustomProduct Supabase Error]:', error.message);
-      return { success: false, error };
-    }
-  } catch (err) {
-    console.warn('[deleteCustomProduct Error]:', err.message);
-    return { success: false, error: err };
-  }
+    await query;
+  } catch (err) {}
 
-  // 2. Bersihkan dari LocalStorage HANYA jika server berhasil
+  // 2. Hapus dari Cloud Sync Hub di Supabase
+  try {
+    const cloudConfig = await fetchCloudCustomConfig();
+    if (cloudConfig?.products) {
+      const updatedProds = cloudConfig.products.filter(p => {
+        if (productId && p.id === productId) return false;
+        if (productName && p.name === productName) return false;
+        return true;
+      });
+      await saveCloudCustomConfig({
+        stores: cloudConfig.stores || [],
+        products: updatedProds
+      });
+    }
+  } catch (e) {}
+
+  // 3. Bersihkan dari LocalStorage
   if (typeof localStorage !== 'undefined') {
     try {
       const stored = localStorage.getItem('sakugrosir_custom_products_v1');
@@ -1498,7 +1643,7 @@ export async function deleteCustomProduct(productId, productName = null, userId 
 }
 
 /**
- * Ambil Daftar Supermarket Kustom dari Supabase (tabel custom_stores)
+ * Ambil Daftar Supermarket Kustom dari Supabase & LocalStorage
  */
 export async function getCustomStores(userId = null) {
   let localList = [];
@@ -1524,6 +1669,9 @@ export async function getCustomStores(userId = null) {
     } catch (e) {}
   }
 
+  const byName = new Map();
+
+  // 1. Coba ambil dari tabel custom_stores Supabase
   try {
     let targetUserId = userId;
     if (!targetUserId && typeof localStorage !== 'undefined') {
@@ -1547,36 +1695,69 @@ export async function getCustomStores(userId = null) {
       query = query.eq('user_id', targetUserId);
     }
     const { data, error } = await query;
-    if (error || !data || data.length === 0) {
-      return localList;
+    if (!error && data && data.length > 0) {
+      data.forEach(item => {
+        if (item && item.store_name) {
+          byName.set(item.store_name.toLowerCase(), {
+            id: item.id,
+            store_name: item.store_name,
+            name: item.store_name,
+            user_id: item.user_id,
+            created_at: item.created_at,
+            isCustom: true
+          });
+        }
+      });
     }
+  } catch (err) {}
 
-    const byName = new Map();
-    // Cloud data
-    data.forEach(item => {
-      if (item && item.store_name) {
-        byName.set(item.store_name.toLowerCase(), {
-          id: item.id,
-          store_name: item.store_name,
-          name: item.store_name,
-          user_id: item.user_id,
-          created_at: item.created_at,
-          isCustom: true
-        });
-      }
-    });
+  // 2. Ambil dari Supabase Cloud Sync Hub jika tabel belum ada atau kosong
+  try {
+    const cloudConfig = await fetchCloudCustomConfig();
+    if (cloudConfig?.stores && Array.isArray(cloudConfig.stores)) {
+      cloudConfig.stores.forEach(item => {
+        const key = (typeof item === 'string' ? item : (item.store_name || item.name || '')).toLowerCase();
+        if (key && !byName.has(key)) {
+          byName.set(key, typeof item === 'string' ? { id: `cloud-store-${key}`, name: item, store_name: item, isCustom: true } : { ...item, isCustom: true });
+        }
+      });
+    }
+  } catch (e) {}
 
-    // Merge offline local list if not already present from cloud
-    localList.forEach(item => {
-      const key = (item.store_name || item.name || '').toLowerCase();
-      if (key && !byName.has(key)) {
-        byName.set(key, item);
-      }
-    });
+  // 3. Gabungkan juga dari riwayat belanja terdahulu di Supabase
+  try {
+    const { data: histData } = await supabase.from('grocery_history').select('notes').order('created_at', { ascending: false }).limit(25);
+    if (histData && Array.isArray(histData)) {
+      const defaultStoreNames = ['lotte mart - puri indah', 'lotte mart grocery - puri indah', 'super indo - pesanggrahan', 'hypermart - puri mall', 'indogrosir daan mogot'];
+      histData.forEach(row => {
+        if (!row.notes || row.notes.startsWith('##sakugrosir_custom_config##')) return;
+        const cleanStoreName = row.notes.replace(/\s*##uid:[^#]+##\s*/g, '').trim();
+        if (cleanStoreName && !defaultStoreNames.includes(cleanStoreName.toLowerCase()) && !byName.has(cleanStoreName.toLowerCase())) {
+          byName.set(cleanStoreName.toLowerCase(), {
+            id: 'hist-store-' + cleanStoreName.replace(/\s+/g, '-').toLowerCase(),
+            name: cleanStoreName,
+            store_name: cleanStoreName,
+            isCustom: true
+          });
+        }
+      });
+    }
+  } catch (e) {}
 
-    return Array.from(byName.values());
-  } catch (err) {
-    return localList;
+  // 4. Merge offline local list if not already present from cloud
+  localList.forEach(item => {
+    const key = (item.store_name || item.name || '').toLowerCase();
+    if (key && !byName.has(key)) {
+      byName.set(key, item);
+    }
+  });
+
+  const merged = Array.from(byName.values());
+  if (typeof localStorage !== 'undefined' && merged.length > 0) {
+    try {
+      localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(merged));
+    } catch (e) {}
   }
+  return merged;
 }
 

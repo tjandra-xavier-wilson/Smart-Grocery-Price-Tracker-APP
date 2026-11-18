@@ -242,6 +242,12 @@ CREATE POLICY "Public insert custom_stores"
   ON public.custom_stores FOR INSERT 
   WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Public modify custom_stores" ON public.custom_stores;
+CREATE POLICY "Public modify custom_stores" 
+  ON public.custom_stores FOR ALL 
+  USING (true) 
+  WITH CHECK (true);
+
 -- ==============================================================================
 -- 7. TRIGGER AUTO UPDATE TIMESTAMP (budget_settings.updated_at)
 -- ==============================================================================
@@ -265,3 +271,36 @@ CREATE TRIGGER trigger_update_budget_settings_updated_at
 INSERT INTO public.budget_settings (monthly_budget_cap, warning_threshold)
 SELECT 500000, 0.8
 WHERE NOT EXISTS (SELECT 1 FROM public.budget_settings);
+
+-- ==============================================================================
+-- 9. REALTIME PUBLICATION UNTUK SINKRONISASI MULTI-PERANGKAT INSTAN (HP & LAPTOP)
+-- ==============================================================================
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.budget_settings;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.grocery_history;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.grocery_items;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.products;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.custom_stores;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.carts;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+  END IF;
+END $$;

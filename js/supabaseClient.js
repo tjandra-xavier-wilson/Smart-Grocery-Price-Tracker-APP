@@ -215,7 +215,8 @@
 
         if (error || !data) return [];
 
-        return data.map(row => {
+        const filteredRows = data.filter(r => !r.notes || !r.notes.startsWith('##sakugrosir_custom_config##'));
+        return filteredRows.map(row => {
           const dateObj = new Date(row.created_at || row.shopping_date);
           const timeStr = !isNaN(dateObj.getTime())
             ? dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB'

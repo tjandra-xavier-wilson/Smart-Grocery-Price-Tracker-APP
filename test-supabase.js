@@ -44,6 +44,12 @@ check(clientContent.includes('getBudgetSettings'), 'Helper menyediakan fungsi ge
 check(clientContent.includes('updateBudgetSettings'), 'Helper menyediakan fungsi updateBudgetSettings');
 check(clientContent.includes('insertCustomStore'), 'Helper menyediakan fungsi insertCustomStore untuk menyimpan toko kustom');
 check(clientContent.includes('getCustomStores'), 'Helper menyediakan fungsi getCustomStores untuk mengambil toko kustom');
+check(clientContent.includes('deleteCustomStore'), 'Helper menyediakan fungsi deleteCustomStore untuk menghapus toko kustom');
+check(clientContent.includes('insertCustomProduct'), 'Helper menyediakan fungsi insertCustomProduct untuk menyimpan barang kustom');
+check(clientContent.includes('getCustomProducts'), 'Helper menyediakan fungsi getCustomProducts untuk mengambil barang kustom');
+check(clientContent.includes('deleteCustomProduct'), 'Helper menyediakan fungsi deleteCustomProduct untuk menghapus barang kustom');
+check(clientContent.includes('fetchCloudCustomConfig'), 'Helper menyediakan fetchCloudCustomConfig untuk sinkronisasi cloud');
+check(clientContent.includes('saveCloudCustomConfig'), 'Helper menyediakan saveCloudCustomConfig untuk persistensi cloud');
 check(clientContent.includes('getOfflineLastPrice'), 'Helper menyediakan mekanisme offline fallback LocalStorage');
 
 // 3. Check Browser Helper (js/supabaseClient.js)
@@ -65,6 +71,21 @@ const vercelPath = path.join(__dirname, 'vercel.json');
 check(fs.existsSync(vercelPath), 'File vercel.json tersedia');
 const vercelConfig = JSON.parse(fs.readFileSync(vercelPath, 'utf8'));
 check(Array.isArray(vercelConfig.headers), 'vercel.json memuat konfigurasi headers PWA');
+
+// 6. Check Zero-Delay Realtime Multi-Device Sync & Deletion Warning Modals
+const pagePath = path.join(__dirname, 'app/page.jsx');
+const pageSrc = fs.readFileSync(pagePath, 'utf8');
+check(pageSrc.includes('REALTIME_STORE_CHANGE'), 'Realtime WebSocket broadcast menangani perubahan/penghapusan toko seketika');
+check(pageSrc.includes('REALTIME_PRODUCT_CHANGE'), 'Realtime WebSocket broadcast menangani perubahan/penghapusan barang kustom seketika');
+
+const modalsPath = path.join(__dirname, 'app/components/Modals.jsx');
+const modalsSrc = fs.readFileSync(modalsPath, 'utf8');
+check(modalsSrc.includes('storeToDeletePrompt'), 'StoreModal menyediakan dialog peringatan sebelum menghapus lokasi kustom');
+
+const cartPath = path.join(__dirname, 'app/components/ActiveCartScreen.jsx');
+const cartSrc = fs.readFileSync(cartPath, 'utf8');
+check(cartSrc.includes('itemToDeleteFromCart'), 'ActiveCartScreen menyediakan dialog peringatan sebelum menghapus barang belanja');
+check(cartSrc.includes('customProductToDelete'), 'ActiveCartScreen menyediakan dialog peringatan sebelum menghapus barang kustom');
 
 console.log('\n===============================================================');
 console.log(`🏁 HASIL INTEGRASI SUPABASE & DEPLOYMENT: ${pass} / ${total} LULUS!`);
