@@ -499,17 +499,28 @@ export default function Home() {
       const activeUserId = userId || currentUserRef.current?.id || currentUser?.id;
       const prods = await getCustomProducts(activeUserId);
       if (prods && Array.isArray(prods)) {
-        setCustomProducts(prods);
-        setRecommendedItems(prev => {
-          // baseDefaultItems adalah daftar master barang bawaan sistem
-          const baseList = baseDefaultItems.filter(item => !item.isCustom);
-          const customList = prods.map(p => ({
-            ...p,
+        // 1. Pemetaan (mapping) untuk mengonversi base_price kembali menjadi format objek prices
+        const formattedData = prods.map(item => {
+          const rawPrice = Number(String(item.base_price ?? item.price ?? 0).replace(/[^0-9]/g, ''));
+          return {
+            ...item,
+            price: rawPrice,
+            base_price: rawPrice,
             isCustom: true,
-            description: p.description || `Barang kustom: ${p.name}`
-          }));
-          // PENTING (SRS Fix): Barang kustom TETAP ADA di daftar rekomendasi meskipun sudah dimasukkan ke keranjang (No Cart Exclusion)
-          const combined = [...customList, ...baseList];
+            description: item.description || `Barang kustom: ${item.name}`,
+            // Rekonstruksi struktur harga agar tidak Rp 0 di fallback
+            prices: item.prices || generateDefaultPrices(rawPrice)
+          };
+        });
+
+        // 2. DEDUPLIKASI TOTAL (Penyelesaian Konflik State):
+        // Replace (timpa) seluruh state barang kustom dengan formattedData dari database.
+        // Buang seluruh item kustom lokal yang menggunakan tempId (fake ID).
+        setCustomProducts(formattedData);
+        setRecommendedItems(() => {
+          const baseList = baseDefaultItems.filter(item => !item.isCustom);
+          // Timpa seluruh barang kustom dengan data resmi dari Supabase (tanpa duplikasi tempId)
+          const combined = [...formattedData, ...baseList];
           return Array.from(new Map(combined.map(item => [item.name.toLowerCase(), item])).values());
         });
       }
@@ -720,7 +731,8 @@ export default function Home() {
         name: newProductObj.name,
         category: newProductObj.category,
         is_custom: true,
-        user_id: newProductObj.user_id
+        user_id: newProductObj.user_id,
+        base_price: rawPrice
       }])
       .select()
       .maybeSingle()
@@ -729,11 +741,11 @@ export default function Home() {
           console.warn('[Background sync notice]:', error.message);
         } else if (data && data.id) {
           // Ganti tempId dengan UUID resmi dari database
-          setCustomProducts(prev => prev.map(p => p.name.toLowerCase() === cleanName.toLowerCase() ? { ...p, id: data.id } : p));
-          setRecommendedItems(prev => prev.map(p => p.name.toLowerCase() === cleanName.toLowerCase() ? { ...p, id: data.id } : p));
+          setCustomProducts(prev => prev.map(p => p.name.toLowerCase() === cleanName.toLowerCase() ? { ...p, id: data.id, base_price: rawPrice } : p));
+          setRecommendedItems(prev => prev.map(p => p.name.toLowerCase() === cleanName.toLowerCase() ? { ...p, id: data.id, base_price: rawPrice } : p));
         }
         // Simpan juga ke cloud config & fallback
-        insertCustomProduct(newProductObj).catch(() => {});
+        insertCustomProduct({ ...newProductObj, base_price: rawPrice }).catch(() => {});
       })
       .catch((err) => {
         console.warn('[Background sync exception]:', err);

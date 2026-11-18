@@ -548,16 +548,29 @@ export default function ActiveCartScreen({
     const customMap = new Map();
     allCustom.forEach(p => {
       if (p && p.name) {
-        customMap.set(p.name.toLowerCase(), {
-          ...p,
-          categoryKey: normalizeCatKey(p.category),
-          categoryName: p.category || 'Bahan Pokok',
-          categoryEmoji: getProductEmoji(p.name, p.category),
-          description: p.description || `Barang kustom: ${p.name}`,
-          isCustom: true,
-          lastMonthPrice: p.lastMonthPrice || null,
-          historyPrice: p.historyPrice || null
-        });
+        const key = p.name.toLowerCase();
+        const existing = customMap.get(key);
+        const isRealUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(p.id));
+        const rawPrice = Number(String(p.base_price ?? p.price ?? existing?.price ?? 0).replace(/[^0-9]/g, ''));
+        const prices = p.prices || existing?.prices || generateDefaultPrices(rawPrice);
+
+        if (!existing || isRealUuid) {
+          customMap.set(key, {
+            ...(existing || {}),
+            ...p,
+            id: isRealUuid ? p.id : (existing?.id || p.id),
+            price: rawPrice,
+            base_price: rawPrice,
+            prices: prices,
+            categoryKey: normalizeCatKey(p.category),
+            categoryName: p.category || 'Bahan Pokok',
+            categoryEmoji: getProductEmoji(p.name, p.category),
+            description: p.description || `Barang kustom: ${p.name}`,
+            isCustom: true,
+            lastMonthPrice: null,
+            historyPrice: null
+          });
+        }
       }
     });
     const normalizedCustom = Array.from(customMap.values());

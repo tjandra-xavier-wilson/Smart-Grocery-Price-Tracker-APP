@@ -1324,11 +1324,13 @@ export async function insertCustomProduct(productData) {
 
   // 2. Simpan ke Supabase tabel products jika tabel sudah ada di PostgreSQL
   try {
+    const rawPrice = Number(String(payload.base_price ?? payload.price ?? 0).replace(/[^0-9]/g, ''));
     const insertPayload = {
       name: payload.name,
       category: payload.category || 'Bahan Pokok',
       is_custom: true,
-      user_id: payload.user_id
+      user_id: payload.user_id,
+      base_price: rawPrice
     };
     const { data, error } = await supabase
       .from('products')
@@ -1400,14 +1402,16 @@ export async function getCustomProducts(userId = null) {
         if (item && item.name) {
           const key = item.name.toLowerCase();
           const localItem = localList.find(l => l && l.name && l.name.toLowerCase() === key);
+          const rawPrice = Number(String(item.base_price ?? item.price ?? localItem?.price ?? 0).replace(/[^0-9]/g, ''));
           const unit = item.unit || localItem?.unit || 'pcs';
-          const price = item.price || localItem?.price || 0;
-          const prices = item.prices || localItem?.prices || generateDefaultPrices(price);
+          const prices = item.prices || generateDefaultPrices(rawPrice);
           byName.set(key, {
             ...localItem,
             ...item,
+            id: item.id, // ID asli dari Supabase
             unit,
-            price,
+            price: rawPrice,
+            base_price: rawPrice,
             prices,
             isCustom: true,
             historyPrice: null,

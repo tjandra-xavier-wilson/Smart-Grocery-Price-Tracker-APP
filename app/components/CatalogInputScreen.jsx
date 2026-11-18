@@ -273,6 +273,7 @@ export default function CatalogInputScreen({
         category: category,
         unit: unit,
         price: rawPrice,
+        base_price: rawPrice,
         originalPrice: rawPrice,
         prices: defaultPrices,
         isCustom: true
