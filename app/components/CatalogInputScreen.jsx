@@ -101,15 +101,37 @@ export default function CatalogInputScreen({
     ).slice(0, 8);
   }, [itemName, recommendedItems, allMasterItems]);
 
+  // Daftar Kategori Presisi Sesuai Standar Aplikasi
+  const PRODUCT_CATEGORIES = [
+    "Bahan Pokok",
+    "Sayur-sayuran",
+    "Buah-buahan",
+    "Daging & Lauk",
+    "Camilan",
+    "Minuman",
+    "Peralatan Kebersihan"
+  ];
+
+  const CATEGORY_ITEMS = [
+    { id: 'Bahan Pokok', label: 'Bahan Pokok', emoji: '🌾' },
+    { id: 'Sayur-sayuran', label: 'Sayur-sayuran', emoji: '🥬' },
+    { id: 'Buah-buahan', label: 'Buah-buahan', emoji: '🍎' },
+    { id: 'Daging & Lauk', label: 'Daging & Lauk', emoji: '🥩' },
+    { id: 'Camilan', label: 'Camilan', emoji: '🍪' },
+    { id: 'Minuman', label: 'Minuman', emoji: '🧃' },
+    { id: 'Peralatan Kebersihan', label: 'Peralatan Kebersihan', emoji: '🧼' }
+  ];
+
   const mapCategory = (rawCat) => {
     if (!rawCat) return 'Bahan Pokok';
     const cat = String(rawCat).toLowerCase();
     if (cat.includes('sembako') || cat.includes('pokok')) return 'Bahan Pokok';
-    if (cat.includes('sayur') || cat.includes('buah')) return 'Sayur & Buah';
-    if (cat.includes('daging') || cat.includes('ikan') || cat.includes('lauk')) return 'Daging & Ikan';
-    if (cat.includes('mandi') || cat.includes('bersih')) return 'Perlengkapan Mandi';
-    if (cat.includes('bumbu')) return 'Bumbu Dapur';
-    if (cat.includes('minum') || cat.includes('camilan') || cat.includes('snack')) return 'Minuman & Camilan';
+    if (cat.includes('sayur')) return 'Sayur-sayuran';
+    if (cat.includes('buah')) return 'Buah-buahan';
+    if (cat.includes('daging') || cat.includes('ikan') || cat.includes('lauk') || cat.includes('ayam')) return 'Daging & Lauk';
+    if (cat.includes('camilan') || cat.includes('snack') || cat.includes('biskuit') || cat.includes('roti')) return 'Camilan';
+    if (cat.includes('minum') || cat.includes('kopi') || cat.includes('teh') || cat.includes('susu') || cat.includes('jus')) return 'Minuman';
+    if (cat.includes('mandi') || cat.includes('bersih') || cat.includes('peralatan') || cat.includes('sabun') || cat.includes('cuci')) return 'Peralatan Kebersihan';
     return 'Bahan Pokok';
   };
 
@@ -143,8 +165,8 @@ export default function CatalogInputScreen({
     { name: 'Telur Ayam Ras 1kg', price: 28000, lastMonthPrice: 32000, category: 'Bahan Pokok', unit: '1 kg' },
     { name: 'Garam 500g', price: 5000, lastMonthPrice: 5000, category: 'Bahan Pokok', unit: '500g' },
     { name: 'Minyak Goreng Sawit 2L', price: 38500, lastMonthPrice: 35000, category: 'Bahan Pokok', unit: 'pouch/2L' },
-    { name: 'Susu UHT Ultra Milk 1L', price: 19500, lastMonthPrice: 21000, category: 'Bahan Pokok', unit: 'kotak/1L' },
-    { name: 'Sabun Mandi Dettol', price: 26500, lastMonthPrice: 29000, category: 'Perlengkapan Mandi', unit: 'pouch/400ml' }
+    { name: 'Susu UHT Ultra Milk 1L', price: 19500, lastMonthPrice: 21000, category: 'Minuman', unit: 'kotak/1L' },
+    { name: 'Sabun Mandi Dettol 450ml', price: 26500, lastMonthPrice: 29000, category: 'Peralatan Kebersihan', unit: 'pouch/400ml' }
   ];
 
   // Parse discounts from formula or preset
@@ -257,7 +279,7 @@ export default function CatalogInputScreen({
       price: calculatedUnitPrice,
       originalPrice: rawPrice,
       quantity: quantity,
-      isSecondary: category === 'Lainnya' || category === 'Minuman & Camilan',
+      isSecondary: category === 'Lainnya' || category === 'Minuman' || category === 'Camilan' || category === 'Minuman & Camilan',
       discountLabel: (d1 > 0 || d2 > 0) ? `${d1}%${d2 > 0 ? ` + ${d2}%` : ''}` : null,
       lastMonthPrice: effectiveLastMonth,
       historyPrice: effectiveLastMonth,
@@ -424,34 +446,34 @@ export default function CatalogInputScreen({
             )}
           </div>
 
-          {/* Quick chips below input */}
-          <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar pt-2 text-[10px]">
-            {quickItems.slice(0, 4).map((item, idx) => (
+          {/* Tag Barang Sering Dibeli (Horizontal Scroll / Swipeable Carousel) */}
+          <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-2 pt-2 w-full no-scrollbar scrollbar-hide [&::-webkit-scrollbar]:hidden text-[10px]">
+            {quickItems.map((item, idx) => (
               <button
                 key={idx}
                 type="button"
                 onClick={() => handleSelectQuickItem(item)}
-                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 rounded-full border border-slate-200/80 font-semibold flex items-center space-x-1 transition-colors shrink-0 cursor-pointer"
+                className="flex-shrink-0 whitespace-nowrap px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 rounded-full border border-slate-200/90 font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer"
               >
-                <span>{getProductEmoji(item.name, item.category)}</span>
-                <span>{item.name}</span>
+                <span className="text-sm flex-shrink-0">{getProductEmoji(item.name, item.category)}</span>
+                <span className="whitespace-nowrap">{item.name}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Kategori Barang (Segmented Horizontal Buttons) */}
+        {/* Kategori Barang (Horizontal Scroll / Swipeable Carousel) */}
         <div>
-          <span className="text-xs font-bold text-slate-800 mb-1.5 block">
-            Kategori Barang
-          </span>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-            {[
-              { id: 'Bahan Pokok', label: 'Bahan Pokok', icon: Check },
-              { id: 'Sayur & Buah', label: 'Sayur & Buah' },
-              { id: 'Daging & Ikan', label: 'Daging & Ikan' },
-              { id: 'Perlengkapan Mandi', label: 'Perlengkapan Mandi' },
-            ].map((cat) => {
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-bold text-slate-800">
+              Kategori Barang
+            </span>
+            <span className="text-[10px] text-slate-400 font-medium">
+              Geser ke samping →
+            </span>
+          </div>
+          <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-2 w-full no-scrollbar scrollbar-hide [&::-webkit-scrollbar]:hidden">
+            {CATEGORY_ITEMS.map((cat) => {
               const isActive = category === cat.id;
               return (
                 <button
@@ -461,14 +483,18 @@ export default function CatalogInputScreen({
                     playTapSound();
                     setCategory(cat.id);
                   }}
-                  className={`py-2 px-2 rounded-xl text-[11px] font-bold transition-all border flex items-center justify-center space-x-1 cursor-pointer ${
+                  className={`flex-shrink-0 py-2 px-3 rounded-xl text-xs font-bold transition-all border flex items-center justify-center space-x-1.5 cursor-pointer ${
                     isActive
                       ? 'bg-emerald-800 text-white border-emerald-900 shadow-2xs'
-                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
                   }`}
                 >
-                  {isActive && <Check className="w-3 h-3 stroke-[3]" />}
-                  <span className="truncate">{cat.label}</span>
+                  {isActive ? (
+                    <Check className="w-3.5 h-3.5 stroke-[3] flex-shrink-0" />
+                  ) : (
+                    <span className="text-xs flex-shrink-0">{cat.emoji}</span>
+                  )}
+                  <span className="whitespace-nowrap">{cat.label}</span>
                 </button>
               );
             })}

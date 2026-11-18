@@ -80,9 +80,9 @@ export default function ActiveCartScreen({
   const CART_CATEGORIES = [
     { id: 'all', name: 'Semua', emoji: '✨' },
     { id: 'sembako', name: 'Bahan Pokok', emoji: '🌾' },
-    { id: 'sayur', name: 'Sayuran Segar', emoji: '🥬' },
+    { id: 'sayur', name: 'Sayur-sayuran', emoji: '🥬' },
     { id: 'buah', name: 'Buah-buahan', emoji: '🍎' },
-    { id: 'daging', name: 'Daging dan Lauk', emoji: '🥩' },
+    { id: 'daging', name: 'Daging & Lauk', emoji: '🥩' },
     { id: 'camilan', name: 'Camilan', emoji: '🍪' },
     { id: 'minuman', name: 'Minuman', emoji: '🧃' },
     { id: 'kebersihan', name: 'Peralatan Kebersihan', emoji: '🧼' }
@@ -188,7 +188,7 @@ export default function ActiveCartScreen({
       ]
     },
     sayur: {
-      categoryName: 'Sayuran Segar',
+      categoryName: 'Sayur-sayuran',
       iconEmoji: '🥕',
       items: [
         {
@@ -290,7 +290,7 @@ export default function ActiveCartScreen({
       ]
     },
     daging: {
-      categoryName: 'Daging dan Lauk',
+      categoryName: 'Daging & Lauk',
       iconEmoji: '🥩',
       items: [
         {
