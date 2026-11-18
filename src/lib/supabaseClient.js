@@ -1320,22 +1320,29 @@ export async function insertCustomStore(storeName, userId = null) {
   if (!storeName || !storeName.trim()) return { success: false, error: 'Nama toko tidak boleh kosong' };
   const cleanName = storeName.trim();
 
-  // Simpan ke offline storage fallback
-  if (typeof localStorage !== 'undefined') {
+  let targetUserId = userId;
+  if (!targetUserId && typeof localStorage !== 'undefined') {
     try {
-      const stored = localStorage.getItem('sakugrosir_custom_stores_v1');
-      const list = stored ? JSON.parse(stored) : [];
-      if (!list.includes(cleanName)) {
-        list.push(cleanName);
-        localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(list));
+      const saved = localStorage.getItem('sakugrosir_single_user_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        targetUserId = parsed?.id;
       }
     } catch (e) {}
   }
+  if (!targetUserId) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      targetUserId = session?.user?.id;
+    } catch (e) {}
+  }
+
+  const tempId = 'store-' + Date.now();
 
   try {
     const payload = {
       store_name: cleanName,
-      user_id: userId || null
+      user_id: targetUserId || null
     };
 
     const { data, error } = await supabase
@@ -1343,15 +1350,120 @@ export async function insertCustomStore(storeName, userId = null) {
       .insert([payload])
       .select();
 
-    if (error) {
-      console.warn('[insertCustomStore Supabase Warn]:', error.message);
-      return { success: true, store_name: cleanName, offline: true };
+    const created = data?.[0] || { id: tempId, store_name: cleanName, name: cleanName, isCustom: true };
+    const normalizedItem = {
+      id: created.id || tempId,
+      store_name: cleanName,
+      name: cleanName,
+      user_id: targetUserId || null,
+      isCustom: true
+    };
+
+    // Simpan ke offline storage fallback
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('sakugrosir_custom_stores_v1');
+        const list = stored ? JSON.parse(stored) : [];
+        const exists = list.some(item => (typeof item === 'string' ? item : item.store_name || item.name) === cleanName);
+        if (!exists) {
+          list.push(normalizedItem);
+          localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(list));
+        }
+      } catch (e) {}
     }
 
-    return { success: true, store_name: cleanName, data: data?.[0] };
+    if (error) {
+      console.warn('[insertCustomStore Supabase Warn]:', error.message);
+      return { success: true, store_name: cleanName, id: tempId, data: normalizedItem, offline: true };
+    }
+
+    return { success: true, store_name: cleanName, id: normalizedItem.id, data: normalizedItem };
   } catch (err) {
     console.warn('[insertCustomStore Error]:', err.message);
-    return { success: true, store_name: cleanName, offline: true };
+    return { success: true, store_name: cleanName, id: tempId, offline: true };
+  }
+}
+
+/**
+ * Hapus Lokasi Supermarket Kustom dari Supabase (tabel custom_stores) & LocalStorage
+ */
+export async function deleteCustomStore(storeId, storeName = null) {
+  // 1. Hapus dari LocalStorage
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('sakugrosir_custom_stores_v1');
+      if (stored) {
+        let list = JSON.parse(stored);
+        list = list.filter(item => {
+          if (typeof item === 'string') return item !== storeName;
+          const sName = item.store_name || item.name;
+          const sId = item.id;
+          if (storeId && sId === storeId) return false;
+          if (storeName && sName === storeName) return false;
+          return true;
+        });
+        localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(list));
+      }
+    } catch (e) {}
+  }
+
+  // 2. Eksekusi delete ke Supabase
+  try {
+    let query = supabase.from('custom_stores').delete();
+    if (storeId && !String(storeId).startsWith('store-') && !String(storeId).startsWith('local-')) {
+      query = query.eq('id', storeId);
+    } else if (storeName) {
+      query = query.eq('store_name', storeName);
+    }
+    const { error } = await query;
+    if (error) {
+      console.warn('[deleteCustomStore Supabase Error]:', error.message);
+      return { success: false, error };
+    }
+    return { success: true };
+  } catch (err) {
+    console.warn('[deleteCustomStore Error]:', err.message);
+    return { success: false, error: err };
+  }
+}
+
+/**
+ * Hapus Barang Kustom dari Supabase (tabel products) & LocalStorage
+ */
+export async function deleteCustomProduct(productId, productName = null) {
+  // 1. Hapus dari LocalStorage
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('sakugrosir_custom_products_v1');
+      if (stored) {
+        let list = JSON.parse(stored);
+        list = list.filter(item => {
+          if (productId && item.id === productId) return false;
+          if (productName && item.name === productName) return false;
+          return true;
+        });
+        localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(list));
+      }
+    } catch (e) {}
+  }
+
+  // 2. Eksekusi delete ke Supabase
+  try {
+    let query = supabase.from('products').delete();
+    if (productId && !String(productId).startsWith('prod-') && !String(productId).startsWith('local-')) {
+      query = query.eq('id', productId);
+    } else if (productName) {
+      query = query.eq('name', productName);
+    }
+    const { error } = await query;
+    if (error) {
+      console.warn('[deleteCustomProduct Supabase Error]:', error.message);
+      return { success: false, error };
+    }
+    return { success: true };
+  } catch (err) {
+    console.warn('[deleteCustomProduct Error]:', err.message);
+    return { success: false, error: err };
   }
 }
 
@@ -1363,28 +1475,76 @@ export async function getCustomStores(userId = null) {
   if (typeof localStorage !== 'undefined') {
     try {
       const stored = localStorage.getItem('sakugrosir_custom_stores_v1');
-      if (stored) localList = JSON.parse(stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          localList = parsed.map((item, idx) => {
+            if (typeof item === 'string') {
+              return { id: `local-store-${idx}-${item}`, store_name: item, name: item, isCustom: true };
+            }
+            return {
+              id: item.id || `local-store-${idx}-${item.store_name || item.name}`,
+              store_name: item.store_name || item.name,
+              name: item.store_name || item.name,
+              isCustom: true
+            };
+          });
+        }
+      }
     } catch (e) {}
   }
 
   try {
+    let targetUserId = userId;
+    if (!targetUserId && typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('sakugrosir_single_user_v1');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          targetUserId = parsed?.id;
+        }
+      } catch (e) {}
+    }
+    if (!targetUserId) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        targetUserId = session?.user?.id;
+      } catch (e) {}
+    }
+
     let query = supabase.from('custom_stores').select('*').order('created_at', { ascending: true });
-    if (userId) {
-      query = query.or(`user_id.eq.${userId},user_id.is.null`);
+    if (targetUserId) {
+      query = query.or(`user_id.eq.${targetUserId},user_id.is.null`);
     }
     const { data, error } = await query;
     if (error || !data || data.length === 0) {
       return localList;
     }
 
-    const set = new Set(localList);
+    const byName = new Map();
+    // Cloud data
     data.forEach(item => {
       if (item && item.store_name) {
-        set.add(item.store_name);
+        byName.set(item.store_name.toLowerCase(), {
+          id: item.id,
+          store_name: item.store_name,
+          name: item.store_name,
+          user_id: item.user_id,
+          created_at: item.created_at,
+          isCustom: true
+        });
       }
     });
 
-    return Array.from(set);
+    // Merge offline local list if not already present from cloud
+    localList.forEach(item => {
+      const key = (item.store_name || item.name || '').toLowerCase();
+      if (key && !byName.has(key)) {
+        byName.set(key, item);
+      }
+    });
+
+    return Array.from(byName.values());
   } catch (err) {
     return localList;
   }

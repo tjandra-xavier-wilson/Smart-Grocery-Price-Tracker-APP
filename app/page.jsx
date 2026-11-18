@@ -38,7 +38,9 @@ import {
   getCustomProducts,
   generateDefaultPrices,
   insertCustomStore,
-  getCustomStores
+  getCustomStores,
+  deleteCustomStore,
+  deleteCustomProduct
 } from '../src/lib/supabaseClient';
 import { toIndoDisplayDate, toISODateString } from './utils/date';
 import { playTapSound, playSuccessSound } from './utils/sound';
@@ -272,7 +274,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('cart');
 
   // Core App State
-  const [currentStore, setCurrentStore] = useState('Lotte Mart Grocery - Puri Indah');
+  const [currentStore, setCurrentStore] = useState('Lotte Mart - Puri Indah');
   const [transactionDate, setTransactionDate] = useState('24 Mei 2025');
   const [budgetLimit, setBudgetLimit] = useState(350000);
   // State keranjang belanja terisolasi per akun (akun baru tanpa transaksi mulai dari state kosong [])
@@ -286,18 +288,43 @@ export default function Home() {
   // State Global untuk Lokasi Supermarket Kustom (Terintegrasi Supabase custom_stores)
   const [customSupermarkets, setCustomSupermarkets] = useState([]);
 
-  // Muat custom products dari Supabase / LocalStorage saat akun aktif
+  // Base catalog items bawaan
+  const baseDefaultItems = useMemo(() => [
+    { id: 'base-1', name: 'Beras 5kg', price: 74000, lastMonthPrice: 68000, category: 'Bahan Pokok', unit: '5kg', isCustom: false },
+    { id: 'base-2', name: 'Telur Ayam Ras 1kg', price: 28000, lastMonthPrice: 32000, category: 'Bahan Pokok', unit: '1 kg', isCustom: false },
+    { id: 'base-3', name: 'Garam 500g', price: 5000, lastMonthPrice: 5000, category: 'Bahan Pokok', unit: '500g', isCustom: false },
+    { id: 'base-4', name: 'Minyak Goreng Sawit Murni 2L', price: 38500, lastMonthPrice: 35000, category: 'Bahan Pokok', unit: '2L', isCustom: false },
+    { id: 'base-5', name: 'Gula Pasir Kristal Putih 1kg', price: 17500, lastMonthPrice: 17500, category: 'Bahan Pokok', unit: '1 kg', isCustom: false },
+    { id: 'base-6', name: 'Indomie Goreng (5 pcs)', price: 15500, lastMonthPrice: 15500, category: 'Bahan Pokok', unit: '5 pcs', isCustom: false },
+    { id: 'base-7', name: 'Susu UHT Ultra Milk 1L', price: 19500, lastMonthPrice: 21000, category: 'Bahan Pokok', unit: '1L', isCustom: false },
+    { id: 'base-8', name: 'Kecap Manis Bango 550ml', price: 24500, lastMonthPrice: 22000, category: 'Bumbu Dapur', unit: '550ml', isCustom: false },
+    { id: 'base-9', name: 'Bawang Merah Brebes 500g', price: 19000, lastMonthPrice: 22000, category: 'Bumbu Dapur', unit: '500g', isCustom: false },
+    { id: 'base-10', name: 'Bawang Putih Kating 500g', price: 22000, lastMonthPrice: 21000, category: 'Bumbu Dapur', unit: '500g', isCustom: false },
+    { id: 'base-11', name: 'Cabe Rawit Merah 250g', price: 18000, lastMonthPrice: 16000, category: 'Sayuran Segar', unit: '250g', isCustom: false },
+    { id: 'base-12', name: 'Sabun Mandi Dettol 400ml', price: 26500, lastMonthPrice: 29000, category: 'Peralatan Kebersihan', unit: '400ml', isCustom: false },
+    { id: 'base-13', name: 'Deterjen Rinso Cair 750ml', price: 21500, lastMonthPrice: 20000, category: 'Peralatan Kebersihan', unit: '750ml', isCustom: false }
+  ], []);
+
+  // State global recommendedItems (menggabungkan master bawaan + custom products)
+  const [recommendedItems, setRecommendedItems] = useState(baseDefaultItems);
+
+  // Muat custom products dari Supabase / LocalStorage saat komponen dimuat atau user aktif
   useEffect(() => {
     let isMounted = true;
     getCustomProducts(currentUser?.id).then(prods => {
       if (isMounted && prods && Array.isArray(prods)) {
         setCustomProducts(prods);
+        setRecommendedItems(prev => {
+          const baseList = prev.filter(item => !item.isCustom);
+          const combined = [...prods.map(p => ({ ...p, isCustom: true })), ...baseList];
+          return Array.from(new Map(combined.map(item => [item.name.toLowerCase(), item])).values());
+        });
       }
     }).catch(() => {});
     return () => { isMounted = false; };
   }, [currentUser?.id]);
 
-  // Muat custom stores dari Supabase / LocalStorage saat akun aktif
+  // Muat custom stores dari Supabase / LocalStorage saat komponen dimuat atau user aktif
   useEffect(() => {
     let isSubscribed = true;
     getCustomStores(currentUser?.id).then(stores => {
@@ -314,9 +341,17 @@ export default function Home() {
     const cleanName = newStoreName.trim();
 
     // 1. Optimistic update ke state lokal customSupermarkets
+    const tempStoreObj = {
+      id: 'store-' + Date.now(),
+      name: cleanName,
+      store_name: cleanName,
+      isCustom: true
+    };
+
     setCustomSupermarkets(prev => {
-      if (prev.includes(cleanName)) return prev;
-      return [...prev, cleanName];
+      const exists = prev.some(s => (typeof s === 'string' ? s : s.name || s.store_name) === cleanName);
+      if (exists) return prev;
+      return [...prev, tempStoreObj];
     });
 
     // 2. Otomatis atur toko yang baru dibuat sebagai selectedSupermarket yang aktif
@@ -325,11 +360,78 @@ export default function Home() {
 
     // 3. Simpan permanen ke Supabase tabel custom_stores
     try {
-      await insertCustomStore(cleanName, currentUser?.id);
+      const res = await insertCustomStore(cleanName, currentUser?.id);
+      if (res && res.data && res.data.id) {
+        setCustomSupermarkets(prev => prev.map(s => {
+          const sName = typeof s === 'string' ? s : s.name || s.store_name;
+          if (sName === cleanName) {
+            return {
+              id: res.data.id,
+              name: cleanName,
+              store_name: cleanName,
+              isCustom: true
+            };
+          }
+          return s;
+        }));
+      }
     } catch (e) {
       console.warn('[Sync Custom Store Error]:', e);
     }
     return true;
+  };
+
+  // Handler hapus lokasi supermarket kustom dari Supabase & state lokal
+  const handleDeleteCustomStore = async (storeToDelete) => {
+    if (!storeToDelete) return;
+    const storeId = typeof storeToDelete === 'object' ? storeToDelete.id : null;
+    const storeName = typeof storeToDelete === 'string' ? storeToDelete : (storeToDelete.name || storeToDelete.store_name);
+
+    // 1. Logika Hapus: Eksekusi delete ke Supabase tabel custom_stores
+    try {
+      if (storeId && !String(storeId).startsWith('store-') && !String(storeId).startsWith('custom-')) {
+        await supabase.from('custom_stores').delete().eq('id', storeId);
+      } else if (storeName) {
+        await supabase.from('custom_stores').delete().eq('store_name', storeName);
+      }
+    } catch (e) {
+      console.warn('[Delete Custom Store Error]:', e);
+    }
+
+    // 2. Hapus dari LocalStorage
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('sakugrosir_custom_stores_v1');
+        if (stored) {
+          let list = JSON.parse(stored);
+          list = list.filter(item => {
+            if (typeof item === 'string') return item !== storeName;
+            const sName = item.store_name || item.name;
+            const sId = item.id;
+            if (storeId && sId === storeId) return false;
+            if (storeName && sName === storeName) return false;
+            return true;
+          });
+          localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(list));
+        }
+      } catch (e) {}
+    }
+
+    // 3. Hapus dari state lokal customSupermarkets
+    setCustomSupermarkets(prev => prev.filter(s => {
+      const sId = typeof s === 'object' ? s.id : null;
+      const sName = typeof s === 'string' ? s : (s.name || s.store_name);
+      if (storeId && sId === storeId) return false;
+      if (storeName && sName === storeName) return false;
+      return true;
+    }));
+
+    // 4. Fallback Aktif: Jika toko yang dihapus kebetulan sedang menjadi selectedSupermarket aktif,
+    // otomatis ubah selectedSupermarket kembali ke "Lotte Mart - Puri Indah" agar aplikasi tidak error
+    if (currentStore === storeName) {
+      setCurrentStore('Lotte Mart - Puri Indah');
+      persistState(undefined, undefined, 'Lotte Mart - Puri Indah');
+    }
   };
 
   // Handler simpan barang kustom baru: Optimistic UI + Insert Supabase
@@ -350,39 +452,72 @@ export default function Home() {
 
     // Optimistic UI: langsung tampil di Rekomendasi Belanja & Autocomplete seketika
     setCustomProducts(prev => [newProductObj, ...(prev || []).filter(p => p.name.toLowerCase() !== newProductObj.name.toLowerCase())]);
+    setRecommendedItems(prev => [newProductObj, ...(prev || []).filter(p => p.name.toLowerCase() !== newProductObj.name.toLowerCase())]);
 
     // Insert ke tabel products Supabase di latar belakang
     try {
-      await insertCustomProduct({
+      const res = await insertCustomProduct({
         ...newProductObj,
         user_id: currentUser?.id
       });
+      if (res && res.data && res.data.id) {
+        const realId = res.data.id;
+        setCustomProducts(prev => prev.map(p => p.id === newProductObj.id ? { ...p, id: realId } : p));
+        setRecommendedItems(prev => prev.map(p => p.id === newProductObj.id ? { ...p, id: realId } : p));
+      }
     } catch (e) {
       console.warn('[Sync Custom Product]:', e);
     }
   };
 
-  // State global recommendedItems menggabungkan master bawaan + custom products
-  const recommendedItems = useMemo(() => {
-    const baseItems = [
-      { id: 'base-1', name: 'Beras 5kg', price: 74000, lastMonthPrice: 68000, category: 'Bahan Pokok', unit: '5kg' },
-      { id: 'base-2', name: 'Telur Ayam Ras 1kg', price: 28000, lastMonthPrice: 32000, category: 'Bahan Pokok', unit: '1 kg' },
-      { id: 'base-3', name: 'Garam 500g', price: 5000, lastMonthPrice: 5000, category: 'Bahan Pokok', unit: '500g' },
-      { id: 'base-4', name: 'Minyak Goreng Sawit Murni 2L', price: 38500, lastMonthPrice: 35000, category: 'Bahan Pokok', unit: '2L' },
-      { id: 'base-5', name: 'Gula Pasir Kristal Putih 1kg', price: 17500, lastMonthPrice: 17500, category: 'Bahan Pokok', unit: '1 kg' },
-      { id: 'base-6', name: 'Indomie Goreng (5 pcs)', price: 15500, lastMonthPrice: 15500, category: 'Bahan Pokok', unit: '5 pcs' },
-      { id: 'base-7', name: 'Susu UHT Ultra Milk 1L', price: 19500, lastMonthPrice: 21000, category: 'Bahan Pokok', unit: '1L' },
-      { id: 'base-8', name: 'Kecap Manis Bango 550ml', price: 24500, lastMonthPrice: 22000, category: 'Bumbu Dapur', unit: '550ml' },
-      { id: 'base-9', name: 'Bawang Merah Brebes 500g', price: 19000, lastMonthPrice: 22000, category: 'Bumbu Dapur', unit: '500g' },
-      { id: 'base-10', name: 'Bawang Putih Kating 500g', price: 22000, lastMonthPrice: 21000, category: 'Bumbu Dapur', unit: '500g' },
-      { id: 'base-11', name: 'Cabe Rawit Merah 250g', price: 18000, lastMonthPrice: 16000, category: 'Sayuran Segar', unit: '250g' },
-      { id: 'base-12', name: 'Sabun Mandi Dettol 400ml', price: 26500, lastMonthPrice: 29000, category: 'Peralatan Kebersihan', unit: '400ml' },
-      { id: 'base-13', name: 'Deterjen Rinso Cair 750ml', price: 21500, lastMonthPrice: 20000, category: 'Peralatan Kebersihan', unit: '750ml' }
-    ];
+  // Handler hapus barang kustom: Supabase + LocalStorage + State recommendedItems & customProducts
+  const handleDeleteCustomProduct = async (itemId, itemName) => {
+    try {
+      if (itemId && !String(itemId).startsWith('prod-') && !String(itemId).startsWith('local-')) {
+        await supabase.from('products').delete().eq('id', itemId);
+      } else if (itemName) {
+        await supabase.from('products').delete().eq('name', itemName);
+      }
+    } catch (e) {
+      console.warn('[Delete Custom Product Error]:', e);
+    }
 
-    const combined = [...customProducts, ...baseItems];
-    return Array.from(new Map(combined.map(item => [item.name.toLowerCase(), item])).values());
-  }, [customProducts]);
+    // LocalStorage fallback sync
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('sakugrosir_custom_products_v1');
+        if (stored) {
+          const list = JSON.parse(stored);
+          const filtered = list.filter(p => p.id !== itemId && p.name !== itemName);
+          localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(filtered));
+        }
+      } catch (e) {}
+    }
+
+    setCustomProducts(prev => (prev || []).filter(p => p.id !== itemId && p.name !== itemName));
+    setRecommendedItems(prev => (prev || []).filter(p => p.id !== itemId && p.name !== itemName));
+  };
+
+  // Refresh / Fetch Ulang Data Custom Products & Stores saat dibutuhkan
+  const refreshCustomData = async () => {
+    try {
+      const prods = await getCustomProducts(currentUser?.id);
+      if (prods && Array.isArray(prods)) {
+        setCustomProducts(prods);
+        setRecommendedItems(prev => {
+          const baseList = prev.filter(item => !item.isCustom);
+          const combined = [...prods.map(p => ({ ...p, isCustom: true })), ...baseList];
+          return Array.from(new Map(combined.map(item => [item.name.toLowerCase(), item])).values());
+        });
+      }
+      const stores = await getCustomStores(currentUser?.id);
+      if (stores && Array.isArray(stores)) {
+        setCustomSupermarkets(stores);
+      }
+    } catch (e) {
+      console.warn('[Refresh Custom Data Error]:', e);
+    }
+  };
 
   // Splash Screen State
   const [showSplash, setShowSplash] = useState(false);
@@ -1659,6 +1794,8 @@ export default function Home() {
                       onAddToCart={handleAddToCart}
                       recommendedItems={recommendedItems}
                       customProducts={customProducts}
+                      onDeleteCustomProduct={handleDeleteCustomProduct}
+                      onRefreshCustomProducts={refreshCustomData}
                     />
                   )}
 
@@ -1722,6 +1859,7 @@ export default function Home() {
                   onSaveStore={handleSaveStore}
                   customSupermarkets={customSupermarkets}
                   onAddNewStore={handleAddNewStore}
+                  onDeleteCustomStore={handleDeleteCustomStore}
                   userId={currentUser?.id}
                 />
 

@@ -526,23 +526,17 @@ export default function CatalogInputScreen({
           <label className="text-xs font-bold text-slate-800 mb-1 block">
             Harga Satuan Normal (Rp) *
           </label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-              Rp
-            </span>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={normalPrice}
-              onChange={(e) => {
-                const numeric = e.target.value.replace(/\D/g, '');
-                setNormalPrice(numeric);
-              }}
-              placeholder="74.000"
-              required
-              className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white"
-            />
-          </div>
+          <input
+            type="number"
+            inputMode="numeric"
+            value={normalPrice}
+            onChange={(e) => {
+              setNormalPrice(e.target.value);
+            }}
+            placeholder="Ketik harga, contoh: 5000"
+            required
+            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white"
+          />
         </div>
 
         {/* 3. SKEMA DISKON BERSTANDAR SRS F-03 */}

@@ -36,6 +36,7 @@ import { playTapSound, playSuccessSound, playWarningBeep } from '../utils/sound'
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
 import { getProductEmoji, ProductEmojiBox, PriceFluctuationBadge } from '../utils/emoji';
 import { getItemStorePrice } from '../utils/storePrices';
+import { supabase } from '../../src/lib/supabaseClient';
 
 export default function ActiveCartScreen({
   cartItems = [],
@@ -55,9 +56,18 @@ export default function ActiveCartScreen({
   onLoadMockupNormal,
   onAddToCart,
   recommendedItems = [],
-  customProducts = []
+  customProducts = [],
+  onDeleteCustomProduct,
+  onRefreshCustomProducts
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
+
+  // Sinkronisasi otomatis saat komponen dimuat
+  useEffect(() => {
+    if (onRefreshCustomProducts) {
+      onRefreshCustomProducts();
+    }
+  }, [onRefreshCustomProducts]);
 
   // 1. Menu Kategori Horizontal (100% Representasi Emoji)
   const CART_CATEGORIES = [
@@ -524,17 +534,28 @@ export default function ActiveCartScreen({
       return 'sembako';
     };
 
-    // Normalisasi custom products dari state global / Supabase
-    const normalizedCustom = (customProducts || []).map(p => ({
-      ...p,
-      categoryKey: normalizeCatKey(p.category),
-      categoryName: p.category || 'Bahan Pokok',
-      categoryEmoji: getProductEmoji(p.name, p.category),
-      description: p.description || `Barang kustom: ${p.name}`,
-      isCustom: true,
-      lastMonthPrice: null,
-      historyPrice: null
-    }));
+    // Gabungkan custom products dari props customProducts dan recommendedItems
+    const allCustom = [
+      ...(customProducts || []),
+      ...(recommendedItems || []).filter(i => i && i.isCustom)
+    ];
+
+    const customMap = new Map();
+    allCustom.forEach(p => {
+      if (p && p.name) {
+        customMap.set(p.name.toLowerCase(), {
+          ...p,
+          categoryKey: normalizeCatKey(p.category),
+          categoryName: p.category || 'Bahan Pokok',
+          categoryEmoji: getProductEmoji(p.name, p.category),
+          description: p.description || `Barang kustom: ${p.name}`,
+          isCustom: true,
+          lastMonthPrice: p.lastMonthPrice || null,
+          historyPrice: p.historyPrice || null
+        });
+      }
+    });
+    const normalizedCustom = Array.from(customMap.values());
 
     let baseItems = [];
     if (activeCategory === 'all') {
@@ -566,7 +587,7 @@ export default function ActiveCartScreen({
     // Letakkan custom products di paling atas rekomendasi
     const combined = [...matchingCustom, ...baseItems];
     return Array.from(new Map(combined.map(item => [item.name.toLowerCase(), item])).values());
-  }, [activeCategory, customProducts]);
+  }, [activeCategory, customProducts, recommendedItems]);
 
   // Kalkulasi Total Halaman Dinamis mengikuti jumlah item pada kategori aktif
   const totalPages = Math.max(1, Math.ceil(currentCategoryItems.length / itemsPerPage));
@@ -633,6 +654,26 @@ export default function ActiveCartScreen({
     }
   };
 
+  // Handler Hapus Barang Kustom: konfirmasi -> delete ke Supabase -> update state
+  const handleDeleteProduct = async (prod) => {
+    if (!window.confirm('Hapus barang ini?')) {
+      return;
+    }
+    playTapSound();
+    const itemId = prod.id;
+    try {
+      if (itemId && !String(itemId).startsWith('prod-') && !String(itemId).startsWith('local-')) {
+        await supabase.from('products').delete().eq('id', itemId);
+      }
+    } catch (err) {
+      console.warn('[Delete Custom Product error]:', err);
+    }
+
+    if (onDeleteCustomProduct) {
+      await onDeleteCustomProduct(itemId, prod.name);
+    }
+  };
+
   // Render Product Card (Horizontal List Layout with Full Emoji Box & Dynamic Store Pricing)
   const renderProductCard = (prod) => {
     const storePrice = getItemStorePrice(prod, currentStore);
@@ -644,8 +685,23 @@ export default function ActiveCartScreen({
     return (
       <div 
         key={prod.id}
-        className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-emerald-50/40 hover:border-emerald-200 flex items-center justify-between gap-3 transition-all group"
+        className="relative p-2.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-emerald-50/40 hover:border-emerald-200 flex items-center justify-between gap-3 transition-all group"
       >
+        {/* Fitur Hapus Barang Kustom: Ikon tempat sampah di sudut kanan atas kartu HANYA JIKA item.isCustom === true */}
+        {prod.isCustom && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteProduct(prod);
+            }}
+            className="absolute top-2 right-2 p-1 rounded-md text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer z-10"
+            title={`Hapus barang kustom ${prod.name}`}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+
         {/* Bagian Kiri: Full Emoji Container Box (Tanpa tag <img>) */}
         <ProductEmojiBox 
           name={prod.name} 
@@ -654,10 +710,17 @@ export default function ActiveCartScreen({
         />
 
         {/* Bagian Tengah: Judul produk, Deskripsi singkat, Kategori & Fluktuasi Harga Dinamis */}
-        <div className="flex-1 min-w-0">
-          <h5 className="text-xs font-bold text-slate-900 truncate leading-snug">
-            {prod.name}
-          </h5>
+        <div className={`flex-1 min-w-0 ${prod.isCustom ? 'pr-5' : ''}`}>
+          <div className="flex items-center space-x-1.5">
+            <h5 className="text-xs font-bold text-slate-900 truncate leading-snug">
+              {prod.name}
+            </h5>
+            {prod.isCustom && (
+              <span className="text-[8px] font-bold px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded">
+                Kustom
+              </span>
+            )}
+          </div>
           <p className="text-[10.5px] text-slate-500 line-clamp-1 mt-0.5">
             {prod.description}
           </p>
@@ -683,7 +746,7 @@ export default function ActiveCartScreen({
         </div>
 
         {/* Bagian Kanan: Nominal harga & Tombol Tambah Hijau */}
-        <div className="text-right shrink-0 flex items-center space-x-2">
+        <div className={`text-right shrink-0 flex items-center space-x-2 ${prod.isCustom ? 'pt-4 sm:pt-0' : ''}`}>
           <div>
             <span className="text-xs font-black text-slate-900 block">
               Rp {currentPrice.toLocaleString('id-ID')}

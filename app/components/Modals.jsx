@@ -26,6 +26,7 @@ import {
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
 import { playTapSound, playSuccessSound, playWarningBeep } from '../utils/sound';
 import { getProductEmoji } from '../utils/emoji';
+import { supabase } from '../../src/lib/supabaseClient';
 
 /**
  * 1. Modal Edit Batas Saldo Dompet
@@ -117,9 +118,10 @@ export function StoreModal({
   onSaveStore,
   customSupermarkets = [],
   onAddNewStore,
+  onDeleteCustomStore,
   userId = null
 }) {
-  const [store, setStore] = useState(currentStore || 'Lotte Mart Grocery - Puri Indah');
+  const [store, setStore] = useState(currentStore || 'Lotte Mart - Puri Indah');
   const [isoDate, setIsoDate] = useState(() => toISODateString(currentDate || new Date()));
   const [isAddingStore, setIsAddingStore] = useState(false);
   const [newStoreName, setNewStoreName] = useState('');
@@ -127,7 +129,7 @@ export function StoreModal({
 
   useEffect(() => {
     if (isOpen) {
-      setStore(currentStore || 'Lotte Mart Grocery - Puri Indah');
+      setStore(currentStore || 'Lotte Mart - Puri Indah');
       setIsoDate(toISODateString(currentDate || new Date()));
       setIsAddingStore(false);
       setNewStoreName('');
@@ -139,18 +141,65 @@ export function StoreModal({
 
   const displayDate = toIndoDisplayDate(isoDate);
 
+  // 4 Toko Default Aplikasi (DILARANG memunculkan tombol hapus)
   const defaultStores = [
-    'Lotte Mart Grocery - Puri Indah',
+    'Lotte Mart - Puri Indah',
     'Super Indo - Pesanggrahan',
     'Hypermart - Puri Mall',
     'Indogrosir Daan Mogot'
   ];
 
-  // Gabungkan daftar 4 toko default dengan customSupermarkets menjadi satu array
-  const allStores = Array.from(new Set([
-    ...defaultStores,
-    ...(customSupermarkets || []).filter(Boolean)
-  ]));
+  const isDefaultStore = (name) => {
+    if (!name) return false;
+    const lower = name.toLowerCase().trim();
+    return (
+      lower === 'lotte mart - puri indah' ||
+      lower === 'lotte mart grocery - puri indah' ||
+      lower === 'super indo - pesanggrahan' ||
+      lower === 'hypermart - puri mall' ||
+      lower === 'indogrosir daan mogot'
+    );
+  };
+
+  // Normalisasi custom stores dari state / Supabase
+  const normalizedCustomStores = (customSupermarkets || []).map((s, idx) => {
+    if (!s) return null;
+    if (typeof s === 'string') {
+      return {
+        id: `custom-store-${idx}-${s}`,
+        name: s,
+        store_name: s,
+        isCustom: true
+      };
+    }
+    return {
+      ...s,
+      id: s.id || `custom-store-${idx}-${s.store_name || s.name}`,
+      name: s.store_name || s.name,
+      store_name: s.store_name || s.name,
+      isCustom: true
+    };
+  }).filter(Boolean).filter(s => !isDefaultStore(s.name));
+
+  // Gabungkan 4 toko default dengan custom stores tanpa duplikasi
+  const allStoreMap = new Map();
+  defaultStores.forEach(name => {
+    allStoreMap.set(name.toLowerCase(), {
+      id: `default-${name}`,
+      name: name,
+      store_name: name,
+      isCustom: false
+    });
+  });
+
+  normalizedCustomStores.forEach(item => {
+    const key = item.name.toLowerCase();
+    if (!allStoreMap.has(key)) {
+      allStoreMap.set(key, item);
+    }
+  });
+
+  const allStores = Array.from(allStoreMap.values());
 
   const handleSaveNewStore = async () => {
     if (!newStoreName.trim()) return;
@@ -170,6 +219,34 @@ export function StoreModal({
       console.warn('[handleSaveNewStore error]:', err);
     } finally {
       setIsSavingStore(false);
+    }
+  };
+
+  const handleDeleteStore = async (e, item) => {
+    e.stopPropagation();
+    playTapSound();
+
+    const storeId = item.id;
+    const storeName = item.name || item.store_name;
+
+    // Logika Hapus: Eksekusi delete ke tabel custom_stores Supabase
+    try {
+      if (storeId && !String(storeId).startsWith('custom-store-') && !String(storeId).startsWith('local-')) {
+        await supabase.from('custom_stores').delete().eq('id', storeId);
+      }
+    } catch (err) {
+      console.warn('[deleteCustomStore error]:', err);
+    }
+
+    // Panggil handler parent untuk update state lokal & LocalStorage
+    if (onDeleteCustomStore) {
+      await onDeleteCustomStore(item);
+    }
+
+    // Fallback Aktif: Jika toko yang dihapus kebetulan sedang menjadi selectedSupermarket aktif,
+    // otomatis ubah selectedSupermarket kembali ke "Lotte Mart - Puri Indah" agar aplikasi tidak error
+    if (store === storeName || currentStore === storeName) {
+      setStore('Lotte Mart - Puri Indah');
     }
   };
 
@@ -198,21 +275,45 @@ export function StoreModal({
           <div>
             <label className="text-xs font-bold text-slate-800 mb-1.5 block">Nama Supermarket</label>
             <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-0.5">
-              {allStores.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => { playTapSound(); setStore(s); }}
-                  className={`w-full py-2.5 px-3 rounded-xl text-left text-xs font-bold border transition-colors flex items-center justify-between cursor-pointer ${
-                    store === s 
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
-                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  <span className="truncate">{s}</span>
-                  {store === s && <Check className="w-4 h-4 text-emerald-700 shrink-0" />}
-                </button>
-              ))}
+              {allStores.map((item) => {
+                const isSelected = store === item.name || (item.name === 'Lotte Mart - Puri Indah' && store === 'Lotte Mart Grocery - Puri Indah');
+                return (
+                  <div
+                    key={item.id || item.name}
+                    onClick={() => { playTapSound(); setStore(item.name); }}
+                    className={`w-full py-2.5 px-3 rounded-xl text-left text-xs font-bold border transition-colors flex items-center justify-between cursor-pointer group ${
+                      isSelected 
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2 min-w-0">
+                      <span className="truncate">{item.name}</span>
+                      {item.isCustom && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded shrink-0">
+                          Kustom
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center space-x-1.5 shrink-0 ml-2">
+                      {isSelected && <Check className="w-4 h-4 text-emerald-700 shrink-0" />}
+
+                      {/* Tombol Hapus (Trash Icon) HANYA untuk Toko Kustom (DILARANG pada 4 Toko Default) */}
+                      {item.isCustom && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteStore(e, item)}
+                          className="p-1 rounded-md text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer"
+                          title={`Hapus toko kustom ${item.name}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* UI Form Inline & Tombol Tambah Toko Baru */}
