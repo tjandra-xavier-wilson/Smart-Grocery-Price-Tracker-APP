@@ -581,8 +581,8 @@ export function BarcodeScannerModal({ isOpen, onClose, onScannedItem, catalogIte
       playBarcodeBeep();
 
       // Coba deteksi tipe barang berdasarkan prefix barcode
-      let estimatedName = "Barang Tidak Dikenal (" + cleanCode + ")";
-      let estimatedCategory = "Bahan Pokok"; // Kategori default
+      let estimatedName = "Barang Kustom (" + cleanCode + ")";
+      let estimatedCategory = "📦 Yang Lainnya"; // Fallback Kategori Default Sesuai Standar
       let estimatedPrice = 15000; // Harga default
 
       if (cleanCode.startsWith('8993')) {
@@ -593,10 +593,14 @@ export function BarcodeScannerModal({ isOpen, onClose, onScannedItem, catalogIte
         estimatedCategory = "Peralatan Kebersihan";
         estimatedPrice = 22000;
         estimatedName = `Peralatan Kebersihan (${cleanCode})`;
-      } else if (cleanCode.startsWith('899')) {
+      } else if (cleanCode.startsWith('8991') || cleanCode.startsWith('8992')) {
         estimatedCategory = "Bahan Pokok";
         estimatedPrice = 15000;
-        estimatedName = `Barang Indonesia (${cleanCode})`;
+        estimatedName = `Bahan Pokok (${cleanCode})`;
+      } else {
+        estimatedCategory = "📦 Yang Lainnya";
+        estimatedPrice = 15000;
+        estimatedName = `Barang Kustom (${cleanCode})`;
       }
 
       const generateUUID = () => {

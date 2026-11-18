@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import SplashScreen from './components/SplashScreen';
+import SentinelLoadingScreen from './components/SentinelLoadingScreen';
 import HeaderBackgroundTrolley from './components/HeaderBackgroundTrolley';
 import HeaderBar from './components/HeaderBar';
 import BottomNav from './components/BottomNav';
@@ -949,8 +950,9 @@ export default function Home() {
     } catch (e) {}
   };
 
-  // Splash Screen State
+  // Splash & Initialization State
   const [showSplash, setShowSplash] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
 
   // Simpan penanda ke sessionStorage saat splash screen nonaktif
   useEffect(() => {
@@ -1061,6 +1063,7 @@ export default function Home() {
             setCurrentUser(parsedUser);
             setIsAuthenticated(true);
             setShowSplash(false);
+            setIsInitializing(true);
 
             // Isolasi keranjang belanja untuk akun aktif
             const userCartKey = `${STORAGE_KEYS.CART}_${parsedUser.id}`;
@@ -1268,9 +1271,9 @@ export default function Home() {
           setActiveTab('cart');
           setAuthErrorMessage('');
 
-          // Tampilkan transisi dan splash screen saat masuk ke akun yang dituju
+          // Tampilkan SentinelLoadingScreen pasca-login
           if (!isTabSwitchRef.current && !isAuthenticated) {
-            setShowSplash(true);
+            setIsInitializing(true);
           }
 
           if (typeof window !== 'undefined') {
@@ -1666,9 +1669,9 @@ export default function Home() {
         setIsAuthenticated(true);
         setAuthErrorMessage('');
 
-        // DILARANG memicu splash screen jika user hanya berpindah tab / Alt+Tab atau sudah login!
+        // Tampilkan SentinelLoadingScreen pasca-login (DILARANG jika user hanya pindah tab)
         if (event === 'SIGNED_IN' && !isTabSwitchRef.current && !isAuthenticated) {
-          setShowSplash(true);
+          setIsInitializing(true);
         }
         if (typeof loadCloudHistoryRef.current === 'function') {
           loadCloudHistoryRef.current(u.id);
@@ -1840,8 +1843,8 @@ export default function Home() {
     setCartItems(initialUserCart);
     setHistoryList([]);
 
-    // 2. Tampilkan transisi dan splash screen saat masuk ke akun yang dituju
-    setShowSplash(true);
+    // 2. Tampilkan SentinelLoadingScreen pasca-login
+    setIsInitializing(true);
 
     if (typeof window !== 'undefined') {
       try {
@@ -1878,6 +1881,7 @@ export default function Home() {
     setTransactionDate(toIndoDisplayDate(new Date()));
     setCurrentUser(null);
     setIsAuthenticated(false);
+    setIsInitializing(false);
     setIsProfileModalOpen(false);
     setShowSplash(false);
 
@@ -2132,8 +2136,8 @@ export default function Home() {
     } else {
       // AI Item Estimation Fallback
       playBarcodeBeep();
-      let estimatedName = "Barang Tidak Dikenal (" + barcodeCode + ")";
-      let estimatedCategory = "Bahan Pokok";
+      let estimatedName = "Barang Kustom (" + barcodeCode + ")";
+      let estimatedCategory = "📦 Yang Lainnya";
       let estimatedPrice = 15000;
 
       if (barcodeCode.startsWith('8993')) {
@@ -2144,10 +2148,14 @@ export default function Home() {
         estimatedCategory = "Peralatan Kebersihan";
         estimatedPrice = 22000;
         estimatedName = `Peralatan Kebersihan (${barcodeCode})`;
-      } else if (barcodeCode.startsWith('899')) {
+      } else if (barcodeCode.startsWith('8991') || barcodeCode.startsWith('8992')) {
         estimatedCategory = "Bahan Pokok";
         estimatedPrice = 15000;
-        estimatedName = `Barang Indonesia (${barcodeCode})`;
+        estimatedName = `Bahan Pokok (${barcodeCode})`;
+      } else {
+        estimatedCategory = "📦 Yang Lainnya";
+        estimatedPrice = 15000;
+        estimatedName = `Barang Kustom (${barcodeCode})`;
       }
 
       const generateUUID = () => {
@@ -2378,6 +2386,8 @@ export default function Home() {
         
         {showSplash ? (
           <SplashScreen onFinish={handleSplashFinish} />
+        ) : isInitializing ? (
+          <SentinelLoadingScreen onFinish={() => setIsInitializing(false)} />
         ) : (
           <>
             {/* ============================================================== */}

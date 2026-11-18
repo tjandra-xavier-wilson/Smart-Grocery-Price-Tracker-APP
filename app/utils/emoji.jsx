@@ -85,6 +85,9 @@ export function getProductEmoji(itemName = '', category = '') {
   // 7. Snacks / Camilan
   if (text.includes('camilan') || text.includes('snack') || text.includes('keripik') || text.includes('chitato')) return '🍿';
 
+  // 8. Yang Lainnya / Fallback
+  if (text.includes('lain')) return '📦';
+
   // Fallback Emoji
   return '📦';
 }

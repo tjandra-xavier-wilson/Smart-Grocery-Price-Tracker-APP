@@ -85,7 +85,8 @@ export default function ActiveCartScreen({
     { id: 'daging', name: 'Daging & Lauk', emoji: '🥩' },
     { id: 'camilan', name: 'Camilan', emoji: '🍪' },
     { id: 'minuman', name: 'Minuman', emoji: '🧃' },
-    { id: 'kebersihan', name: 'Peralatan Kebersihan', emoji: '🧼' }
+    { id: 'kebersihan', name: 'Peralatan Kebersihan', emoji: '🧼' },
+    { id: 'lainnya', name: 'Yang Lainnya', emoji: '📦' }
   ];
 
   // 2. Data Katalog Rekomendasi Belanja Berdasarkan Kategori Lengkap (100% Emoji + Dynamic 4-Store Pricing)
@@ -507,6 +508,11 @@ export default function ActiveCartScreen({
           }
         }
       ]
+    },
+    lainnya: {
+      categoryName: 'Yang Lainnya',
+      iconEmoji: '📦',
+      items: []
     }
   };
 
@@ -538,6 +544,7 @@ export default function ActiveCartScreen({
       if (s.includes('camilan') || s.includes('snack')) return 'camilan';
       if (s.includes('minum')) return 'minuman';
       if (s.includes('bersih') || s.includes('mandi') || s.includes('perawatan') || s.includes('kebersihan')) return 'kebersihan';
+      if (s.includes('lain')) return 'lainnya';
       return 'sembako';
     };
 

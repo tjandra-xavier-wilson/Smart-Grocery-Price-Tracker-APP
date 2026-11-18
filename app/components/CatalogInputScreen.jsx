@@ -214,7 +214,8 @@ export default function CatalogInputScreen({
     "Daging & Lauk",
     "Camilan",
     "Minuman",
-    "Peralatan Kebersihan"
+    "Peralatan Kebersihan",
+    "Yang Lainnya"
   ];
 
   const CATEGORY_ITEMS = [
@@ -224,7 +225,8 @@ export default function CatalogInputScreen({
     { id: 'Daging & Lauk', label: 'Daging & Lauk', emoji: '🥩' },
     { id: 'Camilan', label: 'Camilan', emoji: '🍪' },
     { id: 'Minuman', label: 'Minuman', emoji: '🧃' },
-    { id: 'Peralatan Kebersihan', label: 'Peralatan Kebersihan', emoji: '🧼' }
+    { id: 'Peralatan Kebersihan', label: 'Peralatan Kebersihan', emoji: '🧼' },
+    { id: 'Yang Lainnya', label: 'Yang Lainnya', emoji: '📦' }
   ];
 
   const mapCategory = (rawCat) => {
@@ -237,7 +239,8 @@ export default function CatalogInputScreen({
     if (cat.includes('camilan') || cat.includes('snack') || cat.includes('biskuit') || cat.includes('roti')) return 'Camilan';
     if (cat.includes('minum') || cat.includes('kopi') || cat.includes('teh') || cat.includes('susu') || cat.includes('jus')) return 'Minuman';
     if (cat.includes('mandi') || cat.includes('bersih') || cat.includes('peralatan') || cat.includes('sabun') || cat.includes('cuci')) return 'Peralatan Kebersihan';
-    return 'Bahan Pokok';
+    if (cat.includes('lain')) return 'Yang Lainnya';
+    return 'Yang Lainnya';
   };
 
   const handleSelectSuggestion = (product) => {
@@ -895,14 +898,6 @@ export default function CatalogInputScreen({
           <ShoppingCart className="w-4 h-4" />
           <span>Tambah ke Keranjang (+)</span>
         </button>
-
-        {/* Note Offline Ready */}
-        <div className="flex items-center space-x-2 p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-[10px] text-slate-500 font-medium">
-          <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
-          <span>
-            <strong>Fitur offline ready:</strong> Item akan tersimpan otomatis di perangkat dan sinkron ke cloud saat online.
-          </span>
-        </div>
       </form>
     </div>
   );
