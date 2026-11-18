@@ -943,7 +943,7 @@ export default function Home() {
     if (typeof window !== 'undefined' && 'caches' in window) {
       caches.keys().then((names) => {
         names.forEach((name) => {
-          if (name !== 'sakugrosir-pwa-v6') {
+          if (name !== 'sakugrosir-pwa-v7') {
             caches.delete(name);
           }
         });

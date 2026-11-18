@@ -1,5 +1,5 @@
 // Service Worker for Smart Grocery Price Tracker & Budget Safety Cap (SakuGrosir)
-const CACHE_NAME = 'sakugrosir-pwa-v6';
+const CACHE_NAME = 'sakugrosir-pwa-v7';
 
 self.addEventListener('install', (event) => {
   // Langsung aktifkan versi baru tanpa menunggu tab/sesi lama ditutup

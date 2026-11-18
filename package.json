@@ -1,6 +1,6 @@
 {
   "name": "smart-grocery-price-tracker-app",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "> **Aplikasi Web Mobile PWA Bergaya Native App untuk Belanja Grosir Satu-Tangan Anak Kos / Siswa Rantau.**",
   "main": "server.js",
   "scripts": {
