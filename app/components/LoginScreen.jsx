@@ -16,7 +16,8 @@ import {
   AlertCircle,
   Info,
   ChevronRight,
-  Plus
+  Plus,
+  CheckCircle2
 } from 'lucide-react';
 import { playTapSound, playSuccessSound } from '../utils/sound';
 import { 
@@ -41,6 +42,8 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(externalError || '');
+  const [authError, setAuthError] = useState('');
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [infoMsg, setInfoMsg] = useState('');
   const [deviceAccounts, setDeviceAccounts] = useState([]);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -242,6 +245,17 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
 
       } else {
         // Mode Daftar: pendaftaran via Supabase Auth
+        setAuthError('');
+        setErrorMsg('');
+
+        // 1. Cek apakah akun email ini sudah terdaftar di daftar akun perangkat
+        const isDuplicateLocal = deviceAccounts.some(acc => (acc.email || '').toLowerCase() === email.trim().toLowerCase());
+        if (isDuplicateLocal) {
+          setAuthError("Email ini telah terdaftar. Silakan gunakan email lain atau langsung Masuk.");
+          setLoading(false);
+          return;
+        }
+
         if (typeof window !== 'undefined') {
           window.__isRegistering = true;
         }
@@ -250,7 +264,12 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
           const res = await signUpWithEmailPassword(email, pin, fullName);
           
           if (!res.success) {
-            setErrorMsg(res.error || 'Gagal melakukan pendaftaran akun baru.');
+            const errText = res.error || 'Gagal melakukan pendaftaran akun baru.';
+            if (res.alreadyExists || errText.toLowerCase().includes('terdaftar') || errText.toLowerCase().includes('already')) {
+              setAuthError("Email ini telah terdaftar. Silakan gunakan email lain atau langsung Masuk.");
+            } else {
+              setErrorMsg(errText);
+            }
             setLoading(false);
             return;
           }
@@ -281,15 +300,15 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
           // Ubah state UI kembali ke mode "Login"
           setAuthMode('login');
           setPin(''); // Kosongkan PIN/kata sandi agar pengguna login kembali secara sadar
+          setAuthError('');
           setLoading(false);
           playSuccessSound();
 
-          // Tampilkan pop-up / alert sukses:
-          const successMessage = "Pendaftaran berhasil! Silakan login kembali menggunakan email dan password yang baru saja Anda buat.";
-          setInfoMsg(successMessage);
-          if (typeof window !== 'undefined') {
-            alert(successMessage);
-          }
+          // Tampilkan Custom Floater (Toast Notification) selama 4 detik (Hapus native window.alert)
+          setShowSuccessToast(true);
+          setTimeout(() => {
+            setShowSuccessToast(false);
+          }, 4000);
         } finally {
           if (typeof window !== 'undefined') {
             setTimeout(() => {
@@ -336,6 +355,22 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
 
   return (
     <div className="min-h-full flex flex-col justify-between p-5 sm:p-6 bg-gradient-to-b from-sky-50/50 via-white to-slate-50 select-none animate-fade-in relative">
+      {/* 0. CUSTOM FLOATER (TOAST NOTIFICATION) PENGGANTI NATIVE ALERT */}
+      <div 
+        className={`fixed top-10 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-white/95 backdrop-blur-md border border-teal-500/30 shadow-xl rounded-full flex items-center space-x-2.5 transition-all duration-500 select-none ${
+          showSuccessToast 
+            ? 'translate-y-0 opacity-100 pointer-events-auto scale-100' 
+            : '-translate-y-8 opacity-0 pointer-events-none scale-95'
+        }`}
+      >
+        <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
+        </div>
+        <span className="font-extrabold text-slate-800 text-xs sm:text-sm tracking-tight whitespace-nowrap">
+          Pendaftaran berhasil! Silakan login kembali.
+        </span>
+      </div>
+
       {/* 1. TOP HEADER STATUS BADGES */}
       <div className="w-full flex items-center justify-between text-[11px] font-semibold text-slate-600 pt-1 px-0.5">
         <div className="flex items-center space-x-1.5">
@@ -448,6 +483,7 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
                 playTapSound();
                 setAuthMode('login');
                 setErrorMsg('');
+                setAuthError('');
                 setInfoMsg('');
               }}
               className={`py-2 rounded-lg transition-all cursor-pointer ${
@@ -464,6 +500,7 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
                 playTapSound();
                 setAuthMode('register');
                 setErrorMsg('');
+                setAuthError('');
                 setInfoMsg('');
               }}
               className={`py-2 rounded-lg transition-all cursor-pointer ${
@@ -489,7 +526,10 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
                   <input
                     type="text"
                     value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
+                    onChange={(e) => {
+                      setFullName(e.target.value);
+                      if (authError) setAuthError('');
+                    }}
                     placeholder="Contoh: Budi Santoso"
                     required
                     className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-emerald-700 focus:bg-white"
@@ -511,12 +551,25 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (authError) setAuthError('');
+                    if (errorMsg) setErrorMsg('');
+                  }}
                   placeholder="nama@email.com"
                   required
-                  className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-700 focus:bg-white transition-colors"
+                  className={`w-full pl-9 pr-3.5 py-2.5 bg-slate-50/70 border rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white transition-colors ${
+                    authError ? 'border-red-500 focus:border-red-600' : 'border-slate-200 focus:border-emerald-700'
+                  }`}
                 />
               </div>
+              {/* Pesan Peringatan Akun Ganda (Duplicate Email Error) */}
+              {authError && (
+                <div className="text-red-500 text-sm mt-1 flex items-center gap-1 font-semibold animate-shake">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                  <span>{authError}</span>
+                </div>
+              )}
             </div>
 
             {/* Kata Sandi / PIN Keamanan */}
@@ -530,7 +583,10 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
                 <input
                   type={showPin ? 'text' : 'password'}
                   value={pin}
-                  onChange={(e) => setPin(e.target.value)}
+                  onChange={(e) => {
+                    setPin(e.target.value);
+                    if (authError) setAuthError('');
+                  }}
                   placeholder="Minimal 6 karakter atau PIN 6-digit"
                   maxLength={24}
                   required

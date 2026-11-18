@@ -920,14 +920,16 @@ export async function signUpWithEmailPassword(email, password, fullName) {
   const cleanEmail = (email || '').trim().toLowerCase();
   const cleanName = fullName || cleanEmail.split('@')[0];
 
-  // 1. Selalu rekam kredensial ke vault & whitelist sistem terlebih dahulu
-  saveUserCredential({
-    email: cleanEmail,
-    pin: password,
-    fullName: cleanName,
-    provider: 'email_password'
-  });
-  addRegisteredEmail(cleanEmail);
+  // 1. Cek apakah akun email ini sudah terdaftar di daftar akun perangkat
+  const existingAccounts = getDeviceAccounts();
+  const isAlreadyLocallyRegistered = existingAccounts.some(acc => (acc.email || '').toLowerCase() === cleanEmail);
+  if (isAlreadyLocallyRegistered) {
+    return {
+      success: false,
+      alreadyExists: true,
+      error: 'Email ini telah terdaftar. Silakan gunakan email lain atau langsung Masuk.'
+    };
+  }
 
   try {
     if (typeof window !== 'undefined') {
@@ -948,8 +950,34 @@ export async function signUpWithEmailPassword(email, password, fullName) {
       console.warn('[Supabase signUp] Supabase server error/notice:', error.message);
       const msg = (error.message || '').toLowerCase();
 
+      // Akun sudah pernah terdaftar di Supabase
+      if (
+        msg.includes('already registered') || 
+        msg.includes('user already exists') || 
+        msg.includes('already exists') || 
+        msg.includes('email already') ||
+        error.code === 'user_already_exists' ||
+        (error.status === 400 && msg.includes('registered')) ||
+        error.status === 422
+      ) {
+        return {
+          success: false,
+          alreadyExists: true,
+          error: 'Email ini telah terdaftar. Silakan gunakan email lain atau langsung Masuk.'
+        };
+      }
+
       // Penanganan khusus error rate limit kuota SMTP Supabase free tier
       if (msg.includes('rate limit') || msg.includes('over_email_send_rate_limit') || error.status === 429) {
+        // Pada rate limit, simpan kredensial agar pengguna tetap bisa login
+        saveUserCredential({
+          email: cleanEmail,
+          pin: password,
+          fullName: cleanName,
+          provider: 'email_password'
+        });
+        addRegisteredEmail(cleanEmail);
+
         return {
           success: true,
           rateLimited: true,
@@ -957,22 +985,30 @@ export async function signUpWithEmailPassword(email, password, fullName) {
         };
       }
 
-      // Akun sudah pernah terdaftar
-      if (msg.includes('already registered') || msg.includes('user already exists')) {
-        return {
-          success: true,
-          alreadyExists: true,
-          message: 'Akun ini sudah terdaftar. Silakan login langsung menggunakan email dan PIN Anda.'
-        };
-      }
-
-      // Error konfirmasi email lainnya
+      // Error pendaftaran lainnya
       return {
-        success: true,
-        fallback: true,
-        message: 'Pendaftaran berhasil! Silakan login kembali menggunakan email dan password yang baru saja Anda buat.'
+        success: false,
+        error: error.message || 'Gagal melakukan pendaftaran akun baru.'
       };
     }
+
+    // Supabase GoTrue mengembalikan identities: [] jika email sudah ada (Email Enumeration Protection)
+    if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      return {
+        success: false,
+        alreadyExists: true,
+        error: 'Email ini telah terdaftar. Silakan gunakan email lain atau langsung Masuk.'
+      };
+    }
+
+    // Rekam kredensial ke vault & whitelist setelah pendaftaran terbukti sah dan berhasil
+    saveUserCredential({
+      email: cleanEmail,
+      pin: password,
+      fullName: cleanName,
+      provider: 'email_password'
+    });
+    addRegisteredEmail(cleanEmail);
 
     // WAJIB: Hancurkan sesi auto-login Supabase segera setelah pendaftaran sukses
     try {
