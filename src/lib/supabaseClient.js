@@ -1312,3 +1312,81 @@ export async function getCustomProducts(userId = null) {
     return localList;
   }
 }
+
+/**
+ * Simpan Lokasi Supermarket Kustom ke Supabase (tabel custom_stores)
+ */
+export async function insertCustomStore(storeName, userId = null) {
+  if (!storeName || !storeName.trim()) return { success: false, error: 'Nama toko tidak boleh kosong' };
+  const cleanName = storeName.trim();
+
+  // Simpan ke offline storage fallback
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('sakugrosir_custom_stores_v1');
+      const list = stored ? JSON.parse(stored) : [];
+      if (!list.includes(cleanName)) {
+        list.push(cleanName);
+        localStorage.setItem('sakugrosir_custom_stores_v1', JSON.stringify(list));
+      }
+    } catch (e) {}
+  }
+
+  try {
+    const payload = {
+      store_name: cleanName,
+      user_id: userId || null
+    };
+
+    const { data, error } = await supabase
+      .from('custom_stores')
+      .insert([payload])
+      .select();
+
+    if (error) {
+      console.warn('[insertCustomStore Supabase Warn]:', error.message);
+      return { success: true, store_name: cleanName, offline: true };
+    }
+
+    return { success: true, store_name: cleanName, data: data?.[0] };
+  } catch (err) {
+    console.warn('[insertCustomStore Error]:', err.message);
+    return { success: true, store_name: cleanName, offline: true };
+  }
+}
+
+/**
+ * Ambil Daftar Supermarket Kustom dari Supabase (tabel custom_stores)
+ */
+export async function getCustomStores(userId = null) {
+  let localList = [];
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('sakugrosir_custom_stores_v1');
+      if (stored) localList = JSON.parse(stored);
+    } catch (e) {}
+  }
+
+  try {
+    let query = supabase.from('custom_stores').select('*').order('created_at', { ascending: true });
+    if (userId) {
+      query = query.or(`user_id.eq.${userId},user_id.is.null`);
+    }
+    const { data, error } = await query;
+    if (error || !data || data.length === 0) {
+      return localList;
+    }
+
+    const set = new Set(localList);
+    data.forEach(item => {
+      if (item && item.store_name) {
+        set.add(item.store_name);
+      }
+    });
+
+    return Array.from(set);
+  } catch (err) {
+    return localList;
+  }
+}
+

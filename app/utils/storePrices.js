@@ -65,6 +65,21 @@ export function getItemStorePrice(item, supermarket = DEFAULT_SUPERMARKET) {
           : null
       };
     }
+
+    // Fallback: Jika tidak ditemukan di targetStore (misal toko kustom baru),
+    // gunakan harga standar Lotte Mart:
+    // const currentPrice = item.prices[selectedSupermarket]?.current || item.prices["Lotte Mart - Puri Indah"].current;
+    const fallbackLotte = item.prices['Lotte Mart - Puri Indah'] || 
+                         item.prices['Lotte Mart Grocery - Puri Indah'] || 
+                         item.prices[DEFAULT_SUPERMARKET];
+    if (fallbackLotte) {
+      return {
+        current: Number(fallbackLotte.current || item.price || 0),
+        history: (fallbackLotte.history !== null && fallbackLotte.history !== undefined && fallbackLotte.history !== '')
+          ? Number(fallbackLotte.history)
+          : null
+      };
+    }
   }
 
   // Jika harga riwayat eksplisit null / tidak ada
@@ -128,4 +143,26 @@ export function shouldRenderFluctuationBadge({ isCustom, historyPrice, lastMonth
     return false;
   }
   return true;
+}
+
+/**
+ * Logika Resolusi Harga Aman dengan Optional Chaining & Default Fallback
+ * Sesuai instruksi:
+ * const currentPrice = item.prices?.[selectedSupermarket]?.current || item.prices?.["Lotte Mart - Puri Indah"]?.current;
+ */
+export function resolveItemPrice(item, selectedSupermarket = DEFAULT_SUPERMARKET) {
+  if (!item) return 0;
+  if (item.isCustom) return Number(item.price || item.currentPrice || 0);
+
+  if (item.prices && typeof item.prices === 'object') {
+    const normalized = normalizeSupermarketName(selectedSupermarket);
+    const direct = item.prices[selectedSupermarket]?.current;
+    const norm = item.prices[normalized]?.current;
+    const lotte = item.prices['Lotte Mart - Puri Indah']?.current || 
+                  item.prices['Lotte Mart Grocery - Puri Indah']?.current || 
+                  item.prices[DEFAULT_SUPERMARKET]?.current;
+    return Number(direct || norm || lotte || item.price || item.currentPrice || 0);
+  }
+
+  return Number(getItemStorePrice(item, selectedSupermarket).current || item.price || item.currentPrice || 0);
 }

@@ -30,6 +30,7 @@ check(schemaContent.includes('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'), 'Sch
 check(schemaContent.includes('CREATE TABLE IF NOT EXISTS public.budget_settings'), 'Schema mendefinisikan tabel budget_settings');
 check(schemaContent.includes('CREATE TABLE IF NOT EXISTS public.grocery_history'), 'Schema mendefinisikan tabel grocery_history');
 check(schemaContent.includes('CREATE TABLE IF NOT EXISTS public.grocery_items'), 'Schema mendefinisikan tabel grocery_items');
+check(schemaContent.includes('CREATE TABLE IF NOT EXISTS public.custom_stores'), 'Schema mendefinisikan tabel custom_stores untuk toko kustom');
 check(schemaContent.includes('ENABLE ROW LEVEL SECURITY'), 'Schema mengaktifkan Row Level Security (RLS)');
 check(schemaContent.includes('idx_grocery_items_lookup_last_price') || schemaContent.includes('idx_grocery_items_nama_barang'), 'Schema membuat indeks optimasi pencarian harga');
 
@@ -41,6 +42,8 @@ check(clientContent.includes('getLastPrice'), 'Helper menyediakan fungsi getLast
 check(clientContent.includes('saveShoppingTrip'), 'Helper menyediakan fungsi saveShoppingTrip');
 check(clientContent.includes('getBudgetSettings'), 'Helper menyediakan fungsi getBudgetSettings');
 check(clientContent.includes('updateBudgetSettings'), 'Helper menyediakan fungsi updateBudgetSettings');
+check(clientContent.includes('insertCustomStore'), 'Helper menyediakan fungsi insertCustomStore untuk menyimpan toko kustom');
+check(clientContent.includes('getCustomStores'), 'Helper menyediakan fungsi getCustomStores untuk mengambil toko kustom');
 check(clientContent.includes('getOfflineLastPrice'), 'Helper menyediakan mekanisme offline fallback LocalStorage');
 
 // 3. Check Browser Helper (js/supabaseClient.js)

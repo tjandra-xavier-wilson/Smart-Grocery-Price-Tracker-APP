@@ -109,14 +109,29 @@ export function BudgetLimitModal({ isOpen, onClose, currentLimit, onSaveLimit })
 /**
  * 2. Modal Pemilihan Supermarket & Tanggal
  */
-export function StoreModal({ isOpen, onClose, currentStore, currentDate, onSaveStore }) {
+export function StoreModal({ 
+  isOpen, 
+  onClose, 
+  currentStore, 
+  currentDate, 
+  onSaveStore,
+  customSupermarkets = [],
+  onAddNewStore,
+  userId = null
+}) {
   const [store, setStore] = useState(currentStore || 'Lotte Mart Grocery - Puri Indah');
   const [isoDate, setIsoDate] = useState(() => toISODateString(currentDate || new Date()));
+  const [isAddingStore, setIsAddingStore] = useState(false);
+  const [newStoreName, setNewStoreName] = useState('');
+  const [isSavingStore, setIsSavingStore] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setStore(currentStore || 'Lotte Mart Grocery - Puri Indah');
       setIsoDate(toISODateString(currentDate || new Date()));
+      setIsAddingStore(false);
+      setNewStoreName('');
+      setIsSavingStore(false);
     }
   }, [isOpen, currentStore, currentDate]);
 
@@ -124,12 +139,39 @@ export function StoreModal({ isOpen, onClose, currentStore, currentDate, onSaveS
 
   const displayDate = toIndoDisplayDate(isoDate);
 
-  const stores = [
+  const defaultStores = [
     'Lotte Mart Grocery - Puri Indah',
     'Super Indo - Pesanggrahan',
     'Hypermart - Puri Mall',
     'Indogrosir Daan Mogot'
   ];
+
+  // Gabungkan daftar 4 toko default dengan customSupermarkets menjadi satu array
+  const allStores = Array.from(new Set([
+    ...defaultStores,
+    ...(customSupermarkets || []).filter(Boolean)
+  ]));
+
+  const handleSaveNewStore = async () => {
+    if (!newStoreName.trim()) return;
+    const cleanName = newStoreName.trim();
+    setIsSavingStore(true);
+    playTapSound();
+
+    try {
+      if (onAddNewStore) {
+        await onAddNewStore(cleanName);
+      }
+      playSuccessSound();
+      setStore(cleanName);
+      setIsAddingStore(false);
+      setNewStoreName('');
+    } catch (err) {
+      console.warn('[handleSaveNewStore error]:', err);
+    } finally {
+      setIsSavingStore(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/60 backdrop-blur-xs p-0 sm:p-4 animate-fade-in">
@@ -155,8 +197,8 @@ export function StoreModal({ isOpen, onClose, currentStore, currentDate, onSaveS
         <div className="py-4 space-y-4">
           <div>
             <label className="text-xs font-bold text-slate-800 mb-1.5 block">Nama Supermarket</label>
-            <div className="space-y-1.5">
-              {stores.map((s) => (
+            <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-0.5">
+              {allStores.map((s) => (
                 <button
                   key={s}
                   type="button"
@@ -167,11 +209,66 @@ export function StoreModal({ isOpen, onClose, currentStore, currentDate, onSaveS
                       : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                   }`}
                 >
-                  <span>{s}</span>
-                  {store === s && <Check className="w-4 h-4 text-emerald-700" />}
+                  <span className="truncate">{s}</span>
+                  {store === s && <Check className="w-4 h-4 text-emerald-700 shrink-0" />}
                 </button>
               ))}
             </div>
+
+            {/* UI Form Inline & Tombol Tambah Toko Baru */}
+            {isAddingStore ? (
+              <div className="mt-2.5 p-3 bg-emerald-50/40 border border-emerald-300 rounded-xl space-y-2 animate-fade-in">
+                <input
+                  type="text"
+                  value={newStoreName}
+                  onChange={(e) => setNewStoreName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSaveNewStore();
+                    } else if (e.key === 'Escape') {
+                      setIsAddingStore(false);
+                    }
+                  }}
+                  placeholder="Masukkan nama toko baru..."
+                  autoFocus
+                  className="w-full py-2 px-3 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 shadow-2xs"
+                />
+                <div className="flex items-center justify-end space-x-2">
+                  <button
+                    type="button"
+                    disabled={isSavingStore}
+                    onClick={() => {
+                      playTapSound();
+                      setIsAddingStore(false);
+                      setNewStoreName('');
+                    }}
+                    className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSavingStore || !newStoreName.trim()}
+                    onClick={handleSaveNewStore}
+                    className="px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-900 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors shadow-2xs cursor-pointer flex items-center space-x-1"
+                  >
+                    <span>{isSavingStore ? 'Menyimpan...' : 'Simpan'}</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  playTapSound();
+                  setIsAddingStore(true);
+                }}
+                className="mt-2 flex items-center space-x-1.5 text-xs font-extrabold text-emerald-700 hover:text-emerald-800 hover:underline py-1 px-1 transition-colors cursor-pointer"
+              >
+                <span>+ Tambah Toko Baru</span>
+              </button>
+            )}
           </div>
 
           <div>

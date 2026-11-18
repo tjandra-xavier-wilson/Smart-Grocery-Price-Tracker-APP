@@ -306,6 +306,41 @@
       } catch (e) {
         return false;
       }
+    },
+
+    /**
+     * 8. Simpan lokasi supermarket kustom
+     */
+    async insertCustomStore(storeName, userId) {
+      const sb = getClient();
+      if (!storeName || !storeName.trim()) return false;
+      try {
+        const { data, error } = await sb
+          .from('custom_stores')
+          .insert([{ store_name: storeName.trim(), user_id: userId || null }])
+          .select();
+        return !error;
+      } catch (e) {
+        return false;
+      }
+    },
+
+    /**
+     * 9. Ambil daftar supermarket kustom
+     */
+    async getCustomStores(userId) {
+      const sb = getClient();
+      if (!sb) return [];
+      try {
+        const { data, error } = await sb
+          .from('custom_stores')
+          .select('*')
+          .order('created_at', { ascending: true });
+        if (error || !data) return [];
+        return data.map(d => d.store_name);
+      } catch (e) {
+        return [];
+      }
     }
   };
 

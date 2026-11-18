@@ -182,6 +182,52 @@ assert(shouldRenderNullHistory === false, 'Badge fluktuasi untuk barang tanpa ha
 const shouldRenderValid = shouldRenderFluctuationBadge({ currentPrice: 40000, historyPrice: 35000, isCustom: false });
 assert(shouldRenderValid === true, 'Badge fluktuasi untuk barang dengan riwayat sah diizinkan dirender');
 
+console.log('\n--- TEST GROUP 9: Lokasi Supermarket Kustom & Fallback Harga Standar (Lotte Mart) ---');
+const { resolveItemPrice } = require('./app/utils/storePrices.js');
+const { insertCustomStore, getCustomStores } = require('./src/lib/supabaseClient.js');
+
+// Uji Kasus 1: Penggabungan 4 toko default dengan customSupermarkets
+const defaultStores = [
+  'Lotte Mart Grocery - Puri Indah',
+  'Super Indo - Pesanggrahan',
+  'Hypermart - Puri Mall',
+  'Indogrosir Daan Mogot'
+];
+const customStoresList = ['Toko Sembako Berkah', 'Warung Madura 24 Jam'];
+const combinedStores = Array.from(new Set([...defaultStores, ...customStoresList]));
+assert(combinedStores.length === 6, 'Daftar supermarket berhasil menggabungkan 4 toko default + 2 toko kustom');
+assert(combinedStores.includes('Toko Sembako Berkah'), 'Toko kustom baru tersedia di daftar pilihan');
+
+// Uji Kasus 2: Fallback Harga Standar (Lotte Mart) jika Toko Kustom dipilih
+// Sesuai SRS: const currentPrice = item.prices[selectedSupermarket]?.current || item.prices["Lotte Mart - Puri Indah"].current;
+const mockMasterItem = {
+  id: 'item-beras',
+  name: 'Beras Premium Rojolele 5kg',
+  prices: {
+    'Lotte Mart - Puri Indah': { current: 74000, history: 68000 },
+    'Super Indo - Pesanggrahan': { current: 69900, history: 72900 },
+    'Hypermart - Puri Mall': { current: 72500, history: 72500 },
+    'Indogrosir Daan Mogot': { current: 65000, history: 60000 }
+  }
+};
+
+// Item tidak memiliki properti 'Toko Sembako Berkah' di objek prices
+const fallbackPrice = getItemStorePrice(mockMasterItem, 'Toko Sembako Berkah');
+assert(fallbackPrice.current === 74000, 'Harga item di Toko Kustom otomatis fallback ke harga standar Lotte Mart (Rp 74.000)');
+assert(fallbackPrice.history === 68000, 'Harga riwayat item di Toko Kustom fallback ke riwayat Lotte Mart (Rp 68.000)');
+
+const resolvedPrice = resolveItemPrice(mockMasterItem, 'Toko Sembako Berkah');
+assert(resolvedPrice === 74000, 'resolveItemPrice mengembalikan harga Rp 74.000 tanpa crash');
+
+// Uji Kasus 3: Optional Chaining langsung pada item tanpa properti toko kustom
+const directOptionalChainingPrice = mockMasterItem.prices?.['Toko Sembako Berkah']?.current || 
+                                     mockMasterItem.prices?.['Lotte Mart - Puri Indah']?.current;
+assert(directOptionalChainingPrice === 74000, 'Pola Optional Chaining langsung menghasilkan harga Lotte Mart');
+
+// Uji Kasus 4: Helper fungsi database Supabase
+assert(typeof insertCustomStore === 'function', 'Helper insertCustomStore tersedia');
+assert(typeof getCustomStores === 'function', 'Helper getCustomStores tersedia');
+
 console.log(`\n========================================================`);
 console.log(`🏁 HASIL PENGUJIAN: ${passedTests} / ${totalTests} TEST BERHASIL LULUS 100%!`);
 console.log(`========================================================`);

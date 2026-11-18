@@ -136,7 +136,11 @@ export default function CatalogInputScreen({
     playTapSound();
     setItemName(product.name);
     const storeP = getItemStorePrice(product, currentStore);
-    const resolvedPrice = storeP.current || product.price;
+    const resolvedPrice = product.prices?.[currentStore]?.current || 
+                          product.prices?.['Lotte Mart - Puri Indah']?.current || 
+                          product.prices?.['Lotte Mart Grocery - Puri Indah']?.current || 
+                          storeP.current || 
+                          product.price;
     if (resolvedPrice) setNormalPrice(String(resolvedPrice));
     if (product.unit) setUnit(product.unit);
     if (product.category) setCategory(mapCategory(product.category));

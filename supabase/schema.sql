@@ -74,6 +74,19 @@ CREATE INDEX IF NOT EXISTS idx_products_name ON public.products (lower(name));
 CREATE INDEX IF NOT EXISTS idx_products_user_id ON public.products (user_id);
 
 -- ==============================================================================
+-- 3E. TABEL: custom_stores (Daftar Lokasi Supermarket Kustom Pengguna)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.custom_stores (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID, -- Terikat dengan auth.users(id) atau null untuk fallback anonim
+  store_name TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_custom_stores_user_id ON public.custom_stores (user_id);
+CREATE INDEX IF NOT EXISTS idx_custom_stores_name ON public.custom_stores (lower(store_name));
+
+-- ==============================================================================
 -- 4. TABEL: grocery_items
 -- Menyimpan detail baris item belanjaan dengan formula diskon & harga riwayat
 -- ==============================================================================
@@ -209,6 +222,25 @@ DROP POLICY IF EXISTS "Public select grocery_items" ON public.grocery_items;
 CREATE POLICY "Public select grocery_items" 
   ON public.grocery_items FOR SELECT 
   USING (true);
+
+-- F. Kebijakan Akses: custom_stores
+ALTER TABLE public.custom_stores ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can access their own custom stores" ON public.custom_stores;
+CREATE POLICY "Users can access their own custom stores" 
+  ON public.custom_stores FOR ALL 
+  USING (auth.uid() = user_id OR user_id IS NULL) 
+  WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
+
+DROP POLICY IF EXISTS "Public select custom_stores" ON public.custom_stores;
+CREATE POLICY "Public select custom_stores" 
+  ON public.custom_stores FOR SELECT 
+  USING (true);
+
+DROP POLICY IF EXISTS "Public insert custom_stores" ON public.custom_stores;
+CREATE POLICY "Public insert custom_stores" 
+  ON public.custom_stores FOR INSERT 
+  WITH CHECK (true);
 
 -- ==============================================================================
 -- 7. TRIGGER AUTO UPDATE TIMESTAMP (budget_settings.updated_at)

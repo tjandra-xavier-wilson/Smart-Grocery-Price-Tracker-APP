@@ -36,7 +36,9 @@ import {
   SINGLE_USER_STORAGE_KEY,
   insertCustomProduct,
   getCustomProducts,
-  generateDefaultPrices
+  generateDefaultPrices,
+  insertCustomStore,
+  getCustomStores
 } from '../src/lib/supabaseClient';
 import { toIndoDisplayDate, toISODateString } from './utils/date';
 import { playTapSound, playSuccessSound } from './utils/sound';
@@ -281,6 +283,8 @@ export default function Home() {
 
   // State Global untuk Master Produk & Barang Kustom (Terintegrasi Supabase)
   const [customProducts, setCustomProducts] = useState([]);
+  // State Global untuk Lokasi Supermarket Kustom (Terintegrasi Supabase custom_stores)
+  const [customSupermarkets, setCustomSupermarkets] = useState([]);
 
   // Muat custom products dari Supabase / LocalStorage saat akun aktif
   useEffect(() => {
@@ -292,6 +296,41 @@ export default function Home() {
     }).catch(() => {});
     return () => { isMounted = false; };
   }, [currentUser?.id]);
+
+  // Muat custom stores dari Supabase / LocalStorage saat akun aktif
+  useEffect(() => {
+    let isSubscribed = true;
+    getCustomStores(currentUser?.id).then(stores => {
+      if (isSubscribed && stores && Array.isArray(stores)) {
+        setCustomSupermarkets(stores);
+      }
+    }).catch(() => {});
+    return () => { isSubscribed = false; };
+  }, [currentUser?.id]);
+
+  // Handler simpan lokasi supermarket baru ke Supabase & state lokal
+  const handleAddNewStore = async (newStoreName) => {
+    if (!newStoreName || !newStoreName.trim()) return false;
+    const cleanName = newStoreName.trim();
+
+    // 1. Optimistic update ke state lokal customSupermarkets
+    setCustomSupermarkets(prev => {
+      if (prev.includes(cleanName)) return prev;
+      return [...prev, cleanName];
+    });
+
+    // 2. Otomatis atur toko yang baru dibuat sebagai selectedSupermarket yang aktif
+    setCurrentStore(cleanName);
+    persistState(undefined, undefined, cleanName);
+
+    // 3. Simpan permanen ke Supabase tabel custom_stores
+    try {
+      await insertCustomStore(cleanName, currentUser?.id);
+    } catch (e) {
+      console.warn('[Sync Custom Store Error]:', e);
+    }
+    return true;
+  };
 
   // Handler simpan barang kustom baru: Optimistic UI + Insert Supabase
   const handleAddCustomProduct = async (productData) => {
@@ -1681,6 +1720,9 @@ export default function Home() {
                   currentStore={currentStore}
                   currentDate={transactionDate}
                   onSaveStore={handleSaveStore}
+                  customSupermarkets={customSupermarkets}
+                  onAddNewStore={handleAddNewStore}
+                  userId={currentUser?.id}
                 />
 
                 <BarcodeScannerModal

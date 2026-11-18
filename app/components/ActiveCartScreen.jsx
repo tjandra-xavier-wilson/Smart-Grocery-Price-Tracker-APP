@@ -613,10 +613,15 @@ export default function ActiveCartScreen({
     playTapSound();
     if (onAddToCart) {
       const storePrice = getItemStorePrice(prod, currentStore);
+      const resolvedCurrent = prod.prices?.[currentStore]?.current || 
+                              prod.prices?.['Lotte Mart - Puri Indah']?.current || 
+                              prod.prices?.['Lotte Mart Grocery - Puri Indah']?.current || 
+                              storePrice.current || 
+                              prod.price || 0;
       onAddToCart({
         id: 'rec-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
         name: prod.name,
-        price: storePrice.current,
+        price: resolvedCurrent,
         originalPrice: storePrice.history,
         lastMonthPrice: storePrice.history,
         prices: prod.prices,
@@ -631,6 +636,11 @@ export default function ActiveCartScreen({
   // Render Product Card (Horizontal List Layout with Full Emoji Box & Dynamic Store Pricing)
   const renderProductCard = (prod) => {
     const storePrice = getItemStorePrice(prod, currentStore);
+    const currentPrice = prod.prices?.[currentStore]?.current || 
+                         prod.prices?.['Lotte Mart - Puri Indah']?.current || 
+                         prod.prices?.['Lotte Mart Grocery - Puri Indah']?.current || 
+                         storePrice.current || 
+                         prod.price || 0;
     return (
       <div 
         key={prod.id}
@@ -663,7 +673,7 @@ export default function ActiveCartScreen({
           {!prod.isCustom && storePrice.history !== null && storePrice.history !== undefined && !isNaN(Number(storePrice.history)) && (
             <div className="mt-1">
               <PriceFluctuationBadge 
-                currentPrice={storePrice.current} 
+                currentPrice={currentPrice} 
                 historyPrice={storePrice.history} 
                 showOldPrice={true} 
                 isCustom={prod.isCustom}
@@ -676,7 +686,7 @@ export default function ActiveCartScreen({
         <div className="text-right shrink-0 flex items-center space-x-2">
           <div>
             <span className="text-xs font-black text-slate-900 block">
-              Rp {storePrice.current.toLocaleString('id-ID')}
+              Rp {currentPrice.toLocaleString('id-ID')}
             </span>
           </div>
           <button
@@ -695,7 +705,11 @@ export default function ActiveCartScreen({
   // Calculations: Dihitung secara dinamis berdasarkan supermarket yang aktif
   const totalCartPrice = cartItems.reduce((acc, item) => {
     const storePrice = getItemStorePrice(item, currentStore);
-    const itemPrice = storePrice.current || item.price || 0;
+    const itemPrice = item.prices?.[currentStore]?.current || 
+                      item.prices?.['Lotte Mart - Puri Indah']?.current || 
+                      item.prices?.['Lotte Mart Grocery - Puri Indah']?.current || 
+                      storePrice.current || 
+                      item.price || 0;
     return acc + (itemPrice * (item.quantity || 1));
   }, 0);
 
@@ -1185,7 +1199,11 @@ export default function ActiveCartScreen({
           <div className="space-y-2.5">
             {cartItems.map((item) => {
               const storePrice = getItemStorePrice(item, currentStore);
-              const currentItemPrice = storePrice.current || item.price || 0;
+              const currentItemPrice = item.prices?.[currentStore]?.current || 
+                                       item.prices?.['Lotte Mart - Puri Indah']?.current || 
+                                       item.prices?.['Lotte Mart Grocery - Puri Indah']?.current || 
+                                       storePrice.current || 
+                                       item.price || 0;
               const rawHistory = item.isCustom ? null : (storePrice.history ?? item.lastMonthPrice ?? null);
               const currentHistoryPrice = (rawHistory !== null && rawHistory !== undefined && !isNaN(Number(rawHistory))) ? Number(rawHistory) : null;
               const hasValidHistory = !item.isCustom && currentHistoryPrice !== null;
