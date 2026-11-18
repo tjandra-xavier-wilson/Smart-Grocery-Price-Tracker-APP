@@ -49,6 +49,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, currentUser 
 
     window.addEventListener('pageshow', resetLoadingStates);
     window.addEventListener('focus', resetLoadingStates);
+    window.addEventListener('google_popup_closed', resetLoadingStates);
     const handleVis = () => {
       if (document.visibilityState === 'visible') resetLoadingStates();
     };
@@ -58,6 +59,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, currentUser 
       subscription?.unsubscribe();
       window.removeEventListener('pageshow', resetLoadingStates);
       window.removeEventListener('focus', resetLoadingStates);
+      window.removeEventListener('google_popup_closed', resetLoadingStates);
       document.removeEventListener('visibilitychange', handleVis);
     };
   }, [isOpen, onAuthSuccess, onClose]);
@@ -110,10 +112,11 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, currentUser 
       const res = await signInWithGoogle();
       if (!res.success) {
         setErrorMsg(res.error || 'Gagal memulai login Google');
+        setLoading(false);
+        setGoogleLoading(false);
       }
     } catch (err) {
       setErrorMsg(err.message || 'Gagal masuk akun Google');
-    } finally {
       setLoading(false);
       setGoogleLoading(false);
     }

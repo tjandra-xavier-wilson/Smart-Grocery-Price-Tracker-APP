@@ -1184,6 +1184,28 @@ export default function Home() {
               localStorage.setItem(STORAGE_KEYS.AUTH, 'true');
               localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(profile));
 
+              // Jika jendela ini adalah pop-up Google OAuth, kirim data ke jendela utama dan tutup pop-up
+              if (window.opener && window.opener !== window) {
+                try {
+                  window.opener.postMessage({
+                    type: 'SUPABASE_OAUTH_TOKEN_TRANSFER',
+                    hash: window.location.hash,
+                    user: {
+                      id: payload.sub,
+                      email: email,
+                      user_metadata: {
+                        full_name: name,
+                        avatar_url: avatar
+                      }
+                    }
+                  }, '*');
+                  window.close();
+                  return;
+                } catch (e) {
+                  try { window.close(); } catch (err) {}
+                }
+              }
+
               // Bersihkan token dari address bar agar URL kembali rapi
               window.history.replaceState(null, '', window.location.pathname + window.location.search);
             }
@@ -1612,6 +1634,22 @@ export default function Home() {
 
       if (session?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION')) {
         const u = session.user;
+
+        // Jika jendela saat ini adalah pop-up Google OAuth, kirim session ke jendela utama dan tutup pop-up seketika
+        if (typeof window !== 'undefined' && window.opener && window.opener !== window) {
+          try {
+            window.opener.postMessage({
+              type: 'SUPABASE_OAUTH_TOKEN_TRANSFER',
+              user: u
+            }, '*');
+            window.close();
+            return;
+          } catch (e) {
+            try { window.close(); } catch (err) {}
+            return;
+          }
+        }
+
         const profile = {
           id: u.id,
           name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0],

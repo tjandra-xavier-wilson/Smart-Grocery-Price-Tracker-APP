@@ -44,6 +44,7 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
   const [infoMsg, setInfoMsg] = useState('');
   const [deviceAccounts, setDeviceAccounts] = useState([]);
   const isAuthInitiatedRef = useRef(false);
+  const isGooglePopupActiveRef = useRef(false);
 
   // Listener onAuthStateChange & Event Reset untuk mengatasi infinite loading
   useEffect(() => {
@@ -75,14 +76,24 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
 
     // 2. Tangani tombol 'Back' browser/HP (bfcache) dan fokus tab kembali
     const handleResetLoading = () => {
+      // Jika Google Sign-In sedang berjalan melalui popup, jangan batalkan status saat window menerima fokus
+      if (isGooglePopupActiveRef.current) return;
       setLoading(false);
       setGoogleLoading(false);
-      // Saat tab kembali fokus (Alt+Tab), pastikan inisiasi auth direset agar tidak memicu auto-login splash
       isAuthInitiatedRef.current = false;
+    };
+
+    const handleGooglePopupClosed = () => {
+      setTimeout(() => {
+        isGooglePopupActiveRef.current = false;
+        setLoading(false);
+        setGoogleLoading(false);
+      }, 700);
     };
 
     window.addEventListener('pageshow', handleResetLoading);
     window.addEventListener('focus', handleResetLoading);
+    window.addEventListener('google_popup_closed', handleGooglePopupClosed);
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         handleResetLoading();
@@ -94,6 +105,7 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
       subscription?.unsubscribe();
       window.removeEventListener('pageshow', handleResetLoading);
       window.removeEventListener('focus', handleResetLoading);
+      window.removeEventListener('google_popup_closed', handleGooglePopupClosed);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [onLoginSuccess]);
@@ -233,12 +245,13 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
     }
   };
 
-  // Google Sign-In Resmi Supabase (accounts.google.com) dengan proteksi try...catch...finally
+  // Google Sign-In Resmi Supabase (Popup Mode)
   const handleGoogleSignIn = async () => {
     playTapSound();
     setGoogleLoading(true);
     setLoading(true);
     isAuthInitiatedRef.current = true;
+    isGooglePopupActiveRef.current = true;
     setErrorMsg('');
     setInfoMsg('');
 
@@ -246,13 +259,17 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
       const res = await signInWithGoogle();
       if (!res.success) {
         setErrorMsg(res.error || 'Gagal memulai autentikasi Google. Pastikan Google Provider sudah diaktifkan di Supabase.');
+        setLoading(false);
+        setGoogleLoading(false);
+        isAuthInitiatedRef.current = false;
+        isGooglePopupActiveRef.current = false;
       }
     } catch (err) {
       setErrorMsg(err.message || 'Gagal mengarahkan ke Google OAuth.');
-    } finally {
-      // Wajib kembalikan state loading ke false agar tombol kembali normal dan bisa diklik lagi
       setLoading(false);
       setGoogleLoading(false);
+      isAuthInitiatedRef.current = false;
+      isGooglePopupActiveRef.current = false;
     }
   };
 

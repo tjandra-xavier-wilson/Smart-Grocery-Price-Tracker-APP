@@ -1111,10 +1111,41 @@ export async function signInWithGoogle() {
         }
 
         if (isInIframe) {
-          // Jika aplikasi dibuka di dalam Canvas / iframe / Webview, buka Google OAuth di tab baru untuk mencegah error 'This page couldn't load' (X-Frame-Options Google)
+          // Jika aplikasi dibuka di dalam Canvas / iframe / Webview, buka di tab baru
           window.open(data.url, '_blank');
         } else {
-          window.location.href = data.url;
+          // Popup Mode: Buka jendela pop-up Google Sign-In terpisah berukuran width=500, height=600
+          const width = 500;
+          const height = 600;
+          const screenLeft = window.screenLeft !== undefined ? window.screenLeft : window.screenX;
+          const screenTop = window.screenTop !== undefined ? window.screenTop : window.screenY;
+          const outerWidth = window.outerWidth || document.documentElement.clientWidth || screen.width;
+          const outerHeight = window.outerHeight || document.documentElement.clientHeight || screen.height;
+          const left = Math.max(0, Math.round(screenLeft + (outerWidth - width) / 2));
+          const top = Math.max(0, Math.round(screenTop + (outerHeight - height) / 2));
+
+          const popup = window.open(
+            data.url,
+            'google_oauth_popup',
+            `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,location=no,status=no,scrollbars=yes,resizable=yes`
+          );
+
+          if (popup) {
+            popup.focus();
+
+            // Monitor penutupan popup jika pengguna membatalkan atau menutup jendela pop-up manual
+            const popupTimer = setInterval(() => {
+              if (!popup || popup.closed) {
+                clearInterval(popupTimer);
+                try {
+                  window.dispatchEvent(new CustomEvent('google_popup_closed'));
+                } catch (e) {}
+              }
+            }, 500);
+          } else {
+            // Fallback jika browser memblokir pop-up otomatis
+            window.location.href = data.url;
+          }
         }
       }
       return { success: true, data };
