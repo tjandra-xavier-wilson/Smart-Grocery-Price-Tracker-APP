@@ -48,7 +48,7 @@ export function getItemStorePrice(item, supermarket = DEFAULT_SUPERMARKET) {
 
   // 1. Cek kecocokan langsung di objek item.prices
   if (item.prices && typeof item.prices === 'object') {
-    let matchedStore = item.prices[targetStore];
+    let matchedStore = item.prices?.[supermarket] || item.prices?.[targetStore];
     if (!matchedStore) {
       for (const [key, val] of Object.entries(item.prices)) {
         if (normalizeSupermarketName(key) === targetStore && val) {
@@ -68,10 +68,10 @@ export function getItemStorePrice(item, supermarket = DEFAULT_SUPERMARKET) {
 
     // Fallback: Jika tidak ditemukan di targetStore (misal toko kustom baru),
     // gunakan harga standar Lotte Mart:
-    // const currentPrice = item.prices[selectedSupermarket]?.current || item.prices["Lotte Mart - Puri Indah"].current;
-    const fallbackLotte = item.prices['Lotte Mart - Puri Indah'] || 
-                         item.prices['Lotte Mart Grocery - Puri Indah'] || 
-                         item.prices[DEFAULT_SUPERMARKET];
+    // const currentPrice = item.prices?.[selectedSupermarket]?.current || item.prices?.["Lotte Mart - Puri Indah"]?.current;
+    const fallbackLotte = item.prices?.['Lotte Mart - Puri Indah'] || 
+                         item.prices?.['Lotte Mart Grocery - Puri Indah'] || 
+                         item.prices?.[DEFAULT_SUPERMARKET];
     if (fallbackLotte) {
       return {
         current: Number(fallbackLotte.current || item.price || 0),

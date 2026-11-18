@@ -127,6 +127,7 @@ export function StoreModal({
   const [newStoreName, setNewStoreName] = useState('');
   const [isSavingStore, setIsSavingStore] = useState(false);
   const [deletingStoreId, setDeletingStoreId] = useState(null);
+  const [storeToDeletePrompt, setStoreToDeletePrompt] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -136,6 +137,7 @@ export function StoreModal({
       setNewStoreName('');
       setIsSavingStore(false);
       setDeletingStoreId(null);
+      setStoreToDeletePrompt(null);
     }
   }, [isOpen, currentStore, currentDate]);
 
@@ -233,8 +235,6 @@ export function StoreModal({
       setIsSavingStore(false);
     }
   };
-
-  const [storeToDeletePrompt, setStoreToDeletePrompt] = useState(null);
 
   const handleDeleteStore = (e, item) => {
     e.stopPropagation();

@@ -36,7 +36,7 @@ import {
 import { playTapSound, playSuccessSound, playWarningBeep } from '../utils/sound';
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
 import { getProductEmoji, ProductEmojiBox, PriceFluctuationBadge } from '../utils/emoji';
-import { getItemStorePrice } from '../utils/storePrices';
+import { getItemStorePrice, normalizeSupermarketName } from '../utils/storePrices';
 import { supabase } from '../../src/lib/supabaseClient';
 
 export default function ActiveCartScreen({
@@ -753,7 +753,7 @@ export default function ActiveCartScreen({
             </span>
           </div>
           {/* Indikator Fluktuasi Harga Skenario Uji 4 */}
-          {!prod.isCustom && storePrice.history !== null && storePrice.history !== undefined && !isNaN(Number(storePrice.history)) && (
+          {!prod.isCustom && Boolean(prod.prices?.[currentStore] || prod.prices?.[normalizeSupermarketName(currentStore)]) && storePrice.history !== null && storePrice.history !== undefined && !isNaN(Number(storePrice.history)) && (
             <div className="mt-1">
               <PriceFluctuationBadge 
                 currentPrice={currentPrice} 
@@ -1287,9 +1287,10 @@ export default function ActiveCartScreen({
                                        item.prices?.['Lotte Mart Grocery - Puri Indah']?.current || 
                                        storePrice.current || 
                                        item.price || 0;
-              const rawHistory = item.isCustom ? null : (storePrice.history ?? item.lastMonthPrice ?? null);
+              const hasStoreExplicitPrice = Boolean(item.prices?.[currentStore] || item.prices?.[normalizeSupermarketName(currentStore)]);
+              const rawHistory = (!item.isCustom && hasStoreExplicitPrice) ? (storePrice.history ?? item.lastMonthPrice ?? null) : null;
               const currentHistoryPrice = (rawHistory !== null && rawHistory !== undefined && !isNaN(Number(rawHistory))) ? Number(rawHistory) : null;
-              const hasValidHistory = !item.isCustom && currentHistoryPrice !== null;
+              const hasValidHistory = !item.isCustom && hasStoreExplicitPrice && currentHistoryPrice !== null;
               const itemTotal = currentItemPrice * (item.quantity || 1);
               const hasDiscount = item.originalPrice && item.originalPrice > currentItemPrice;
               const isItemSecondary = item.isSecondary;
