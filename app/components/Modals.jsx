@@ -652,23 +652,23 @@ export function ThermalPaperReceiptModal({
     playTapSound();
     const itemsText = (normalized.items || []).map(item => {
       const qtyStr = item.unit ? `${item.quantity} ${item.unit}` : `${item.quantity}`;
-      return `${item.name}\n${qtyStr} x Rp ${item.price.toLocaleString('id-ID')} = Rp ${item.lineTotal.toLocaleString('id-ID')}`;
+      return `• ${item.name} (${qtyStr}) = Rp ${item.lineTotal.toLocaleString('id-ID')}`;
     }).join('\n');
 
-    const receiptText = `${normalized.storeName}
+    const receiptText = `🧾 *STRUK BELANJA - ${normalized.storeName.toUpperCase()}*
+📅 Tanggal: ${normalized.date}, ${normalized.time}
+👤 Pelanggan: ${normalized.customerName}
+🏢 Kasir: ${normalized.cashier}
 --------------------------------
-No. Struk: ${normalized.id}
-Tanggal: ${normalized.date}, ${normalized.time}
-Pelanggan: ${normalized.customerName}
---------------------------------
-ITEM / KUANTITAS
+*RINCIAN BELANJA:*
 ${itemsText}
 --------------------------------
 Subtotal: Rp ${normalized.subtotal.toLocaleString('id-ID')}
 Pajak (11%): Rp ${normalized.pajak.toLocaleString('id-ID')}
---------------------------------
-GRAND TOTAL: Rp ${normalized.grandTotal.toLocaleString('id-ID')}
-Status: ${normalized.status}`;
+*GRAND TOTAL: Rp ${normalized.grandTotal.toLocaleString('id-ID')}*
+Status: ✅ ${normalized.status}
+
+Terima kasih telah berbelanja di ${normalized.storeName}!`;
 
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(receiptText);
@@ -898,7 +898,7 @@ Status: ${normalized.status}`;
               {copied ? (
                 <>
                   <Check className="w-4 h-4 text-emerald-600" />
-                  <span className="text-emerald-700 font-bold">Tersalin!</span>
+                  <span className="text-emerald-700 font-bold">✅ Disalin!</span>
                 </>
               ) : (
                 <>

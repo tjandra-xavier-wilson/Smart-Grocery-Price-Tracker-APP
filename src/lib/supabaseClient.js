@@ -1287,7 +1287,7 @@ export async function getCustomProducts(userId = null) {
   try {
     let query = supabase.from('products').select('*').order('created_at', { ascending: false });
     if (userId) {
-      query = query.or(`user_id.eq.${userId},user_id.is.null`);
+      query = query.eq('user_id', userId);
     }
     const { data, error } = await query;
     if (error || !data || data.length === 0) {
@@ -1387,8 +1387,40 @@ export async function insertCustomStore(storeName, userId = null) {
 /**
  * Hapus Lokasi Supermarket Kustom dari Supabase (tabel custom_stores) & LocalStorage
  */
-export async function deleteCustomStore(storeId, storeName = null) {
-  // 1. Hapus dari LocalStorage
+export async function deleteCustomStore(storeId, storeName = null, userId = null) {
+  let targetUserId = userId;
+  if (!targetUserId && typeof localStorage !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('sakugrosir_single_user_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        targetUserId = parsed?.id;
+      }
+    } catch (e) {}
+  }
+
+  // 1. Eksekusi delete ke Supabase terlebih dahulu
+  try {
+    let query = supabase.from('custom_stores').delete();
+    if (storeId && !String(storeId).startsWith('store-') && !String(storeId).startsWith('local-')) {
+      query = query.eq('id', storeId);
+    } else if (storeName) {
+      query = query.eq('store_name', storeName);
+    }
+    if (targetUserId) {
+      query = query.eq('user_id', targetUserId);
+    }
+    const { error } = await query;
+    if (error) {
+      console.warn('[deleteCustomStore Supabase Error]:', error.message);
+      return { success: false, error };
+    }
+  } catch (err) {
+    console.warn('[deleteCustomStore Error]:', err.message);
+    return { success: false, error: err };
+  }
+
+  // 2. Bersihkan dari LocalStorage HANYA jika server berhasil
   if (typeof localStorage !== 'undefined') {
     try {
       const stored = localStorage.getItem('sakugrosir_custom_stores_v1');
@@ -1407,31 +1439,46 @@ export async function deleteCustomStore(storeId, storeName = null) {
     } catch (e) {}
   }
 
-  // 2. Eksekusi delete ke Supabase
-  try {
-    let query = supabase.from('custom_stores').delete();
-    if (storeId && !String(storeId).startsWith('store-') && !String(storeId).startsWith('local-')) {
-      query = query.eq('id', storeId);
-    } else if (storeName) {
-      query = query.eq('store_name', storeName);
-    }
-    const { error } = await query;
-    if (error) {
-      console.warn('[deleteCustomStore Supabase Error]:', error.message);
-      return { success: false, error };
-    }
-    return { success: true };
-  } catch (err) {
-    console.warn('[deleteCustomStore Error]:', err.message);
-    return { success: false, error: err };
-  }
+  return { success: true };
 }
 
 /**
  * Hapus Barang Kustom dari Supabase (tabel products) & LocalStorage
  */
-export async function deleteCustomProduct(productId, productName = null) {
-  // 1. Hapus dari LocalStorage
+export async function deleteCustomProduct(productId, productName = null, userId = null) {
+  let targetUserId = userId;
+  if (!targetUserId && typeof localStorage !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('sakugrosir_single_user_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        targetUserId = parsed?.id;
+      }
+    } catch (e) {}
+  }
+
+  // 1. Eksekusi delete ke Supabase terlebih dahulu
+  try {
+    let query = supabase.from('products').delete();
+    if (productId && !String(productId).startsWith('prod-') && !String(productId).startsWith('local-')) {
+      query = query.eq('id', productId);
+    } else if (productName) {
+      query = query.eq('name', productName);
+    }
+    if (targetUserId) {
+      query = query.eq('user_id', targetUserId);
+    }
+    const { error } = await query;
+    if (error) {
+      console.warn('[deleteCustomProduct Supabase Error]:', error.message);
+      return { success: false, error };
+    }
+  } catch (err) {
+    console.warn('[deleteCustomProduct Error]:', err.message);
+    return { success: false, error: err };
+  }
+
+  // 2. Bersihkan dari LocalStorage HANYA jika server berhasil
   if (typeof localStorage !== 'undefined') {
     try {
       const stored = localStorage.getItem('sakugrosir_custom_products_v1');
@@ -1447,24 +1494,7 @@ export async function deleteCustomProduct(productId, productName = null) {
     } catch (e) {}
   }
 
-  // 2. Eksekusi delete ke Supabase
-  try {
-    let query = supabase.from('products').delete();
-    if (productId && !String(productId).startsWith('prod-') && !String(productId).startsWith('local-')) {
-      query = query.eq('id', productId);
-    } else if (productName) {
-      query = query.eq('name', productName);
-    }
-    const { error } = await query;
-    if (error) {
-      console.warn('[deleteCustomProduct Supabase Error]:', error.message);
-      return { success: false, error };
-    }
-    return { success: true };
-  } catch (err) {
-    console.warn('[deleteCustomProduct Error]:', err.message);
-    return { success: false, error: err };
-  }
+  return { success: true };
 }
 
 /**
@@ -1514,7 +1544,7 @@ export async function getCustomStores(userId = null) {
 
     let query = supabase.from('custom_stores').select('*').order('created_at', { ascending: true });
     if (targetUserId) {
-      query = query.or(`user_id.eq.${targetUserId},user_id.is.null`);
+      query = query.eq('user_id', targetUserId);
     }
     const { data, error } = await query;
     if (error || !data || data.length === 0) {

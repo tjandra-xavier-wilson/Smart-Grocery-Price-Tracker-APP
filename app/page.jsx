@@ -288,21 +288,203 @@ export default function Home() {
   // State Global untuk Lokasi Supermarket Kustom (Terintegrasi Supabase custom_stores)
   const [customSupermarkets, setCustomSupermarkets] = useState([]);
 
-  // Base catalog items bawaan
+  // Base catalog items bawaan (dengan struktur dynamic 4-store pricing)
   const baseDefaultItems = useMemo(() => [
-    { id: 'base-1', name: 'Beras 5kg', price: 74000, lastMonthPrice: 68000, category: 'Bahan Pokok', unit: '5kg', isCustom: false },
-    { id: 'base-2', name: 'Telur Ayam Ras 1kg', price: 28000, lastMonthPrice: 32000, category: 'Bahan Pokok', unit: '1 kg', isCustom: false },
-    { id: 'base-3', name: 'Garam 500g', price: 5000, lastMonthPrice: 5000, category: 'Bahan Pokok', unit: '500g', isCustom: false },
-    { id: 'base-4', name: 'Minyak Goreng Sawit Murni 2L', price: 38500, lastMonthPrice: 35000, category: 'Bahan Pokok', unit: '2L', isCustom: false },
-    { id: 'base-5', name: 'Gula Pasir Kristal Putih 1kg', price: 17500, lastMonthPrice: 17500, category: 'Bahan Pokok', unit: '1 kg', isCustom: false },
-    { id: 'base-6', name: 'Indomie Goreng (5 pcs)', price: 15500, lastMonthPrice: 15500, category: 'Bahan Pokok', unit: '5 pcs', isCustom: false },
-    { id: 'base-7', name: 'Susu UHT Ultra Milk 1L', price: 19500, lastMonthPrice: 21000, category: 'Bahan Pokok', unit: '1L', isCustom: false },
-    { id: 'base-8', name: 'Kecap Manis Bango 550ml', price: 24500, lastMonthPrice: 22000, category: 'Bumbu Dapur', unit: '550ml', isCustom: false },
-    { id: 'base-9', name: 'Bawang Merah Brebes 500g', price: 19000, lastMonthPrice: 22000, category: 'Bumbu Dapur', unit: '500g', isCustom: false },
-    { id: 'base-10', name: 'Bawang Putih Kating 500g', price: 22000, lastMonthPrice: 21000, category: 'Bumbu Dapur', unit: '500g', isCustom: false },
-    { id: 'base-11', name: 'Cabe Rawit Merah 250g', price: 18000, lastMonthPrice: 16000, category: 'Sayuran Segar', unit: '250g', isCustom: false },
-    { id: 'base-12', name: 'Sabun Mandi Dettol 400ml', price: 26500, lastMonthPrice: 29000, category: 'Peralatan Kebersihan', unit: '400ml', isCustom: false },
-    { id: 'base-13', name: 'Deterjen Rinso Cair 750ml', price: 21500, lastMonthPrice: 20000, category: 'Peralatan Kebersihan', unit: '750ml', isCustom: false }
+    {
+      id: 'base-1',
+      name: 'Beras 5kg',
+      price: 74000,
+      lastMonthPrice: 68000,
+      category: 'Bahan Pokok',
+      unit: '5kg',
+      isCustom: false,
+      prices: {
+        'Lotte Mart - Puri Indah': { current: 74000, history: 68000 },
+        'Super Indo - Pesanggrahan': { current: 71900, history: 74900 },
+        'Hypermart - Puri Mall': { current: 73000, history: 73000 },
+        'Indogrosir Daan Mogot': { current: 67000, history: 62000 }
+      }
+    },
+    {
+      id: 'base-2',
+      name: 'Telur Ayam Ras 1kg',
+      price: 28000,
+      lastMonthPrice: 32000,
+      category: 'Bahan Pokok',
+      unit: '1 kg',
+      isCustom: false,
+      prices: {
+        'Lotte Mart - Puri Indah': { current: 28000, history: 32000 },
+        'Super Indo - Pesanggrahan': { current: 27900, history: 31900 },
+        'Hypermart - Puri Mall': { current: 29000, history: 29000 },
+        'Indogrosir Daan Mogot': { current: 25500, history: 24000 }
+      }
+    },
+    {
+      id: 'base-3',
+      name: 'Garam 500g',
+      price: 5000,
+      lastMonthPrice: 5000,
+      category: 'Bahan Pokok',
+      unit: '500g',
+      isCustom: false,
+      prices: {
+        'Lotte Mart - Puri Indah': { current: 5000, history: 5000 },
+        'Super Indo - Pesanggrahan': { current: 4900, history: 5900 },
+        'Hypermart - Puri Mall': { current: 5000, history: 5000 },
+        'Indogrosir Daan Mogot': { current: 4500, history: 4000 }
+      }
+    },
+    {
+      id: 'base-4',
+      name: 'Minyak Goreng Sawit Murni 2L',
+      price: 38500,
+      lastMonthPrice: 35000,
+      category: 'Bahan Pokok',
+      unit: '2L',
+      isCustom: false,
+      prices: {
+        'Lotte Mart - Puri Indah': { current: 38500, history: 35000 },
+        'Super Indo - Pesanggrahan': { current: 37900, history: 39900 },
+        'Hypermart - Puri Mall': { current: 38000, history: 38000 },
+        'Indogrosir Daan Mogot': { current: 34000, history: 32000 }
+      }
+    },
+    {
+      id: 'base-5',
+      name: 'Gula Pasir Kristal Putih 1kg',
+      price: 17500,
+      lastMonthPrice: 17500,
+      category: 'Bahan Pokok',
+      unit: '1 kg',
+      isCustom: false,
+      prices: {
+        'Lotte Mart - Puri Indah': { current: 17500, history: 17500 },
+        'Super Indo - Pesanggrahan': { current: 16900, history: 18900 },
+        'Hypermart - Puri Mall': { current: 17000, history: 17000 },
+        'Indogrosir Daan Mogot': { current: 15500, history: 14500 }
+      }
+    },
+    {
+      id: 'base-6',
+      name: 'Indomie Goreng (5 pcs)',
+      price: 15500,
+      lastMonthPrice: 15500,
+      category: 'Bahan Pokok',
+      unit: '5 pcs',
+      isCustom: false,
+      prices: {
+        'Lotte Mart - Puri Indah': { current: 15500, history: 15500 },
+        'Super Indo - Pesanggrahan': { current: 14900, history: 16900 },
+        'Hypermart - Puri Mall': { current: 15000, history: 15000 },
+        'Indogrosir Daan Mogot': { current: 13500, history: 12500 }
+      }
+    },
+    {
+      id: 'base-7',
+      name: 'Susu UHT Ultra Milk 1L',
+      price: 19500,
+      lastMonthPrice: 21000,
+      category: 'Bahan Pokok',
+      unit: '1L',
+      isCustom: false,
+      prices: {
+        'Lotte Mart - Puri Indah': { current: 19500, history: 21000 },
+        'Super Indo - Pesanggrahan': { current: 18900, history: 21900 },
+        'Hypermart - Puri Mall': { current: 19500, history: 19500 },
+        'Indogrosir Daan Mogot': { current: 17500, history: 16500 }
+      }
+    },
+    {
+      id: 'base-8',
+      name: 'Kecap Manis Bango 550ml',
+      price: 24500,
+      lastMonthPrice: 22000,
+      category: 'Bumbu Dapur',
+      unit: '550ml',
+      isCustom: false,
+      prices: {
+        'Lotte Mart - Puri Indah': { current: 24500, history: 22000 },
+        'Super Indo - Pesanggrahan': { current: 23900, history: 25900 },
+        'Hypermart - Puri Mall': { current: 24000, history: 24000 },
+        'Indogrosir Daan Mogot': { current: 21500, history: 20000 }
+      }
+    },
+    {
+      id: 'base-9',
+      name: 'Bawang Merah Brebes 500g',
+      price: 19000,
+      lastMonthPrice: 22000,
+      category: 'Bumbu Dapur',
+      unit: '500g',
+      isCustom: false,
+      prices: {
+        'Lotte Mart - Puri Indah': { current: 19000, history: 22000 },
+        'Super Indo - Pesanggrahan': { current: 18900, history: 22900 },
+        'Hypermart - Puri Mall': { current: 19000, history: 19000 },
+        'Indogrosir Daan Mogot': { current: 16500, history: 15000 }
+      }
+    },
+    {
+      id: 'base-10',
+      name: 'Bawang Putih Kating 500g',
+      price: 22000,
+      lastMonthPrice: 21000,
+      category: 'Bumbu Dapur',
+      unit: '500g',
+      isCustom: false,
+      prices: {
+        'Lotte Mart - Puri Indah': { current: 22000, history: 21000 },
+        'Super Indo - Pesanggrahan': { current: 21900, history: 24900 },
+        'Hypermart - Puri Mall': { current: 22000, history: 22000 },
+        'Indogrosir Daan Mogot': { current: 19500, history: 18000 }
+      }
+    },
+    {
+      id: 'base-11',
+      name: 'Cabe Rawit Merah 250g',
+      price: 18000,
+      lastMonthPrice: 16000,
+      category: 'Sayuran Segar',
+      unit: '250g',
+      isCustom: false,
+      prices: {
+        'Lotte Mart - Puri Indah': { current: 18000, history: 16000 },
+        'Super Indo - Pesanggrahan': { current: 17900, history: 19900 },
+        'Hypermart - Puri Mall': { current: 18000, history: 18000 },
+        'Indogrosir Daan Mogot': { current: 15500, history: 14000 }
+      }
+    },
+    {
+      id: 'base-12',
+      name: 'Sabun Mandi Dettol 400ml',
+      price: 26500,
+      lastMonthPrice: 29000,
+      category: 'Peralatan Kebersihan',
+      unit: '400ml',
+      isCustom: false,
+      prices: {
+        'Lotte Mart - Puri Indah': { current: 26500, history: 29000 },
+        'Super Indo - Pesanggrahan': { current: 25900, history: 28900 },
+        'Hypermart - Puri Mall': { current: 26500, history: 26500 },
+        'Indogrosir Daan Mogot': { current: 23500, history: 22000 }
+      }
+    },
+    {
+      id: 'base-13',
+      name: 'Deterjen Rinso Cair 750ml',
+      price: 21500,
+      lastMonthPrice: 20000,
+      category: 'Peralatan Kebersihan',
+      unit: '750ml',
+      isCustom: false,
+      prices: {
+        'Lotte Mart - Puri Indah': { current: 21500, history: 20000 },
+        'Super Indo - Pesanggrahan': { current: 20900, history: 22900 },
+        'Hypermart - Puri Mall': { current: 21000, history: 21000 },
+        'Indogrosir Daan Mogot': { current: 18500, history: 17500 }
+      }
+    }
   ], []);
 
   // State global recommendedItems (menggabungkan master bawaan + custom products)
@@ -388,14 +570,29 @@ export default function Home() {
     const storeName = typeof storeToDelete === 'string' ? storeToDelete : (storeToDelete.name || storeToDelete.store_name);
 
     // 1. Logika Hapus: Eksekusi delete ke Supabase tabel custom_stores
+    let isSuccess = false;
     try {
-      if (storeId && !String(storeId).startsWith('store-') && !String(storeId).startsWith('custom-')) {
-        await supabase.from('custom_stores').delete().eq('id', storeId);
+      let query = supabase.from('custom_stores').delete();
+      if (storeId && !String(storeId).startsWith('store-') && !String(storeId).startsWith('custom-') && !String(storeId).startsWith('local-')) {
+        query = query.eq('id', storeId);
       } else if (storeName) {
-        await supabase.from('custom_stores').delete().eq('store_name', storeName);
+        query = query.eq('store_name', storeName);
+      }
+      if (currentUser?.id) {
+        query = query.eq('user_id', currentUser.id);
+      }
+      const { error, status } = await query;
+      if (!error && (status === 200 || status === 204 || status === null || status === undefined)) {
+        isSuccess = true;
       }
     } catch (e) {
       console.warn('[Delete Custom Store Error]:', e);
+    }
+
+    // Jika gagal di server dan bukan data lokal sementara, batalkan mutasi state
+    if (!isSuccess && storeId && !String(storeId).startsWith('store-') && !String(storeId).startsWith('local-')) {
+      alert('Gagal menghapus toko dari server Supabase.');
+      return;
     }
 
     // 2. Hapus dari LocalStorage
@@ -472,14 +669,29 @@ export default function Home() {
 
   // Handler hapus barang kustom: Supabase + LocalStorage + State recommendedItems & customProducts
   const handleDeleteCustomProduct = async (itemId, itemName) => {
+    let isSuccess = false;
     try {
+      let query = supabase.from('products').delete();
       if (itemId && !String(itemId).startsWith('prod-') && !String(itemId).startsWith('local-')) {
-        await supabase.from('products').delete().eq('id', itemId);
+        query = query.eq('id', itemId);
       } else if (itemName) {
-        await supabase.from('products').delete().eq('name', itemName);
+        query = query.eq('name', itemName);
+      }
+      if (currentUser?.id) {
+        query = query.eq('user_id', currentUser.id);
+      }
+      const { error, status } = await query;
+      if (!error && (status === 200 || status === 204 || status === null || status === undefined)) {
+        isSuccess = true;
       }
     } catch (e) {
       console.warn('[Delete Custom Product Error]:', e);
+    }
+
+    // Jika gagal di server dan bukan data lokal sementara, batalkan mutasi state
+    if (!isSuccess && itemId && !String(itemId).startsWith('prod-') && !String(itemId).startsWith('local-')) {
+      alert('Gagal menghapus barang dari server Supabase.');
+      return;
     }
 
     // LocalStorage fallback sync
@@ -518,6 +730,35 @@ export default function Home() {
       console.warn('[Refresh Custom Data Error]:', e);
     }
   };
+
+  // Supabase Realtime Subscriptions (Cross-Device Sync) untuk tabel custom_stores & products
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    const channelName = `realtime-custom-sync-${currentUser.id}`;
+    const realtimeCustomChannel = supabase.channel(channelName)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'custom_stores',
+        filter: `user_id=eq.${currentUser.id}`
+      }, () => {
+        refreshCustomData();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'products',
+        filter: `user_id=eq.${currentUser.id}`
+      }, () => {
+        refreshCustomData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(realtimeCustomChannel);
+    };
+  }, [currentUser?.id]);
 
   // Splash Screen State
   const [showSplash, setShowSplash] = useState(false);
@@ -1289,8 +1530,11 @@ export default function Home() {
     // 1. Reset seluruh React State ke kondisi awal bersih (Pencegahan Data Bleeding)
     setCartItems([]);
     setHistoryList([]);
+    setCustomProducts([]);
+    setCustomSupermarkets([]);
+    setRecommendedItems(baseDefaultItems);
     setBudgetLimit(350000);
-    setCurrentStore('Lotte Mart Grocery - Puri Indah');
+    setCurrentStore('Lotte Mart - Puri Indah');
     setTransactionDate(toIndoDisplayDate(new Date()));
     setCurrentUser(null);
     setIsAuthenticated(false);
@@ -1313,6 +1557,10 @@ export default function Home() {
       localStorage.removeItem(STORAGE_KEYS.USER);
       localStorage.removeItem(STORAGE_KEYS.AUTH);
       localStorage.removeItem(STORAGE_KEYS.SPLASH_SHOWN);
+
+      // Hapus custom data
+      localStorage.removeItem('sakugrosir_custom_stores_v1');
+      localStorage.removeItem('sakugrosir_custom_products_v1');
 
       // Hapus kunci session/offline
       localStorage.removeItem(SINGLE_USER_STORAGE_KEY);
