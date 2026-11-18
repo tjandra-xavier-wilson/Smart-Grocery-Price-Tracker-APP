@@ -59,7 +59,8 @@ export default function ActiveCartScreen({
   recommendedItems = [],
   customProducts = [],
   onDeleteCustomProduct,
-  onRefreshCustomProducts
+  onRefreshCustomProducts,
+  currentUser = null
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [deletingItemId, setDeletingItemId] = useState(null);
@@ -669,20 +670,44 @@ export default function ActiveCartScreen({
     setDeletingItemId(prod.id);
     playTapSound();
     const itemId = prod.id;
+    const itemName = prod.name;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(itemId));
+
     try {
-      if (itemId && !String(itemId).startsWith('prod-') && !String(itemId).startsWith('local-')) {
-        await supabase.from('products').delete().eq('id', itemId);
+      // 1. Eksekusi Delete ke Supabase tabel products dengan validasi primary key & keamanan ganda (user_id)
+      let query = supabase.from('products').delete();
+      if (isUuid) {
+        query = query.eq('id', itemId);
+      } else if (itemName) {
+        query = query.eq('name', itemName);
       }
+      if (currentUser?.id) {
+        query = query.eq('user_id', currentUser.id);
+      }
+
+      const { error } = await query;
+      if (error) {
+        console.error("Gagal menghapus dari Supabase:", error);
+        throw error;
+      }
+
+      // 2. Jika sukses, baru hapus dari state lokal (Optimistic UI) & broadcast multi-device
+      if (onDeleteCustomProduct) {
+        await onDeleteCustomProduct(itemId, itemName);
+      }
+
+      // 3. Tutup modal konfirmasi
+      setCustomProductToDelete(null);
     } catch (err) {
-      console.warn('[Delete Custom Product error]:', err);
+      console.error("Gagal menghapus:", err);
+      if (typeof window !== 'undefined') {
+        alert(`Gagal menghapus barang: ${err.message || 'Terjadi gangguan'}. Periksa koneksi atau izin database Anda.`);
+      }
+    } finally {
+      // 4. Memastikan loading spinner SELALU berhenti & modal tertutup (Mencegah Infinite Loading)
+      setDeletingItemId(null);
+      setCustomProductToDelete(null);
     }
-
-    if (onDeleteCustomProduct) {
-      await onDeleteCustomProduct(itemId, prod.name);
-    }
-
-    setDeletingItemId(null);
-    setCustomProductToDelete(null);
   };
 
   // Render Product Card (Horizontal List Layout with Full Emoji Box & Dynamic Store Pricing)

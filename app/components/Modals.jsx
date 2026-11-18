@@ -250,28 +250,28 @@ export function StoreModal({
     setDeletingStoreId(storeId);
     playTapSound();
 
-    // 1. Logika Hapus: Eksekusi delete ke tabel custom_stores Supabase
     try {
+      // 1. Logika Hapus: Eksekusi delete ke tabel custom_stores Supabase
       if (storeId && !String(storeId).startsWith('custom-store-') && !String(storeId).startsWith('local-')) {
         await supabase.from('custom_stores').delete().eq('id', storeId);
       }
+
+      // 2. Panggil handler parent untuk update state lokal & LocalStorage & Realtime Broadcast
+      if (onDeleteCustomStore) {
+        await onDeleteCustomStore(item);
+      }
+
+      // 3. Fallback Aktif: Jika toko yang dihapus kebetulan sedang menjadi selectedSupermarket aktif,
+      // otomatis ubah selectedSupermarket kembali ke "Lotte Mart - Puri Indah" agar aplikasi tidak error
+      if (store === storeName || currentStore === storeName) {
+        setStore('Lotte Mart - Puri Indah');
+      }
     } catch (err) {
       console.warn('[deleteCustomStore error]:', err);
+    } finally {
+      setDeletingStoreId(null);
+      setStoreToDeletePrompt(null);
     }
-
-    // 2. Panggil handler parent untuk update state lokal & LocalStorage & Realtime Broadcast
-    if (onDeleteCustomStore) {
-      await onDeleteCustomStore(item);
-    }
-
-    // 3. Fallback Aktif: Jika toko yang dihapus kebetulan sedang menjadi selectedSupermarket aktif,
-    // otomatis ubah selectedSupermarket kembali ke "Lotte Mart - Puri Indah" agar aplikasi tidak error
-    if (store === storeName || currentStore === storeName) {
-      setStore('Lotte Mart - Puri Indah');
-    }
-
-    setDeletingStoreId(null);
-    setStoreToDeletePrompt(null);
   };
 
   return (

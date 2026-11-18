@@ -1537,23 +1537,26 @@ export async function deleteCustomStore(storeId, storeName = null, userId = null
     await query;
   } catch (err) {}
 
-  // 2. Hapus dari Cloud Sync Hub di Supabase
+  // 2. Hapus dari Cloud Sync Hub di Supabase dengan fast timeout
   try {
-    const cloudConfig = await fetchCloudCustomConfig();
-    if (cloudConfig?.stores) {
-      const updatedStores = cloudConfig.stores.filter(s => {
-        if (typeof s === 'string') return s !== storeName;
-        const sName = s.store_name || s.name;
-        const sId = s.id;
-        if (storeId && sId === storeId) return false;
-        if (storeName && sName === storeName) return false;
-        return true;
-      });
-      await saveCloudCustomConfig({
-        stores: updatedStores,
-        products: cloudConfig.products || []
-      });
-    }
+    const syncPromise = (async () => {
+      const cloudConfig = await fetchCloudCustomConfig();
+      if (cloudConfig?.stores) {
+        const updatedStores = cloudConfig.stores.filter(s => {
+          if (typeof s === 'string') return s !== storeName;
+          const sName = s.store_name || s.name;
+          const sId = s.id;
+          if (storeId && sId === storeId) return false;
+          if (storeName && sName === storeName) return false;
+          return true;
+        });
+        await saveCloudCustomConfig({
+          stores: updatedStores,
+          products: cloudConfig.products || []
+        });
+      }
+    })();
+    await Promise.race([syncPromise, new Promise(res => setTimeout(res, 1200))]);
   } catch (e) {}
 
   // 3. Bersihkan dari LocalStorage
@@ -1593,10 +1596,12 @@ export async function deleteCustomProduct(productId, productName = null, userId 
     } catch (e) {}
   }
 
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(productId));
+
   // 1. Eksekusi delete ke Supabase tabel products jika ada
   try {
     let query = supabase.from('products').delete();
-    if (productId && !String(productId).startsWith('prod-') && !String(productId).startsWith('local-')) {
+    if (isUuid) {
       query = query.eq('id', productId);
     } else if (productName) {
       query = query.eq('name', productName);
@@ -1605,22 +1610,27 @@ export async function deleteCustomProduct(productId, productName = null, userId 
       query = query.eq('user_id', targetUserId);
     }
     await query;
-  } catch (err) {}
+  } catch (err) {
+    console.warn('[deleteCustomProduct query warning]:', err);
+  }
 
-  // 2. Hapus dari Cloud Sync Hub di Supabase
+  // 2. Hapus dari Cloud Sync Hub di Supabase dengan fast timeout
   try {
-    const cloudConfig = await fetchCloudCustomConfig();
-    if (cloudConfig?.products) {
-      const updatedProds = cloudConfig.products.filter(p => {
-        if (productId && p.id === productId) return false;
-        if (productName && p.name === productName) return false;
-        return true;
-      });
-      await saveCloudCustomConfig({
-        stores: cloudConfig.stores || [],
-        products: updatedProds
-      });
-    }
+    const syncPromise = (async () => {
+      const cloudConfig = await fetchCloudCustomConfig();
+      if (cloudConfig?.products) {
+        const updatedProds = cloudConfig.products.filter(p => {
+          if (productId && p.id === productId) return false;
+          if (productName && p.name === productName) return false;
+          return true;
+        });
+        await saveCloudCustomConfig({
+          stores: cloudConfig.stores || [],
+          products: updatedProds
+        });
+      }
+    })();
+    await Promise.race([syncPromise, new Promise(res => setTimeout(res, 1200))]);
   } catch (e) {}
 
   // 3. Bersihkan dari LocalStorage
@@ -1761,3 +1771,201 @@ export async function getCustomStores(userId = null) {
   return merged;
 }
 
+
+// ==============================================================================
+// 7. TOKO KUSTOM & PRODUK REALTIME SYNC (CROSS-DEVICE SYNC)
+// ==============================================================================
+
+/**
+ * Mengambil daftar toko kustom pengguna dari Supabase Cloud & LocalStorage
+ */
+export async function getCustomStoresFromSupabase(userId = null) {
+  let targetUserId = userId;
+  if (!targetUserId && typeof localStorage !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('sakugrosir_single_user_v1');
+      if (saved) targetUserId = JSON.parse(saved)?.id;
+    } catch (e) {}
+  }
+  if (!targetUserId) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      targetUserId = session?.user?.id;
+    } catch (e) {}
+  }
+
+  let localStores = [];
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const key = targetUserId ? `sakugrosir_custom_stores_${targetUserId}` : 'sakugrosir_custom_stores';
+      const raw = localStorage.getItem(key);
+      if (raw) localStores = JSON.parse(raw);
+    } catch (e) {}
+  }
+
+  try {
+    let query = supabase.from('custom_stores').select('*').order('created_at', { ascending: true });
+    if (targetUserId) {
+      query = query.eq('user_id', targetUserId);
+    }
+    const { data, error } = await query;
+    if (error) {
+      console.warn('[Supabase getCustomStores] Notice:', error.message);
+      return localStores;
+    }
+    if (data && Array.isArray(data)) {
+      if (typeof localStorage !== 'undefined') {
+        const key = targetUserId ? `sakugrosir_custom_stores_${targetUserId}` : 'sakugrosir_custom_stores';
+        localStorage.setItem(key, JSON.stringify(data));
+      }
+      return data;
+    }
+    return localStores;
+  } catch (err) {
+    console.warn('[Supabase getCustomStores] Exception:', err.message);
+    return localStores;
+  }
+}
+
+/**
+ * Menyimpan toko kustom baru ke Supabase & LocalStorage
+ */
+export async function saveCustomStoreToSupabase(storeName, userId = null) {
+  if (!storeName || !storeName.trim()) return null;
+  const cleanName = storeName.trim();
+  let targetUserId = userId;
+  if (!targetUserId && typeof localStorage !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('sakugrosir_single_user_v1');
+      if (saved) targetUserId = JSON.parse(saved)?.id;
+    } catch (e) {}
+  }
+  if (!targetUserId) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      targetUserId = session?.user?.id;
+    } catch (e) {}
+  }
+
+  const newStoreObj = {
+    id: 'store-' + Date.now(),
+    name: cleanName,
+    user_id: targetUserId || null,
+    created_at: new Date().toISOString()
+  };
+
+  // Simpan ke local storage
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const key = targetUserId ? `sakugrosir_custom_stores_${targetUserId}` : 'sakugrosir_custom_stores';
+      const current = JSON.parse(localStorage.getItem(key) || '[]');
+      if (!current.some(s => (s.name || s).toLowerCase() === cleanName.toLowerCase())) {
+        current.push(newStoreObj);
+        localStorage.setItem(key, JSON.stringify(current));
+      }
+    } catch (e) {}
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('custom_stores')
+      .insert([{ name: cleanName, user_id: targetUserId || null }])
+      .select()
+      .single();
+
+    if (error) {
+      console.warn('[Supabase saveCustomStore] Notice (saved locally):', error.message);
+      return newStoreObj;
+    }
+    return data || newStoreObj;
+  } catch (err) {
+    console.warn('[Supabase saveCustomStore] Exception:', err.message);
+    return newStoreObj;
+  }
+}
+
+/**
+ * Mengambil daftar produk kustom / rekomendasi belanja dari Supabase & LocalStorage
+ */
+export async function getCustomProductsFromSupabase(userId = null) {
+  let targetUserId = userId;
+  if (!targetUserId && typeof localStorage !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('sakugrosir_single_user_v1');
+      if (saved) targetUserId = JSON.parse(saved)?.id;
+    } catch (e) {}
+  }
+  if (!targetUserId) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      targetUserId = session?.user?.id;
+    } catch (e) {}
+  }
+
+  let localProducts = [];
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const key = targetUserId ? `sakugrosir_custom_products_${targetUserId}` : 'sakugrosir_custom_products';
+      const raw = localStorage.getItem(key);
+      if (raw) localProducts = JSON.parse(raw);
+    } catch (e) {}
+  }
+
+  try {
+    let query = supabase.from('products').select('*').order('created_at', { ascending: false });
+    if (targetUserId) {
+      query = query.eq('user_id', targetUserId);
+    }
+    const { data, error } = await query;
+    if (error) {
+      console.warn('[Supabase getCustomProducts] Notice:', error.message);
+      return localProducts;
+    }
+    if (data && Array.isArray(data)) {
+      if (typeof localStorage !== 'undefined') {
+        const key = targetUserId ? `sakugrosir_custom_products_${targetUserId}` : 'sakugrosir_custom_products';
+        localStorage.setItem(key, JSON.stringify(data));
+      }
+      return data;
+    }
+    return localProducts;
+  } catch (err) {
+    console.warn('[Supabase getCustomProducts] Exception:', err.message);
+    return localProducts;
+  }
+}
+
+/**
+ * Menghapus produk kustom dari Supabase & LocalStorage
+ */
+export async function deleteCustomProductFromSupabase(productId, userId = null) {
+  if (!productId) return false;
+  let targetUserId = userId;
+  if (!targetUserId && typeof localStorage !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('sakugrosir_single_user_v1');
+      if (saved) targetUserId = JSON.parse(saved)?.id;
+    } catch (e) {}
+  }
+
+  // Hapus dari local storage
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const key = targetUserId ? `sakugrosir_custom_products_${targetUserId}` : 'sakugrosir_custom_products';
+      const current = JSON.parse(localStorage.getItem(key) || '[]');
+      const filtered = current.filter(p => p.id !== productId);
+      localStorage.setItem(key, JSON.stringify(filtered));
+    } catch (e) {}
+  }
+
+  try {
+    const { error } = await supabase.from('products').delete().eq('id', productId);
+    if (error) {
+      console.warn('[Supabase deleteCustomProduct] Notice:', error.message);
+    }
+    return true;
+  } catch (err) {
+    console.warn('[Supabase deleteCustomProduct] Exception:', err.message);
+    return true;
+  }
+}

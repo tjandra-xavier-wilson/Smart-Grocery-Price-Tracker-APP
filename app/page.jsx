@@ -33,6 +33,8 @@ import {
   updateBudgetSettings,
   saveDeviceAccount,
   isEmailRegistered,
+  getCustomStoresFromSupabase,
+  saveCustomStoreToSupabase,
   SINGLE_USER_STORAGE_KEY,
   insertCustomProduct,
   getCustomProducts,
@@ -275,6 +277,7 @@ export default function Home() {
 
   // Core App State
   const [currentStore, setCurrentStore] = useState('Lotte Mart - Puri Indah');
+  const [customStores, setCustomStores] = useState([]);
   const [transactionDate, setTransactionDate] = useState('24 Mei 2025');
   const [budgetLimit, setBudgetLimit] = useState(350000);
   // State keranjang belanja terisolasi per akun (akun baru tanpa transaksi mulai dari state kosong [])
@@ -777,6 +780,67 @@ export default function Home() {
       supabase.removeChannel(realtimeCustomChannel);
     };
   }, [currentUser?.id]);
+
+  // Fetch daftar toko kustom pengguna
+  const fetchCustomStores = async (userId = null) => {
+    try {
+      const targetUid = userId || currentUser?.id || currentUserRef.current?.id;
+      const stores = await getCustomStoresFromSupabase(targetUid);
+      setCustomStores(stores || []);
+    } catch (e) {
+      console.warn('Error fetching custom stores:', e);
+    }
+  };
+
+  // 1. Listener Realtime untuk Lokasi Toko (custom_stores)
+  useEffect(() => {
+    // Tarik data awal
+    fetchCustomStores();
+
+    const targetUserId = currentUser?.id;
+    if (!targetUserId) return;
+
+    // Subscribe ke perubahan Realtime
+    const storeSubscription = supabase
+      .channel('custom-stores-sync')
+      .on(
+        'postgres_changes', 
+        { event: '*', schema: 'public', table: 'custom_stores', filter: `user_id=eq.${targetUserId}` }, 
+        (payload) => {
+          console.log('⚡ [Realtime custom_stores event]:', payload);
+          fetchCustomStores(targetUserId); // Re-fetch saat ada data masuk/dihapus dari device lain
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(storeSubscription);
+    };
+  }, [currentUser?.id]);
+
+  const handleAddCustomStore = async (storeName) => {
+    if (!storeName || !storeName.trim()) return;
+    const cleanName = storeName.trim();
+    const newStoreObj = await saveCustomStoreToSupabase(cleanName, currentUser?.id);
+    await fetchCustomStores(currentUser?.id);
+    setCurrentStore(cleanName);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.STORE, cleanName);
+    }
+    // Broadcast perubahan ke perangkat lain secara realtime
+    try {
+      supabaseSyncChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'REALTIME_STORE_ADDED_EVENT',
+        payload: { store: cleanName, storeObj: newStoreObj, timestamp: Date.now() }
+      });
+      supabaseSyncChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'REALTIME_CART_SYNC',
+        payload: { store: cleanName, timestamp: Date.now() }
+      });
+    } catch (e) {}
+  };
 
   // Splash Screen State
   const [showSplash, setShowSplash] = useState(false);
@@ -1405,6 +1469,13 @@ export default function Home() {
           localStorage.removeItem(STORAGE_KEYS.HISTORY);
         }
       })
+      .on('broadcast', { event: 'REALTIME_STORE_ADDED_EVENT' }, (payload) => {
+        console.log('⚡ [Realtime Store Added Broadcast]:', payload);
+        fetchCustomStores();
+        if (payload?.payload?.store) {
+          setCurrentStore(payload.payload.store);
+        }
+      })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           setSyncStatus('Realtime Multi-Device Live');
@@ -1946,7 +2017,7 @@ export default function Home() {
   // Checkout Save & Double Submit Prevention (Evaluasi Dinamis Berdasarkan Toko Terpilih)
   const totalCartPrice = cartItems.reduce((acc, i) => {
     const sp = getItemStorePrice(i, currentStore);
-    const p = sp.current || i.price || 0;
+    const p = i.prices?.[currentStore]?.current || i.prices?.["Lotte Mart - Puri Indah"]?.current || sp.current || i.price || 0;
     return acc + (p * (i.quantity || 1));
   }, 0);
 
@@ -1966,7 +2037,7 @@ export default function Home() {
       // Hitung rincian subtotal, promo potongan, dan simulasi pajak PPN 11%
       const subtotalVal = cartItems.reduce((acc, i) => {
         const sp = getItemStorePrice(i, currentStore);
-        const orig = sp.history || i.originalPrice || sp.current || i.price || 0;
+        const orig = i.prices?.[currentStore]?.history || i.prices?.["Lotte Mart - Puri Indah"]?.history || sp.history || i.originalPrice || sp.current || i.price || 0;
         return acc + (orig * (i.quantity || 1));
       }, 0);
 
@@ -1986,8 +2057,8 @@ export default function Home() {
         cashier: 'Self-Checkout (Smart Grocery)',
         items: cartItems.map(i => {
           const sp = getItemStorePrice(i, currentStore);
-          const p = sp.current || i.price || 0;
-          const orig = sp.history || i.originalPrice || p;
+          const p = i.prices?.[currentStore]?.current || i.prices?.["Lotte Mart - Puri Indah"]?.current || sp.current || i.price || 0;
+          const orig = i.prices?.[currentStore]?.history || i.prices?.["Lotte Mart - Puri Indah"]?.history || sp.history || i.originalPrice || p;
           return {
             name: i.name,
             price: p,
@@ -2013,8 +2084,8 @@ export default function Home() {
         storeName: currentStore
       }, cartItems.map(i => {
         const sp = getItemStorePrice(i, currentStore);
-        const p = sp.current || i.price || 0;
-        const orig = sp.history || i.originalPrice || p;
+        const p = i.prices?.[currentStore]?.current || i.prices?.["Lotte Mart - Puri Indah"]?.current || sp.current || i.price || 0;
+        const orig = i.prices?.[currentStore]?.history || i.prices?.["Lotte Mart - Puri Indah"]?.history || sp.history || i.originalPrice || p;
         return {
           nama_barang: i.name,
           kategori: i.category,
@@ -2214,6 +2285,7 @@ export default function Home() {
                       customProducts={customProducts}
                       onDeleteCustomProduct={handleDeleteCustomProduct}
                       onRefreshCustomProducts={refreshCustomData}
+                      currentUser={currentUser}
                     />
                   )}
 
@@ -2279,6 +2351,9 @@ export default function Home() {
                   onAddNewStore={handleAddNewStore}
                   onDeleteCustomStore={handleDeleteCustomStore}
                   userId={currentUser?.id}
+                  customStores={customStores}
+                  onAddCustomStore={handleAddCustomStore}
+                  currentUser={currentUser}
                 />
 
                 <BarcodeScannerModal

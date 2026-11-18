@@ -304,3 +304,108 @@ BEGIN
     END;
   END IF;
 END $$;
+
+-- ==============================================================================
+-- 9. TABEL: custom_stores (Toko Kustom Milik Pengguna)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.custom_stores (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID, -- Terikat dengan auth.users(id) untuk isolasi antar pengguna
+  name TEXT NOT NULL,
+  address TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_custom_stores_user_id ON public.custom_stores (user_id);
+CREATE INDEX IF NOT EXISTS idx_custom_stores_created_at ON public.custom_stores (created_at ASC);
+
+ALTER TABLE public.custom_stores ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can only access their own custom_stores" ON public.custom_stores;
+CREATE POLICY "Users can only access their own custom_stores" 
+  ON public.custom_stores FOR ALL 
+  TO authenticated 
+  USING (auth.uid() = user_id) 
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Public select custom_stores" ON public.custom_stores;
+CREATE POLICY "Public select custom_stores" 
+  ON public.custom_stores FOR SELECT 
+  USING (true);
+
+DROP POLICY IF EXISTS "Public insert custom_stores" ON public.custom_stores;
+CREATE POLICY "Public insert custom_stores" 
+  ON public.custom_stores FOR INSERT 
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public delete custom_stores" ON public.custom_stores;
+CREATE POLICY "Public delete custom_stores" 
+  ON public.custom_stores FOR DELETE 
+  USING (true);
+
+-- ==============================================================================
+-- 10. TABEL: products (Katalog Rekomendasi / Barang Kustom)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.products (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID, -- Terikat dengan auth.users(id)
+  name TEXT NOT NULL,
+  category TEXT,
+  unit TEXT,
+  price NUMERIC DEFAULT 0,
+  last_month_price NUMERIC DEFAULT 0,
+  description TEXT,
+  prices JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_products_user_id ON public.products (user_id);
+CREATE INDEX IF NOT EXISTS idx_products_created_at ON public.products (created_at DESC);
+
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can only access their own products" ON public.products;
+CREATE POLICY "Users can only access their own products" 
+  ON public.products FOR ALL 
+  TO authenticated 
+  USING (auth.uid() = user_id) 
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete their own products" ON public.products;
+CREATE POLICY "Users can delete their own products" 
+  ON public.products FOR DELETE 
+  TO authenticated 
+  USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Public select products" ON public.products;
+CREATE POLICY "Public select products" 
+  ON public.products FOR SELECT 
+  USING (true);
+
+DROP POLICY IF EXISTS "Public delete products" ON public.products;
+CREATE POLICY "Public delete products" 
+  ON public.products FOR DELETE 
+  USING (true);
+
+DROP POLICY IF EXISTS "Public insert products" ON public.products;
+CREATE POLICY "Public insert products" 
+  ON public.products FOR INSERT 
+  WITH CHECK (true);
+
+-- ==============================================================================
+-- 11. ENABLE REALTIME REPLICATION (Supabase Realtime Subscriptions)
+-- ==============================================================================
+-- Tambahkan tabel ke publikasi supabase_realtime agar event Realtime aktif
+DO $$
+BEGIN
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.custom_stores;
+  EXCEPTION WHEN duplicate_object THEN
+    NULL;
+  END;
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.products;
+  EXCEPTION WHEN duplicate_object THEN
+    NULL;
+  END;
+END $$;
