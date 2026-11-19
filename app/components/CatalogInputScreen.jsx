@@ -512,9 +512,9 @@ export default function CatalogInputScreen({
               onBlur={() => {
                 setTimeout(() => setShowSuggestions(false), 250);
               }}
-              placeholder="Ketik nama barang (contoh: Beras 5kg, Telur, Garam)"
+              placeholder="Ketik nama barang (Contoh: Beras 5kg)"
               required
-              className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white"
+              className="w-full pl-3 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-semibold focus:outline-none focus:border-emerald-600 focus:bg-white"
             />
             <button
               type="button"

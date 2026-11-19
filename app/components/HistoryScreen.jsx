@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { 
   Store, 
   Receipt, 
@@ -24,6 +24,7 @@ import {
   Minus
 } from 'lucide-react';
 import { playTapSound, playSuccessSound } from '../utils/sound';
+import { supabase } from '../../src/lib/supabaseClient';
 import { 
   parseDateComponents, 
   toYearMonthKey, 
@@ -37,6 +38,7 @@ import {
 
 export default function HistoryScreen({
   historyList = [],
+  currentUser = null,
   onOpenReceiptDetail,
   onRequestDeleteTrip,
   onRequestClearAllHistory
@@ -77,10 +79,78 @@ export default function HistoryScreen({
   const [selectedTxA, setSelectedTxA] = useState(null);
   const [selectedTxB, setSelectedTxB] = useState(null);
 
+  // Notifikasi Custom Floater Peringatan (3 detik) saat mencoba memilih transaksi yang sama
+  const [comparisonToast, setComparisonToast] = useState(null);
+  const toastTimerRef = useRef(null);
+
+  const showComparisonWarning = useCallback((message) => {
+    setComparisonToast(message);
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = setTimeout(() => {
+      setComparisonToast(null);
+      toastTimerRef.current = null;
+    }, 3000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Kunci Hybrid Persistence per akun
+  const user = currentUser;
+  const storageKey = user?.id ? `sentinel_comparison_${user.id}` : null;
+
   // historyItems: Single source of truth untuk validasi riwayat belanja
   const historyItems = uniqueHistoryList || historyList || [];
 
-  // Sinkronisasi & Reset Ghost Data: jika data transaksi A atau B sudah dihapus dari database atau riwayat kosong
+  // Simpan pilihan perbandingan ke LocalStorage per user + Supabase Auth user_metadata (non-blocking)
+  const persistComparisonSelection = useCallback((nextA, nextB) => {
+    const nextAId = nextA?.id || null;
+    const nextBId = (nextB?.id && String(nextB.id) !== String(nextAId)) ? nextB.id : null;
+
+    if (storageKey && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify({
+          txAId: nextAId,
+          txBId: nextBId
+        }));
+      } catch (e) {}
+    }
+
+    if (user?.id) {
+      try {
+        supabase.auth.updateUser({
+          data: {
+            comparison_tx_a: nextAId,
+            comparison_tx_b: nextBId
+          }
+        }).catch(() => {});
+      } catch (e) {}
+    }
+  }, [storageKey, user?.id]);
+
+  // Ref untuk melacak ID terpilih saat ini agar hydration tidak mengganggu mode edit manual user
+  const selectedIdsRef = useRef({ a: null, b: null });
+  const hasHydratedRef = useRef(false);
+
+  useEffect(() => {
+    selectedIdsRef.current = {
+      a: selectedTxA?.id ? String(selectedTxA.id) : null,
+      b: selectedTxB?.id ? String(selectedTxB.id) : null
+    };
+  }, [selectedTxA, selectedTxB]);
+
+  useEffect(() => {
+    hasHydratedRef.current = false;
+  }, [user?.id]);
+
+  // Hydration saat Refresh / Login Ulang + Sinkronisasi & Pencegahan Ghost Data
   useEffect(() => {
     if (!historyItems || historyItems.length === 0) {
       setSelectedTxA(null);
@@ -88,59 +158,164 @@ export default function HistoryScreen({
       setIsSelectingFor('A');
       return;
     }
-    if (selectedTxA && !historyItems.some(item => String(item.id) === String(selectedTxA.id))) {
-      setSelectedTxA(null);
-      setIsSelectingFor('A');
-    }
-    if (selectedTxB && !historyItems.some(item => String(item.id) === String(selectedTxB.id))) {
-      setSelectedTxB(null);
-      setIsSelectingFor(selectedTxA ? 'B' : 'A');
-    }
-  }, [historyItems, selectedTxA, selectedTxB]);
 
-  // Handler reset pilihan: mengosongkan pilihan dan mengembalikan isSelectingFor ke 'A'
+    // Jika user.id belum tersedia, lakukan validasi ghost data saja terhadap state aktif
+    if (!storageKey) {
+      const validA = selectedTxA && historyItems.find(item => String(item.id) === String(selectedTxA.id)) || null;
+      const validB = (selectedTxB && (!validA || String(selectedTxB.id) !== String(validA.id)))
+        ? (historyItems.find(item => String(item.id) === String(selectedTxB.id)) || null)
+        : null;
+      if ((selectedTxA && !validA) || (selectedTxB && !validB)) {
+        setSelectedTxA(validA);
+        setSelectedTxB(validB);
+        setIsSelectingFor(!validA ? 'A' : (!validB ? 'B' : null));
+      }
+      return;
+    }
+
+    // 1. Ambil ID tersimpan dari LocalStorage terlebih dahulu, fallback ke Supabase user_metadata
+    let savedTxAId = null;
+    let savedTxBId = null;
+    let hasLocalData = false;
+
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw !== null) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            hasLocalData = true;
+            savedTxAId = parsed.txAId || null;
+            savedTxBId = parsed.txBId || null;
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (!hasLocalData) {
+      const meta = user?.user_metadata || {};
+      savedTxAId = meta.comparison_tx_a || null;
+      savedTxBId = meta.comparison_tx_b || null;
+    }
+
+    // 2. Cocokkan ID tersimpan dengan daftar riwayat asli (.find() menjamin 0 ghost data & anti-duplikat)
+    const restoredA = savedTxAId
+      ? (historyItems.find(item => String(item.id) === String(savedTxAId)) || null)
+      : null;
+    const restoredB = (savedTxBId && String(savedTxBId) !== String(savedTxAId))
+      ? (historyItems.find(item => String(item.id) === String(savedTxBId)) || null)
+      : null;
+
+    const nextAId = restoredA?.id ? String(restoredA.id) : null;
+    const nextBId = restoredB?.id ? String(restoredB.id) : null;
+    const prevAId = selectedIdsRef.current.a;
+    const prevBId = selectedIdsRef.current.b;
+    const didSelectionChange = nextAId !== prevAId || nextBId !== prevBId;
+
+    setSelectedTxA(restoredA);
+    setSelectedTxB(restoredB);
+
+    // Cache ke localStorage jika baru saja dipulihkan dari cloud user_metadata (perangkat/browser baru)
+    if (!hasLocalData && (restoredA || restoredB) && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify({
+          txAId: restoredA?.id || null,
+          txBId: restoredB?.id || null
+        }));
+      } catch (e) {}
+    }
+
+    // Perbarui mode pemilihan hanya saat hydration pertama atau ketika pilihan berubah (misal data terhapus)
+    if (!hasHydratedRef.current || didSelectionChange) {
+      hasHydratedRef.current = true;
+      if (restoredA && restoredB) {
+        setIsSelectingFor(null);
+      } else if (restoredA && !restoredB) {
+        setIsSelectingFor('B');
+      } else {
+        setIsSelectingFor('A');
+      }
+    }
+  }, [
+    historyItems,
+    storageKey,
+    user?.id,
+    user?.user_metadata?.comparison_tx_a,
+    user?.user_metadata?.comparison_tx_b
+  ]);
+
+  // Handler reset pilihan: mengosongkan pilihan, mengembalikan isSelectingFor ke 'A', dan simpan perubahan
   const handleResetComparison = () => {
     playTapSound();
     setSelectedTxA(null);
     setSelectedTxB(null);
     setIsSelectingFor('A');
+    persistComparisonSelection(null, null);
   };
 
-  // Handler penghapusan transaksi individu dengan State Reset pengaman
+  // Handler penghapusan transaksi individu dengan pembersihan slot & penyimpanan (cegah ghost data)
   const handleDeleteTransaction = (session) => {
-    if ((selectedTxA && String(selectedTxA.id) === String(session?.id)) ||
-        (selectedTxB && String(selectedTxB.id) === String(session?.id))) {
-      setSelectedTxA(null);
-      setSelectedTxB(null);
-      setIsSelectingFor('A');
+    const isDeletingA = Boolean(selectedTxA && String(selectedTxA.id) === String(session?.id));
+    const isDeletingB = Boolean(selectedTxB && String(selectedTxB.id) === String(session?.id));
+
+    if (isDeletingA || isDeletingB) {
+      const nextA = isDeletingA ? null : selectedTxA;
+      const nextB = isDeletingB ? null : selectedTxB;
+      setSelectedTxA(nextA);
+      setSelectedTxB(nextB);
+      setIsSelectingFor(!nextA ? 'A' : (!nextB ? 'B' : null));
+      persistComparisonSelection(nextA, nextB);
     }
     if (onRequestDeleteTrip) {
       onRequestDeleteTrip(session);
     }
   };
 
-  // Handler penghapusan seluruh riwayat belanja dengan State Reset pengaman
+  // Handler penghapusan seluruh riwayat belanja dengan pembersihan slot & penyimpanan
   const handleClearAllHistory = () => {
     setSelectedTxA(null);
     setSelectedTxB(null);
     setIsSelectingFor('A');
+    persistComparisonSelection(null, null);
     if (onRequestClearAllHistory) {
       onRequestClearAllHistory();
     }
   };
 
-  // Handler pemilihan kartu langsung dari daftar sesi belanja
-  const handleSelectSession = (session) => {
-    playTapSound();
+  // Handler pemilihan kartu langsung dari daftar sesi belanja dengan validasi ketat berbasis ID
+  const handleSelectForComparison = (tx) => {
+    if (!tx) return;
+
     if (isSelectingFor === 'A') {
-      setSelectedTxA(session);
-      setIsSelectingFor('B');
+      // Validasi Ketat: Tolak jika transaksi sudah dipilih sebagai Transaksi B
+      if (selectedTxB && String(selectedTxB.id) === String(tx.id)) {
+        playTapSound();
+        showComparisonWarning('Transaksi ini sudah dipilih. Pilih sesi belanja lain untuk dibandingkan.');
+        return;
+      }
+      playTapSound();
+      const nextA = tx;
+      const nextB = selectedTxB;
+      setSelectedTxA(nextA);
+      setIsSelectingFor(nextB ? null : 'B');
+      persistComparisonSelection(nextA, nextB);
     } else if (isSelectingFor === 'B') {
-      setSelectedTxB(session);
-      setIsSelectingFor(null);
+      // Validasi Ketat: Tolak jika transaksi sudah dipilih sebagai Transaksi A
+      if (selectedTxA && String(selectedTxA.id) === String(tx.id)) {
+        playTapSound();
+        showComparisonWarning('Transaksi ini sudah dipilih. Pilih sesi belanja lain untuk dibandingkan.');
+        return;
+      }
+      playTapSound();
+      const nextA = selectedTxA;
+      const nextB = tx;
+      setSelectedTxB(nextB);
+      setIsSelectingFor(nextA ? null : 'A');
+      persistComparisonSelection(nextA, nextB);
     } else {
       // Jika mode pemilihan sedang nonaktif, klik kartu membuka detail struk
-      if (onOpenReceiptDetail) onOpenReceiptDetail(session);
+      playTapSound();
+      if (onOpenReceiptDetail) onOpenReceiptDetail(tx);
     }
   };
 
@@ -152,7 +327,11 @@ export default function HistoryScreen({
     return selectedTxB ? Number(selectedTxB.totalSpent || selectedTxB.total_spent || 0) : 0;
   }, [selectedTxB]);
 
-  const hasBothSelected = Boolean(selectedTxA && selectedTxB);
+  const hasBothSelected = Boolean(
+    selectedTxA &&
+    selectedTxB &&
+    String(selectedTxA.id) !== String(selectedTxB.id)
+  );
 
   // Kalkulasi analitik perbandingan pengeluaran (reaktif terhadap perubahan kartu A dan B)
   const comparisonResult = useMemo(() => {
@@ -284,7 +463,25 @@ export default function HistoryScreen({
   };
 
   return (
-    <div className="pb-36 bg-slate-50 min-h-full px-4 pt-3 space-y-3.5">
+    <div className="pb-36 bg-slate-50 min-h-full px-4 pt-3 space-y-3.5 relative">
+      {/* CUSTOM FLOATER (TOAST) PERINGATAN PERBANDINGAN TRANSAKSI - TEMA TERANG */}
+      <div
+        role="alert"
+        aria-live="polite"
+        className={`fixed top-14 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-2rem)] max-w-[390px] px-4 py-3 bg-white/95 backdrop-blur-md border border-amber-300 shadow-xl rounded-2xl flex items-center gap-2.5 transition-all duration-300 select-none ${
+          comparisonToast
+            ? 'translate-y-0 opacity-100 pointer-events-auto scale-100'
+            : '-translate-y-6 opacity-0 pointer-events-none scale-95'
+        }`}
+      >
+        <div className="w-7 h-7 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0">
+          <AlertTriangle className="w-4 h-4 text-amber-600 stroke-[2.5]" />
+        </div>
+        <p className="text-xs font-bold text-slate-800 leading-snug">
+          {comparisonToast || 'Transaksi ini sudah dipilih. Pilih sesi belanja lain untuk dibandingkan.'}
+        </p>
+      </div>
+
       {/* 1. FILTER BULAN & TAHUN (MONTH-YEAR PICKER DINAMIS) */}
       <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
         <div className="flex items-center justify-between">
@@ -360,7 +557,9 @@ export default function HistoryScreen({
               {historyItems.length === 0
                 ? 'Belum ada data untuk dibandingkan (Minimal 2 transaksi)'
                 : (isSelectingFor === 'A' && '👉 Klik kartu pada daftar di bawah untuk memilih Transaksi A')
-                || (isSelectingFor === 'B' && '👉 Transaksi A terpilih! Sekarang klik kartu untuk Transaksi B')
+                || (isSelectingFor === 'B' && (historyItems.length < 2
+                    ? 'Transaksi A terpilih! Butuh minimal 1 sesi belanja lain untuk Transaksi B'
+                    : '👉 Transaksi A terpilih! Sekarang klik sesi lain untuk Transaksi B'))
                 || (!isSelectingFor && hasBothSelected && 'Hasil perbandingan 2 sesi belanja')
                 || (!isSelectingFor && !hasBothSelected && 'Klik slot di bawah untuk memilih transaksi')}
             </p>
@@ -398,15 +597,15 @@ export default function HistoryScreen({
               }}
               className={`rounded-xl border p-2.5 text-left cursor-pointer transition-all relative ${
                 isSelectingFor === 'A'
-                  ? 'border-2 border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-200/80 shadow-xs'
-                  : 'border-emerald-300 bg-emerald-50/20 hover:border-emerald-400'
+                  ? 'border-2 border-teal-500 bg-teal-50/50 ring-2 ring-teal-200/80 shadow-xs'
+                  : 'border-teal-300 bg-teal-50/20 hover:border-teal-400'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="px-1.5 py-0.2 bg-emerald-600 text-white rounded text-[9px] font-extrabold uppercase tracking-wide">
+                <span className="px-1.5 py-0.2 bg-teal-600 text-white rounded text-[9px] font-extrabold uppercase tracking-wide">
                   Transaksi A
                 </span>
-                <span className="text-[10px] text-emerald-700 font-bold">
+                <span className="text-[10px] text-teal-700 font-bold">
                   {isSelectingFor === 'A' ? 'Memilih...' : 'Ubah ↺'}
                 </span>
               </div>
@@ -416,7 +615,7 @@ export default function HistoryScreen({
               <p className="text-[10px] text-slate-500 truncate">
                 {selectedTxA.date || selectedTxA.shopping_date || 'Tanggal'}
               </p>
-              <p className="text-xs font-black text-emerald-800 mt-0.5 tabular-nums">
+              <p className="text-xs font-black text-teal-800 mt-0.5 tabular-nums">
                 Rp {Number(selectedTxA.totalSpent || selectedTxA.total_spent || 0).toLocaleString('id-ID')}
               </p>
             </div>
@@ -582,8 +781,10 @@ export default function HistoryScreen({
               {historyItems.length === 0
                 ? 'Belum ada riwayat transaksi belanja untuk dibandingkan.'
                 : (isSelectingFor === 'A' && 'Silakan pilih sesi belanja pertama sebagai Transaksi A dari daftar di bawah.')
-                || (isSelectingFor === 'B' && 'Transaksi A berhasil dipilih! Silakan klik sesi belanja kedua sebagai Transaksi B.')
-                || (!isSelectingFor && 'Pilih 2 transaksi untuk melihat analisis perbandingan nominal.')}
+                || (isSelectingFor === 'B' && (historyItems.length < 2
+                    ? 'Transaksi A berhasil dipilih! Tambahkan minimal 1 sesi belanja lain untuk dibandingkan sebagai Transaksi B.'
+                    : 'Transaksi A berhasil dipilih! Silakan klik sesi belanja lain yang berbeda sebagai Transaksi B.'))
+                || (!isSelectingFor && 'Pilih 2 transaksi berbeda untuk melihat analisis perbandingan nominal.')}
             </p>
           </div>
         )}
@@ -663,34 +864,48 @@ export default function HistoryScreen({
             </p>
           </div>
         ) : (
-          <div className="space-y-2.5">
+          <div className="space-y-3.5 pt-1">
             {displayList.map((session) => {
-              const isSelectedA = selectedTxA && String(selectedTxA.id) === String(session.id);
-              const isSelectedB = selectedTxB && String(selectedTxB.id) === String(session.id);
+              const isSelectedA = Boolean(selectedTxA && String(selectedTxA.id) === String(session.id));
+              const isSelectedB = Boolean(selectedTxB && String(selectedTxB.id) === String(session.id));
+              const isBlockedForCurrentSlot =
+                (isSelectingFor === 'B' && isSelectedA) ||
+                (isSelectingFor === 'A' && isSelectedB);
 
               return (
                 <div
                   key={session.id}
-                  onClick={() => handleSelectSession(session)}
-                  className={`bg-white rounded-2xl p-3.5 border transition-all cursor-pointer hover:bg-gray-50 relative group ${
-                    isSelectedA
-                      ? 'border-2 border-emerald-500 ring-2 ring-emerald-200 shadow-sm bg-emerald-50/15'
+                  onClick={() => handleSelectForComparison(session)}
+                  className={`rounded-2xl p-3.5 border transition-all relative group ${
+                    isBlockedForCurrentSlot
+                      ? isSelectedA
+                        ? 'border-2 border-teal-400/70 bg-slate-50/90 opacity-75 cursor-not-allowed shadow-2xs'
+                        : 'border-2 border-blue-400/70 bg-slate-50/90 opacity-75 cursor-not-allowed shadow-2xs'
+                      : isSelectedA
+                      ? 'bg-teal-50/20 border-2 border-teal-500 ring-2 ring-teal-200 shadow-sm cursor-pointer hover:bg-teal-50/35'
                       : isSelectedB
-                      ? 'border-2 border-blue-500 ring-2 ring-blue-200 shadow-sm bg-blue-50/15'
-                      : 'border-slate-200/90 shadow-2xs hover:border-emerald-300'
+                      ? 'bg-blue-50/20 border-2 border-blue-500 ring-2 ring-blue-200 shadow-sm cursor-pointer hover:bg-blue-50/35'
+                      : 'bg-white border-slate-200/90 shadow-2xs cursor-pointer hover:bg-gray-50 hover:border-teal-300'
                   }`}
                 >
-                  {/* Badge Indikator Terpilih di Sudut Kiri Atas (Sesuai Lingkaran Merah User di Gambar 2) */}
+                  {/* Badge Indikator Terpilih di Sudut Kiri Atas */}
                   {isSelectedA && (
-                    <div className="absolute -top-2.5 left-3 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white shadow-xs flex items-center space-x-1 z-10">
+                    <div className="absolute -top-2.5 left-3 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-teal-600 text-white shadow-xs flex items-center space-x-1 z-10">
                       <span>✓</span>
                       <span>Terpilih sebagai A</span>
                     </div>
                   )}
                   {isSelectedB && (
-                    <div className="absolute -top-2.5 left-3 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-600 text-white shadow-xs flex items-center space-x-1 z-10">
+                    <div className="absolute -top-2.5 left-3 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-600 text-white shadow-xs flex items-center space-x-1 z-10">
                       <span>✓</span>
                       <span>Terpilih sebagai B</span>
+                    </div>
+                  )}
+
+                  {/* Keterangan Non-Aktif Ringan saat sedang memilih slot lawannya */}
+                  {isBlockedForCurrentSlot && (
+                    <div className="absolute -top-2.5 right-3 px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-slate-100 text-slate-600 border border-slate-300 shadow-2xs z-10">
+                      {isSelectedA ? 'Sudah di Slot A · Pilih sesi lain' : 'Sudah di Slot B · Pilih sesi lain'}
                     </div>
                   )}
 
@@ -699,7 +914,7 @@ export default function HistoryScreen({
                       {/* Store Icon */}
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 border ${
                         isSelectedA 
-                          ? 'bg-emerald-100 border-emerald-200 text-emerald-700' 
+                          ? 'bg-teal-100 border-teal-200 text-teal-700' 
                           : isSelectedB 
                           ? 'bg-blue-100 border-blue-200 text-blue-700' 
                           : 'bg-blue-50 border-blue-100 text-blue-600'

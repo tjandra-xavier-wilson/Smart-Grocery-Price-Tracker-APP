@@ -136,6 +136,7 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
           name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0],
           email: u.email,
           avatar_url: u.user_metadata?.avatar_url || null,
+          user_metadata: u.user_metadata || {},
           provider: u.app_metadata?.provider || 'google',
           role: 'user',
           authenticated_at: new Date().toISOString()
@@ -255,6 +256,7 @@ export default function LoginScreen({ onLoginSuccess, externalError = '' }) {
           name: u?.user_metadata?.full_name || fullName || u?.email?.split('@')[0] || email.split('@')[0],
           email: u?.email || email.trim(),
           avatar_url: u?.user_metadata?.avatar_url || null,
+          user_metadata: u?.user_metadata || {},
           provider: u?.app_metadata?.provider || 'email_password',
           role: 'user',
           authenticated_at: new Date().toISOString()

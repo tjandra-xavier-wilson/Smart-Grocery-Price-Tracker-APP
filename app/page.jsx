@@ -1187,6 +1187,7 @@ export default function Home() {
                 name: name || (email ? email.split('@')[0] : 'Pengguna'),
                 email: email,
                 avatar_url: avatar,
+                user_metadata: payload.user_metadata || {},
                 provider: 'google',
                 role: 'user',
                 authenticated_at: new Date().toISOString()
@@ -1274,6 +1275,7 @@ export default function Home() {
             name: name || email.split('@')[0],
             email: email,
             avatar_url: avatar,
+            user_metadata: meta || {},
             provider: 'google',
             role: 'user',
             authenticated_at: new Date().toISOString()
@@ -2139,7 +2141,15 @@ export default function Home() {
           localStorage.removeItem('history');
           if (currentUser?.id) {
             localStorage.removeItem(`${STORAGE_KEYS.HISTORY}_${currentUser.id}`);
+            localStorage.setItem(`sentinel_comparison_${currentUser.id}`, JSON.stringify({ txAId: null, txBId: null }));
           }
+        }
+        if (currentUser?.id) {
+          try {
+            supabase.auth.updateUser({
+              data: { comparison_tx_a: null, comparison_tx_b: null }
+            }).catch(() => {});
+          } catch (e) {}
         }
         try {
           supabaseSyncChannelRef.current?.send({
@@ -2176,6 +2186,35 @@ export default function Home() {
           }
           return updated;
         });
+
+        // Bersihkan slot perbandingan jika transaksi yang dihapus masih tersimpan di storage/metadata
+        if (currentUser?.id) {
+          try {
+            const compKey = `sentinel_comparison_${currentUser.id}`;
+            let savedA = currentUser?.user_metadata?.comparison_tx_a || null;
+            let savedB = currentUser?.user_metadata?.comparison_tx_b || null;
+            if (typeof localStorage !== 'undefined') {
+              const rawComp = localStorage.getItem(compKey);
+              if (rawComp !== null) {
+                const parsedComp = JSON.parse(rawComp);
+                savedA = parsedComp?.txAId || null;
+                savedB = parsedComp?.txBId || null;
+              }
+            }
+            const affectedA = savedA && String(savedA) === String(targetId);
+            const affectedB = savedB && String(savedB) === String(targetId);
+            if (affectedA || affectedB) {
+              const nextAId = affectedA ? null : savedA;
+              const nextBId = affectedB ? null : savedB;
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(compKey, JSON.stringify({ txAId: nextAId, txBId: nextBId }));
+              }
+              supabase.auth.updateUser({
+                data: { comparison_tx_a: nextAId, comparison_tx_b: nextBId }
+              }).catch(() => {});
+            }
+          } catch (e) {}
+        }
         try {
           supabaseSyncChannelRef.current?.send({
             type: 'broadcast',
@@ -2582,6 +2621,7 @@ export default function Home() {
                   {activeTab === 'history' && (
                     <HistoryScreen
                       historyList={historyList}
+                      currentUser={currentUser}
                       onOpenReceiptDetail={(session) => {
                         setSelectedReceipt({
                           ...session,
