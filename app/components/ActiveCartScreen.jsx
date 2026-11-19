@@ -31,13 +31,15 @@ import {
   Brush,
   ChevronLeft,
   ChevronRight,
-  Loader2
+  Loader2,
+  Settings
 } from 'lucide-react';
 import { playTapSound, playSuccessSound, playWarningBeep } from '../utils/sound';
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
 import { getProductEmoji, ProductEmojiBox, PriceFluctuationBadge } from '../utils/emoji';
 import { getItemStorePrice, normalizeSupermarketName } from '../utils/storePrices';
 import { supabase } from '../../src/lib/supabaseClient';
+import { EditCustomItemModal } from './Modals';
 
 export default function ActiveCartScreen({
   cartItems = [],
@@ -62,12 +64,14 @@ export default function ActiveCartScreen({
   customProducts = [],
   onDeleteCustomProduct,
   onRefreshCustomProducts,
+  onEditCustomProduct,
   currentUser = null
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [deletingItemId, setDeletingItemId] = useState(null);
   const [itemToDeleteFromCart, setItemToDeleteFromCart] = useState(null);
   const [customProductToDelete, setCustomProductToDelete] = useState(null);
+  const [editingCustomItem, setEditingCustomItem] = useState(null);
 
   // Sinkronisasi otomatis saat komponen dimuat
   useEffect(() => {
@@ -823,15 +827,19 @@ export default function ActiveCartScreen({
     );
   };
 
-  // Calculations: Dihitung secara dinamis berdasarkan supermarket yang aktif
+  // Calculations: Dihitung secara dinamis dari harga satuan (unit price / final unit price)
   const totalCartPrice = cartItems.reduce((acc, item) => {
-    const storePrice = getItemStorePrice(item, currentStore);
-    const itemPrice = item.prices?.[currentStore]?.current || 
-                      item.prices?.['Lotte Mart - Puri Indah']?.current || 
-                      item.prices?.['Lotte Mart Grocery - Puri Indah']?.current || 
-                      storePrice.current || 
-                      item.price || 0;
-    return acc + (itemPrice * (item.quantity || 1));
+    const finalUnitP = item.finalUnitPrice !== undefined && item.finalUnitPrice !== null
+      ? item.finalUnitPrice
+      : (() => {
+          const storePrice = getItemStorePrice(item, currentStore);
+          return item.prices?.[currentStore]?.current || 
+                 item.prices?.['Lotte Mart - Puri Indah']?.current || 
+                 item.prices?.['Lotte Mart Grocery - Puri Indah']?.current || 
+                 storePrice.current || 
+                 item.price || 0;
+        })();
+    return acc + (finalUnitP * (item.quantity || 1));
   }, 0);
 
   const totalItemCount = cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
@@ -1320,17 +1328,23 @@ export default function ActiveCartScreen({
           <div className="space-y-2.5">
             {cartItems.map((item) => {
               const storePrice = getItemStorePrice(item, currentStore);
-              const currentItemPrice = item.prices?.[currentStore]?.current || 
-                                       item.prices?.['Lotte Mart - Puri Indah']?.current || 
-                                       item.prices?.['Lotte Mart Grocery - Puri Indah']?.current || 
-                                       storePrice.current || 
-                                       item.price || 0;
+              const currentItemPrice = item.finalUnitPrice !== undefined && item.finalUnitPrice !== null
+                ? item.finalUnitPrice
+                : (item.prices?.[currentStore]?.current || 
+                   item.prices?.['Lotte Mart - Puri Indah']?.current || 
+                   item.prices?.['Lotte Mart Grocery - Puri Indah']?.current || 
+                   storePrice.current || 
+                   item.price || 0);
+
+              const itemUnitPrice = item.unitPrice ?? item.originalPrice ?? currentItemPrice;
+              const itemFinalUnitPrice = currentItemPrice;
+              const itemTotal = itemFinalUnitPrice * (item.quantity || 1);
+              const totalNormalItem = itemUnitPrice * (item.quantity || 1);
+              const hasDiscount = itemUnitPrice > itemFinalUnitPrice;
               const hasStoreExplicitPrice = Boolean(item.prices?.[currentStore] || item.prices?.[normalizeSupermarketName(currentStore)]);
               const rawHistory = (!item.isCustom && hasStoreExplicitPrice) ? (storePrice.history ?? item.lastMonthPrice ?? null) : null;
               const currentHistoryPrice = (rawHistory !== null && rawHistory !== undefined && !isNaN(Number(rawHistory))) ? Number(rawHistory) : null;
               const hasValidHistory = !item.isCustom && hasStoreExplicitPrice && currentHistoryPrice !== null;
-              const itemTotal = currentItemPrice * (item.quantity || 1);
-              const hasDiscount = item.originalPrice && item.originalPrice > currentItemPrice;
               const isItemSecondary = item.isSecondary;
 
               return (
@@ -1413,14 +1427,14 @@ export default function ActiveCartScreen({
                         <div>
                           {hasDiscount && (
                             <span className="text-[10px] text-slate-400 line-through mr-1.5 font-medium">
-                              Rp {item.originalPrice.toLocaleString('id-ID')}
+                              Rp {totalNormalItem.toLocaleString('id-ID')}
                             </span>
                           )}
                           <div className="text-xs font-extrabold text-slate-900">
                             Rp {itemTotal.toLocaleString('id-ID')}
                             {item.quantity > 1 && (
                               <span className="text-[10px] text-slate-400 font-normal ml-1">
-                                (Rp {currentItemPrice.toLocaleString('id-ID')}/{item.unit ? item.unit.split('/')[0].trim() : 'unit'})
+                                (Rp {itemFinalUnitPrice.toLocaleString('id-ID')}/{item.unit ? item.unit.split('/')[0].trim() : 'unit'})
                               </span>
                             )}
                           </div>
@@ -1453,17 +1467,32 @@ export default function ActiveCartScreen({
                       </div>
                     </div>
 
-                    {/* Delete Item Button (top right) */}
-                    <button
-                      onClick={() => {
-                        playTapSound();
-                        setItemToDeleteFromCart(item);
-                      }}
-                      className="absolute top-2.5 right-2.5 p-1 text-slate-300 hover:text-rose-600 transition-colors cursor-pointer"
-                      title="Hapus Barang"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {/* Action Buttons (top right): Trash & Settings (Gear) for custom items */}
+                    <div className="absolute top-2.5 right-2.5 flex flex-col items-center space-y-1.5 z-10">
+                      <button
+                        onClick={() => {
+                          playTapSound();
+                          setItemToDeleteFromCart(item);
+                        }}
+                        className="p-1 text-slate-300 hover:text-rose-600 transition-colors cursor-pointer"
+                        title="Hapus Barang"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+
+                      {item.isCustom && (
+                        <button
+                          onClick={() => {
+                            playTapSound();
+                            setEditingCustomItem(item);
+                          }}
+                          className="p-1 text-slate-400 hover:text-teal-600 transition-colors cursor-pointer"
+                          title="Edit Harga & Diskon Barang Kustom"
+                        >
+                          <Settings className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -1676,6 +1705,18 @@ export default function ActiveCartScreen({
           </div>
         </div>
       )}
+
+      {/* 9. MODAL EDIT BARANG KUSTOM (HARGA SATUAN NORMAL & DISKON) */}
+      <EditCustomItemModal
+        isOpen={Boolean(editingCustomItem)}
+        item={cartItems.find(i => i.id === editingCustomItem?.id) || editingCustomItem}
+        onClose={() => setEditingCustomItem(null)}
+        onSave={(updatedItem) => {
+          if (onEditCustomProduct) {
+            onEditCustomProduct(updatedItem);
+          }
+        }}
+      />
     </div>
   );
 }

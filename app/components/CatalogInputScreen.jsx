@@ -112,10 +112,8 @@ export default function CatalogInputScreen({
   const [normalPrice, setNormalPrice] = useState(initialValues?.price ? String(initialValues.price) : '');
   const [showSuggestions, setShowSuggestions] = useState(false);
   
-  // Discount Scheme: 'tunggal' | 'kompound'
-  const [discountMode, setDiscountMode] = useState('kompound');
-  const [selectedPreset, setSelectedPreset] = useState('50% + 20%');
-  const [discountFormula, setDiscountFormula] = useState('50% + 20%');
+  // Discount Scheme: Formula diskon awal kosong (0% / tanpa diskon)
+  const [discountFormula, setDiscountFormula] = useState(initialValues?.discountFormula || '');
   
   // Validation state
   const [errorMessage, setErrorMessage] = useState('');
@@ -280,25 +278,36 @@ export default function CatalogInputScreen({
   // Parse discounts from formula or preset
   let d1 = 0;
   let d2 = 0;
-  if (discountMode === 'tunggal') {
-    const match = discountFormula.match(/(\d+)/);
-    if (match) d1 = Number(match[1]);
-  } else {
-    // compound discount formula e.g. 50% + 20%
-    const matches = discountFormula.match(/(\d+)/g);
+  const trimmedFormula = (discountFormula || '').trim();
+  const lowerFormula = trimmedFormula.toLowerCase();
+
+  if (lowerFormula.includes('beli 1 gratis 1') || lowerFormula.includes('b1g1')) {
+    d1 = 50;
+    d2 = 0;
+  } else if (trimmedFormula.includes('+')) {
+    const matches = trimmedFormula.match(/(\d+)/g);
     if (matches && matches.length >= 2) {
       d1 = Number(matches[0]);
       d2 = Number(matches[1]);
     } else if (matches && matches.length === 1) {
       d1 = Number(matches[0]);
+      d2 = 0;
+    }
+  } else if (trimmedFormula) {
+    const match = trimmedFormula.match(/(\d+)/);
+    if (match) {
+      d1 = Number(match[1]);
+      d2 = 0;
     }
   }
+
+  const discountMode = trimmedFormula.includes('+') ? 'kompound' : 'tunggal';
 
   // Calculate Transparency Pricing (SRS F-03)
   const priceNum = Math.max(0, Number(normalPrice.toString().replace(/[^0-9]/g, '')) || 0);
   const priceAfterD1 = priceNum * (1 - d1 / 100);
   const priceAfterD2 = priceAfterD1 * (1 - d2 / 100);
-  const finalUnitPrice = Math.round(priceAfterD2);
+  const finalUnitPrice = (d1 > 0 || d2 > 0) ? Math.round(priceAfterD2) : priceNum;
   const totalItemSubtotal = finalUnitPrice * quantity;
   const normalSubtotal = priceNum * quantity;
   const totalSavings = Math.max(0, normalSubtotal - totalItemSubtotal);
@@ -307,11 +316,24 @@ export default function CatalogInputScreen({
   const simulatedRemaining = currentRemainingBudget - totalItemSubtotal;
   const isBudgetSafe = simulatedRemaining >= 0;
 
-  const handleSelectPreset = (preset) => {
+  const handleSelectQuickDiscount = (presetValue) => {
     playTapSound();
-    setSelectedPreset(preset.id);
-    setDiscountMode(preset.mode);
-    setDiscountFormula(preset.text);
+    // Normalisasi spasi & huruf agar perbandingan akurat (untuk '20%', '50% + 20%', maupun 'Beli 1 Gratis 1')
+    const currentNormalized = (discountFormula || '').trim().toLowerCase();
+    const targetNormalized = presetValue.trim().toLowerCase();
+
+    if (currentNormalized === targetNormalized) {
+      // KLIK KE-2 pada tombol yang sedang aktif: Reset ke 0% (tanpa diskon)
+      setDiscountFormula('');
+    } else {
+      // KLIK KE-1 atau pindah ke promo lain: Terapkan diskon tersebut
+      setDiscountFormula(presetValue);
+    }
+  };
+
+  const handleSelectPreset = (preset) => {
+    const val = typeof preset === 'string' ? preset : (preset.text || preset.label);
+    handleSelectQuickDiscount(val);
   };
 
   const handleSelectQuickItem = (item) => {
@@ -379,6 +401,12 @@ export default function CatalogInputScreen({
     const generatedId = (matched && matched.isCustom && matched.id) ? matched.id : generateUUID();
 
     // 2. Samakan ID untuk Optimistic UI dan Database (Zero Mismatch)
+    const discountLabelVal = (d1 > 0 || d2 > 0)
+      ? (lowerFormula.includes('beli 1 gratis 1') || lowerFormula.includes('b1g1')
+          ? 'Beli 1 Gratis 1'
+          : `${d1}%${d2 > 0 ? ` + ${d2}%` : ''}`)
+      : null;
+
     const newItem = {
       id: generatedId,
       name: cleanName,
@@ -386,9 +414,12 @@ export default function CatalogInputScreen({
       unit: unit,
       price: calculatedUnitPrice,
       originalPrice: rawPrice,
+      unitPrice: rawPrice,
+      finalUnitPrice: calculatedUnitPrice,
+      discountFormula: trimmedFormula,
       quantity: quantity,
       isSecondary: category === 'Lainnya' || category === 'Minuman' || category === 'Camilan' || category === 'Minuman & Camilan',
-      discountLabel: (d1 > 0 || d2 > 0) ? `${d1}%${d2 > 0 ? ` + ${d2}%` : ''}` : null,
+      discountLabel: discountLabelVal,
       lastMonthPrice: effectiveLastMonth,
       historyPrice: effectiveLastMonth,
       isCustom: isCustomItem,
@@ -402,6 +433,7 @@ export default function CatalogInputScreen({
     // 4. Bersihkan Form UI seketika agar user merasa instan
     setItemName('');
     setNormalPrice('');
+    setDiscountFormula('');
     setShowSuggestions(false);
 
     // 5. BACKGROUND SYNC: Kirim ke database dengan generatedId yang SAMA PERSIS
@@ -785,12 +817,12 @@ export default function CatalogInputScreen({
             </span>
             <div className="flex flex-wrap gap-1.5">
               {presets.map((pr) => {
-                const isSelected = selectedPreset === pr.id;
+                const isSelected = (discountFormula || '').trim().toLowerCase() === pr.text.trim().toLowerCase();
                 return (
                   <button
                     key={pr.id}
                     type="button"
-                    onClick={() => handleSelectPreset(pr)}
+                    onClick={() => handleSelectQuickDiscount(pr.text)}
                     className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold border transition-all cursor-pointer ${
                       isSelected
                         ? 'bg-emerald-800 text-white border-emerald-900 shadow-2xs'
@@ -817,15 +849,15 @@ export default function CatalogInputScreen({
                 type="text"
                 value={discountFormula}
                 onChange={(e) => setDiscountFormula(e.target.value)}
-                placeholder="50% + 20%"
+                placeholder="0%"
                 className="w-full pl-3 pr-8 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
               />
               {discountFormula && (
                 <button
                   type="button"
                   onClick={() => {
-                    setDiscountFormula('0%');
-                    setSelectedPreset('');
+                    playTapSound();
+                    setDiscountFormula('');
                   }}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >

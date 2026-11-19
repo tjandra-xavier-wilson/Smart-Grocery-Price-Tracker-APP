@@ -22,7 +22,9 @@ import {
   Printer,
   Download,
   Share2,
-  Database
+  Database,
+  Settings,
+  Percent
 } from 'lucide-react';
 import { toISODateString, toIndoDisplayDate } from '../utils/date';
 import { playTapSound, playSuccessSound, playWarningBeep, playBarcodeBeep } from '../utils/sound';
@@ -2167,6 +2169,297 @@ export function EmptyCartModal({ isOpen, onClose }) {
             className="bg-amber-500 h-full rounded-full w-full"
             style={{ animation: 'emptyProgressCountdown 1.8s linear forwards' }}
           />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 11. Modal Edit Barang Kustom (Harga Satuan Normal & Diskon Per Produk)
+ */
+export function EditCustomItemModal({ isOpen, onClose, item, onSave }) {
+  if (!isOpen || !item) return null;
+
+  const initialNormalPrice = item.unitPrice ?? item.originalPrice ?? item.price ?? 0;
+  const initialFormula = item.discountFormula || item.discountLabel || '';
+
+  const [normalPrice, setNormalPrice] = useState(String(initialNormalPrice));
+  const [discountFormula, setDiscountFormula] = useState(initialFormula);
+
+  useEffect(() => {
+    if (item) {
+      setNormalPrice(String(item.unitPrice ?? item.originalPrice ?? item.price ?? 0));
+      setDiscountFormula(item.discountFormula || item.discountLabel || '');
+    }
+  }, [item]);
+
+  // 5 Tombol Preset Cepat (Tanpa Tombol Tambahan 0%)
+  const presets = [
+    { id: '10%', label: '10%', text: '10%' },
+    { id: '20%', label: '20%', text: '20%' },
+    { id: '25%', label: '25%', text: '25%' },
+    { id: '50% + 20%', label: '50% + 20%', text: '50% + 20%' },
+    { id: 'b1g1', label: 'Beli 1 Gratis 1', text: 'Beli 1 Gratis 1' },
+  ];
+
+  // Logika Toggle Klik Ke-2 = 0%
+  const handleSelectQuickDiscount = (presetValue) => {
+    playTapSound();
+    const currentNormalized = (discountFormula || '').trim().toLowerCase();
+    const targetNormalized = presetValue.trim().toLowerCase();
+
+    if (currentNormalized === targetNormalized) {
+      // KLIK KE-2 pada tombol yang sedang aktif: Reset ke 0% (tanpa diskon)
+      setDiscountFormula('');
+    } else {
+      // KLIK KE-1 atau pindah ke promo lain: Terapkan diskon tersebut
+      setDiscountFormula(presetValue);
+    }
+  };
+
+  // Sanitasi angka murni untuk Harga Satuan Normal (Rp) per 1 produk
+  const rawUnitPrice = Math.max(0, Number(normalPrice.toString().replace(/[^0-9]/g, '')) || 0);
+
+  // Parsing diskon formula
+  let d1 = 0;
+  let d2 = 0;
+  const trimmedFormula = (discountFormula || '').trim();
+  const lowerFormula = trimmedFormula.toLowerCase();
+
+  if (lowerFormula.includes('beli 1 gratis 1') || lowerFormula.includes('b1g1')) {
+    d1 = 50;
+    d2 = 0;
+  } else if (trimmedFormula.includes('+')) {
+    const matches = trimmedFormula.match(/(\d+)/g);
+    if (matches && matches.length >= 2) {
+      d1 = Number(matches[0]);
+      d2 = Number(matches[1]);
+    } else if (matches && matches.length === 1) {
+      d1 = Number(matches[0]);
+      d2 = 0;
+    }
+  } else if (trimmedFormula) {
+    const match = trimmedFormula.match(/(\d+)/);
+    if (match) {
+      d1 = Number(match[1]);
+      d2 = 0;
+    }
+  }
+
+  const discountMode = trimmedFormula.includes('+') ? 'kompound' : 'tunggal';
+
+  // Kalkulasi Harga Satuan & Subtotal
+  const priceAfterD1 = rawUnitPrice * (1 - d1 / 100);
+  const priceAfterD2 = priceAfterD1 * (1 - d2 / 100);
+  const finalUnitPrice = (d1 > 0 || d2 > 0) ? Math.round(priceAfterD2) : rawUnitPrice;
+  const discountPerUnit = Math.max(0, rawUnitPrice - finalUnitPrice);
+
+  const quantity = item.quantity || 1;
+  const totalSubtotal = finalUnitPrice * quantity;
+  const normalSubtotal = rawUnitPrice * quantity;
+  const totalHemat = Math.max(0, normalSubtotal - totalSubtotal);
+
+  const discountLabelVal = (d1 > 0 || d2 > 0)
+    ? (lowerFormula.includes('beli 1 gratis 1') || lowerFormula.includes('b1g1')
+        ? 'Beli 1 Gratis 1'
+        : `${d1}%${d2 > 0 ? ` + ${d2}%` : ''}`)
+    : null;
+
+  const handleSave = () => {
+    playSuccessSound();
+    if (onSave) {
+      onSave({
+        ...item,
+        unitPrice: rawUnitPrice,
+        originalPrice: rawUnitPrice,
+        base_price: rawUnitPrice,
+        finalUnitPrice: finalUnitPrice,
+        price: finalUnitPrice,
+        discountFormula: trimmedFormula,
+        discountLabel: discountLabelVal,
+        prices: generateDefaultPrices(rawUnitPrice)
+      });
+    }
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 animate-fade-in">
+      <div 
+        className="w-full max-w-[420px] bg-white rounded-2xl shadow-2xl border border-gray-200 p-5 animate-slide-up space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header Modal */}
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-full bg-teal-50 text-teal-700 flex items-center justify-center">
+              <Settings className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-sm text-slate-900">Edit Barang Kustom</h3>
+              <p className="text-[11px] text-slate-500 font-medium truncate max-w-[240px]">
+                {item.name} {item.unit ? `(${item.unit})` : ''}
+              </p>
+            </div>
+          </div>
+          <button 
+            type="button"
+            onClick={() => { playTapSound(); onClose(); }}
+            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center cursor-pointer transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Input Harga Satuan Normal (Rp) per 1 produk */}
+        <div>
+          <label className="text-xs font-bold text-slate-800 mb-1 block">
+            Harga Satuan Normal (Rp) <span className="text-rose-500">*</span>
+          </label>
+          <p className="text-[10px] text-slate-400 mb-1.5 font-medium">
+            Harga normal per 1 produk sebelum diskon
+          </p>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={normalPrice}
+            onChange={(e) => {
+              const cleanNum = e.target.value.replace(/[^0-9]/g, '');
+              setNormalPrice(cleanNum);
+            }}
+            placeholder="Contoh: 20000"
+            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white transition-all"
+          />
+        </div>
+
+        {/* Pengaturan Diskon per Produk */}
+        <div className="p-3 bg-slate-50/90 rounded-2xl border border-slate-200 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-1.5">
+              <Percent className="w-3.5 h-3.5 text-emerald-700" />
+              <span className="text-xs font-black text-slate-900">
+                Pengaturan Diskon per Produk
+              </span>
+            </div>
+            <span className="text-[10px] text-slate-400 font-semibold">SRS F-03</span>
+          </div>
+
+          {/* 5 Tombol Pilih Cepat Diskon */}
+          <div>
+            <span className="text-[11px] font-bold text-slate-600 mb-1.5 block">
+              Pilih Cepat Diskon:
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {presets.map((pr) => {
+                const isSelected = (discountFormula || '').trim().toLowerCase() === pr.text.trim().toLowerCase();
+                return (
+                  <button
+                    key={pr.id}
+                    type="button"
+                    onClick={() => handleSelectQuickDiscount(pr.text)}
+                    className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-emerald-800 text-white border-emerald-900 shadow-2xs'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {pr.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Formula Diskon Input Box */}
+          <div>
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 mb-1">
+              <span>Formula Diskon (% atau %)</span>
+              <span className="text-[10px] text-emerald-700 font-semibold">
+                {discountMode === 'kompound' ? 'Mode Diskon Kompound' : 'Mode Diskon Tunggal'}
+              </span>
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                value={discountFormula}
+                onChange={(e) => setDiscountFormula(e.target.value)}
+                placeholder="0%"
+                className="w-full pl-3 pr-8 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
+              />
+              {discountFormula && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    playTapSound();
+                    setDiscountFormula('');
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Ringkasan Live Preview */}
+        <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-xs space-y-1.5">
+          <div className="text-[11px] font-bold text-slate-700 pb-1 border-b border-slate-200 flex items-center justify-between">
+            <span>Ringkasan Live Preview</span>
+            <span className="text-[10px] text-emerald-700 font-semibold">{quantity} unit di keranjang</span>
+          </div>
+          <div className="flex justify-between text-slate-600 font-medium">
+            <span>Harga Satuan Normal:</span>
+            <span className="font-bold text-slate-900">Rp {rawUnitPrice.toLocaleString('id-ID')}</span>
+          </div>
+          {discountPerUnit > 0 ? (
+            <div className="flex justify-between text-slate-600 font-medium">
+              <span>Potongan Diskon (1 unit):</span>
+              <span className="font-bold text-emerald-700">-Rp {discountPerUnit.toLocaleString('id-ID')} {discountLabelVal ? `(${discountLabelVal})` : ''}</span>
+            </div>
+          ) : (
+            <div className="flex justify-between text-slate-400 font-medium">
+              <span>Potongan Diskon (1 unit):</span>
+              <span>Rp 0</span>
+            </div>
+          )}
+          <div className="flex justify-between text-slate-600 font-medium">
+            <span>Harga Satuan Setelah Diskon:</span>
+            <span className="font-bold text-slate-900">Rp {finalUnitPrice.toLocaleString('id-ID')}</span>
+          </div>
+          <div className="flex justify-between text-emerald-800 font-extrabold pt-1.5 border-t border-slate-200">
+            <span>Total Subtotal ({quantity} unit):</span>
+            <span className="text-sm">Rp {totalSubtotal.toLocaleString('id-ID')}</span>
+          </div>
+          {totalHemat > 0 && (
+            <div className="flex justify-between text-emerald-700 font-semibold text-[11px]">
+              <span>🎁 Total Hemat Diskon:</span>
+              <span>Rp {totalHemat.toLocaleString('id-ID')}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Tombol Batal & Simpan Perubahan */}
+        <div className="flex items-center space-x-2 pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              playTapSound();
+              onClose();
+            }}
+            className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            className="flex-1 py-2.5 px-4 bg-emerald-800 hover:bg-emerald-900 active:bg-emerald-950 text-white text-xs font-extrabold rounded-xl shadow-md transition-colors cursor-pointer flex items-center justify-center space-x-1.5"
+          >
+            <Check className="w-3.5 h-3.5" />
+            <span>Simpan Perubahan</span>
+          </button>
         </div>
       </div>
     </div>

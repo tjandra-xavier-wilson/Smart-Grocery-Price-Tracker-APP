@@ -43,7 +43,8 @@ import {
   insertCustomStore,
   getCustomStores,
   deleteCustomStore,
-  deleteCustomProduct
+  deleteCustomProduct,
+  updateCustomProduct
 } from '../src/lib/supabaseClient';
 import { toIndoDisplayDate, toISODateString } from './utils/date';
 import { playTapSound, playSuccessSound, playBarcodeBeep } from './utils/sound';
@@ -275,6 +276,19 @@ export default function Home() {
 
   // Navigation State: 'cart' | 'input' | 'history'
   const [activeTab, setActiveTab] = useState('cart');
+  const mainScrollContainerRef = useRef(null);
+
+  // Auto Scroll-to-Top Saat Berpindah Tab
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    // Jika konten utama dibungkus container scrollable (overflow-y-auto), reset juga ref-nya:
+    if (mainScrollContainerRef?.current) {
+      mainScrollContainerRef.current.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      mainScrollContainerRef.current.scrollTop = 0;
+    }
+  }, [activeTab]);
 
   // Core App State
   const [currentStore, setCurrentStore] = useState('Lotte Mart - Puri Indah');
@@ -1950,8 +1964,13 @@ export default function Home() {
 
   const handleAddToCart = (newItem) => {
     if (!newItem) return;
+    const rawUnitP = newItem.unitPrice ?? newItem.originalPrice ?? newItem.price ?? 0;
+    const finalUnitP = newItem.finalUnitPrice ?? newItem.price ?? rawUnitP;
     const cleanItem = {
-      ...newItem
+      ...newItem,
+      unitPrice: rawUnitP,
+      finalUnitPrice: finalUnitP,
+      discountFormula: newItem.discountFormula ?? ''
     };
     delete cleanItem.image;
     setCartItems((prev) => {
@@ -1968,6 +1987,70 @@ export default function Home() {
       return updated;
     });
     setActiveTab('cart');
+  };
+
+  // Edit Barang Kustom: Update Harga Satuan Normal & Diskon Per Produk
+  const handleEditCustomProduct = async (updatedItem) => {
+    if (!updatedItem) return;
+
+    // 1. Optimistic Update pada cartItems (berbasis satuan)
+    setCartItems((prev) => {
+      const updated = prev.map((item) =>
+        item.id === updatedItem.id ? { ...item, ...updatedItem } : item
+      );
+      persistState(updated);
+      return updated;
+    });
+
+    // 2. Optimistic Update pada recommendedItems dan customProducts
+    const rawPrice = updatedItem.unitPrice ?? updatedItem.originalPrice ?? updatedItem.price ?? 0;
+    const finalPrice = updatedItem.finalUnitPrice ?? updatedItem.price ?? rawPrice;
+
+    setRecommendedItems((prev) =>
+      (prev || []).map((item) => {
+        if (item.id === updatedItem.id || item.name.toLowerCase() === updatedItem.name.toLowerCase()) {
+          return {
+            ...item,
+            ...updatedItem,
+            price: finalPrice,
+            base_price: rawPrice,
+            originalPrice: rawPrice
+          };
+        }
+        return item;
+      })
+    );
+
+    setCustomProducts((prev) => {
+      const nextProds = (prev || []).map((item) => {
+        if (item.id === updatedItem.id || item.name.toLowerCase() === updatedItem.name.toLowerCase()) {
+          return {
+            ...item,
+            ...updatedItem,
+            price: finalPrice,
+            base_price: rawPrice,
+            originalPrice: rawPrice
+          };
+        }
+        return item;
+      });
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(nextProds));
+      }
+      return nextProds;
+    });
+
+    playSuccessSound();
+
+    // 3. Sinkronkan base_price terbaru ke tabel products di Supabase di latar belakang (non-blocking)
+    try {
+      const activeUserId = currentUser?.id || currentUserRef.current?.id;
+      updateCustomProduct(updatedItem, activeUserId).catch((err) => {
+        console.warn('[updateCustomProduct background error]:', err);
+      });
+    } catch (e) {
+      console.warn('[updateCustomProduct exception]:', e);
+    }
   };
 
   // Potong Sekunder: Automatically remove/cut secondary items to restore budget limit
@@ -2195,11 +2278,15 @@ export default function Home() {
     }
   };
 
-  // Checkout Save & Double Submit Prevention (Evaluasi Dinamis Berdasarkan Toko Terpilih)
+  // Checkout Save & Double Submit Prevention (Evaluasi Dinamis Berdasarkan Harga Satuan)
   const totalCartPrice = cartItems.reduce((acc, i) => {
-    const sp = getItemStorePrice(i, currentStore);
-    const p = i.prices?.[currentStore]?.current || i.prices?.["Lotte Mart - Puri Indah"]?.current || sp.current || i.price || 0;
-    return acc + (p * (i.quantity || 1));
+    const finalUnitP = i.finalUnitPrice !== undefined && i.finalUnitPrice !== null
+      ? i.finalUnitPrice
+      : (() => {
+          const sp = getItemStorePrice(i, currentStore);
+          return i.prices?.[currentStore]?.current || i.prices?.["Lotte Mart - Puri Indah"]?.current || sp.current || i.price || 0;
+        })();
+    return acc + (finalUnitP * (i.quantity || 1));
   }, 0);
 
   const handleConfirmCheckout = async () => {
@@ -2217,9 +2304,13 @@ export default function Home() {
 
       // Hitung rincian subtotal, promo potongan, dan simulasi pajak PPN 11%
       const subtotalVal = cartItems.reduce((acc, i) => {
-        const sp = getItemStorePrice(i, currentStore);
-        const orig = i.prices?.[currentStore]?.history || i.prices?.["Lotte Mart - Puri Indah"]?.history || sp.history || i.originalPrice || sp.current || i.price || 0;
-        return acc + (orig * (i.quantity || 1));
+        const origUnitP = i.unitPrice !== undefined && i.unitPrice !== null
+          ? i.unitPrice
+          : (() => {
+              const sp = getItemStorePrice(i, currentStore);
+              return i.prices?.[currentStore]?.history || i.prices?.["Lotte Mart - Puri Indah"]?.history || sp.history || i.originalPrice || sp.current || i.price || 0;
+            })();
+        return acc + (origUnitP * (i.quantity || 1));
       }, 0);
 
       const promoVal = Math.max(0, subtotalVal - totalCartPrice);
@@ -2439,7 +2530,7 @@ export default function Home() {
               /* ============================================================== */
               <>
                 {/* Scrollable Viewport Content */}
-                <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar bg-slate-50 relative">
+                <div ref={mainScrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar bg-slate-50 relative">
                   {activeTab === 'cart' && (
                     <ActiveCartScreen
                       cartItems={cartItems}
@@ -2470,6 +2561,7 @@ export default function Home() {
                       customProducts={customProducts}
                       onDeleteCustomProduct={handleDeleteCustomProduct}
                       onRefreshCustomProducts={refreshCustomData}
+                      onEditCustomProduct={handleEditCustomProduct}
                       currentUser={currentUser}
                     />
                   )}

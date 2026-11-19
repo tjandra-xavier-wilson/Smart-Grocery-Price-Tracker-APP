@@ -1467,6 +1467,88 @@ export async function insertCustomProduct(productData) {
 }
 
 /**
+ * Memperbarui data barang custom di LocalStorage, Supabase Cloud (tabel products), dan Cloud Custom Config
+ */
+export async function updateCustomProduct(productData, userId = null) {
+  if (!productData) return { success: false };
+
+  let targetUserId = userId;
+  if (!targetUserId) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      targetUserId = session?.user?.id;
+    } catch (e) { }
+  }
+
+  const rawPrice = Number(String(productData.base_price ?? productData.unitPrice ?? productData.originalPrice ?? productData.price ?? 0).replace(/[^0-9]/g, ''));
+  const isUuid = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id));
+
+  // 1. Simpan perubahan ke LocalStorage
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('sakugrosir_custom_products_v1');
+      if (stored) {
+        const list = JSON.parse(stored);
+        const updatedList = list.map(p => {
+          if ((productData.id && p.id === productData.id) || (p.name && productData.name && p.name.toLowerCase() === productData.name.toLowerCase())) {
+            return {
+              ...p,
+              ...productData,
+              price: rawPrice,
+              base_price: rawPrice,
+              prices: productData.prices || generateDefaultPrices(rawPrice)
+            };
+          }
+          return p;
+        });
+        localStorage.setItem('sakugrosir_custom_products_v1', JSON.stringify(updatedList));
+      }
+    } catch (e) { }
+  }
+
+  // 2. Update base_price di Supabase tabel products di PostgreSQL
+  try {
+    let query = supabase.from('products').update({
+      base_price: rawPrice
+    });
+    if (productData.id && isUuid(productData.id)) {
+      query = query.eq('id', productData.id);
+    } else if (productData.name) {
+      query = query.eq('name', productData.name.trim());
+    }
+    if (targetUserId) {
+      query = query.eq('user_id', targetUserId);
+    }
+    await query;
+  } catch (err) { }
+
+  // 3. Update di Cloud Custom Config untuk konsistensi antar perangkat
+  try {
+    const cloudConfig = await fetchCloudCustomConfig();
+    if (cloudConfig) {
+      const currentProds = cloudConfig.products || [];
+      const updatedProds = currentProds.map(p => {
+        if ((productData.id && p.id === productData.id) || (p.name && productData.name && p.name.toLowerCase() === productData.name.toLowerCase())) {
+          return {
+            ...p,
+            ...productData,
+            price: rawPrice,
+            base_price: rawPrice
+          };
+        }
+        return p;
+      });
+      await saveCloudCustomConfig({
+        stores: cloudConfig.stores || [],
+        products: updatedProds
+      });
+    }
+  } catch (e) { }
+
+  return { success: true };
+}
+
+/**
  * Mengambil daftar barang custom / produk dari Supabase Cloud & LocalStorage
  */
 export async function getCustomProducts(userId = null) {
